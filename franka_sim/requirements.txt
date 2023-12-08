@@ -1,0 +1,4 @@
+dm_env
+mujoco==2.3.7
+gymnasium
+dm-robotics-transformations
