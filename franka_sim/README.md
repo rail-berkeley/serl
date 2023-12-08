@@ -4,7 +4,8 @@ It includes a state-based and a vision-based Franka lift cube task environment.
 
 # Installation:
 - From `serl` folder, cd into `franka_sim`.
-- In your `serl` conda environment, run `pip install -e .` to install this package and its dependencies.
+- In your `serl` conda environment, run `pip install -e .` to install this package.
+- run `pip install -r requirements.txt` to install sim dependencies.
 
 # Explore the Environments
 - Run `python franka_sim/test/test_gym_env_human.py` to launch a display window and visualize the task.
