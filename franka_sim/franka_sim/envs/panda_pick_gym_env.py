@@ -1,12 +1,13 @@
-import mujoco
 from pathlib import Path
-import numpy as np
 from typing import Any, Literal
+
 import gymnasium as gym
+import mujoco
+import numpy as np
 from gymnasium import spaces
 
-from franka_sim.mujoco_gym_env import MujocoGymEnv, GymRenderingSpec
 from franka_sim.controllers import opspace
+from franka_sim.mujoco_gym_env import GymRenderingSpec, MujocoGymEnv
 
 _HERE = Path(__file__).parent
 _XML_PATH = _HERE / "xmls" / "arena.xml"
@@ -63,41 +64,65 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         self._pinch_site_id = self._model.site("pinch").id
         self._block_z = self._model.geom("block").size[2]
 
-        self.observation_space = gym.spaces.Dict({
-            'state': gym.spaces.Dict(
-                {
-                    "panda/tcp_pos": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
-                    "panda/tcp_vel": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
-                    "panda/gripper_pos": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float32),
-                    # "panda/joint_pos": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
-                    # "panda/joint_vel": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
-                    # "panda/joint_torque": specs.Array(shape=(21,), dtype=np.float32),
-                    # "panda/wrist_force": specs.Array(shape=(3,), dtype=np.float32),
-                    "block_pos": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
-                }
-            ),
-        })
+        self.observation_space = gym.spaces.Dict(
+            {
+                "state": gym.spaces.Dict(
+                    {
+                        "panda/tcp_pos": spaces.Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/tcp_vel": spaces.Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/gripper_pos": spaces.Box(
+                            -np.inf, np.inf, shape=(1,), dtype=np.float32
+                        ),
+                        # "panda/joint_pos": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_vel": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_torque": specs.Array(shape=(21,), dtype=np.float32),
+                        # "panda/wrist_force": specs.Array(shape=(3,), dtype=np.float32),
+                        "block_pos": spaces.Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                    }
+                ),
+            }
+        )
 
         if self.image_obs:
-            self.observation_space = gym.spaces.Dict({
-                'state': gym.spaces.Dict({
-                        "panda/tcp_pos": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
-                        "panda/tcp_vel": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
-                        "panda/gripper_pos": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float32),
-                    }),
-                'images': gym.spaces.Dict({
-                        "front": gym.spaces.Box(
-                            low=0,
-                            high=255,
-                            shape=(render_spec.height, render_spec.width, 3),
-                            dtype=np.uint8,),
-                        "wrist": gym.spaces.Box(
-                            low=0,
-                            high=255,
-                            shape=(render_spec.height, render_spec.width, 3),
-                            dtype=np.uint8,),
-                }),
-            })
+            self.observation_space = gym.spaces.Dict(
+                {
+                    "state": gym.spaces.Dict(
+                        {
+                            "panda/tcp_pos": spaces.Box(
+                                -np.inf, np.inf, shape=(3,), dtype=np.float32
+                            ),
+                            "panda/tcp_vel": spaces.Box(
+                                -np.inf, np.inf, shape=(3,), dtype=np.float32
+                            ),
+                            "panda/gripper_pos": spaces.Box(
+                                -np.inf, np.inf, shape=(1,), dtype=np.float32
+                            ),
+                        }
+                    ),
+                    "images": gym.spaces.Dict(
+                        {
+                            "front": gym.spaces.Box(
+                                low=0,
+                                high=255,
+                                shape=(render_spec.height, render_spec.width, 3),
+                                dtype=np.uint8,
+                            ),
+                            "wrist": gym.spaces.Box(
+                                low=0,
+                                high=255,
+                                shape=(render_spec.height, render_spec.width, 3),
+                                dtype=np.uint8,
+                            ),
+                        }
+                    ),
+                }
+            )
 
         self.action_space = gym.spaces.Box(
             low=np.asarray([-1.0, -1.0, -1.0, -1.0]),
@@ -106,13 +131,16 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         )
 
         from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
+
         self._viewer = MujocoRenderer(
             self.model,
             self.data,
         )
         self._viewer.render(self.render_mode)
 
-    def reset(self, seed=None, **kwargs) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    def reset(
+        self, seed=None, **kwargs
+    ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
         mujoco.mj_resetData(self._model, self._data)
 
         # Reset arm to home position.
@@ -135,7 +163,7 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         obs = self._compute_observation()
         return obs, {}
 
-    '''
+    """
     take a step in the environment.
     Params:
         action: np.ndarray
@@ -146,8 +174,11 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         done: bool,
         truncated: bool,
         info: dict[str, Any]
-    '''
-    def step(self, action: np.ndarray) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+    """
+
+    def step(
+        self, action: np.ndarray
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         x, y, z, grasp = action
 
         # Set the mocap position.
@@ -185,14 +216,16 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
     def render(self):
         rendered_frames = []
         for cam_id in self.camera_id:
-            rendered_frames.append(self._viewer.render(render_mode='rgb_array', camera_id=cam_id))
+            rendered_frames.append(
+                self._viewer.render(render_mode="rgb_array", camera_id=cam_id)
+            )
         return rendered_frames
 
     # Helper methods.
 
     def _compute_observation(self) -> dict:
         obs = {}
-        obs['state'] = {}
+        obs["state"] = {}
 
         # joint_pos = np.stack(
         #     [self._data.sensor(f"panda/joint{i}_pos").data for i in range(1, 8)],
@@ -205,11 +238,13 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         # obs["panda/joint_vel"] = joint_vel.astype(np.float32)
 
         tcp_pos = self._data.sensor("2f85/pinch_pos").data
-        obs['state']["panda/tcp_pos"] = tcp_pos.astype(np.float32)
+        obs["state"]["panda/tcp_pos"] = tcp_pos.astype(np.float32)
         tcp_vel = self._data.sensor("2f85/pinch_vel").data
-        obs['state']["panda/tcp_vel"] = tcp_vel.astype(np.float32)
-        gripper_pos = np.array(self._data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32)
-        obs['state']["panda/gripper_pos"] = gripper_pos
+        obs["state"]["panda/tcp_vel"] = tcp_vel.astype(np.float32)
+        gripper_pos = np.array(
+            self._data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32
+        )
+        obs["state"]["panda/gripper_pos"] = gripper_pos
         # joint_torque = np.stack(
         # [self._data.sensor(f"panda/joint{i}_torque").data for i in range(1, 8)],
         # ).ravel()
@@ -219,13 +254,13 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         # obs["panda/wrist_force"] = symlog(wrist_force.astype(np.float32))
 
         if self.image_obs:
-            obs['images'] = {}
-            obs['images']['front'], obs['images']['wrist'] = self.render()
+            obs["images"] = {}
+            obs["images"]["front"], obs["images"]["wrist"] = self.render()
         else:
             block_pos = self._data.sensor("block_pos").data.astype(np.float32)
-            obs['state']["block_pos"] = block_pos
+            obs["state"]["block_pos"] = block_pos
 
-        if self.render_mode == 'human':
+        if self.render_mode == "human":
             self._viewer.render(self.render_mode)
 
         return obs
@@ -240,8 +275,9 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         rew = 0.3 * r_close + 0.7 * r_lift
         return rew
 
-if __name__ == '__main__':
-    env = PandaPickCubeGymEnv(render_mode='human')
+
+if __name__ == "__main__":
+    env = PandaPickCubeGymEnv(render_mode="human")
     env.reset()
     for i in range(100):
         env.step(np.random.uniform(-1, 1, 4))

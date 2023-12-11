@@ -1,7 +1,8 @@
 from typing import Optional, Tuple, Union
+
+import mujoco
 import numpy as np
 from dm_robotics.transformations import transformations as tr
-import mujoco
 
 
 def pd_control(

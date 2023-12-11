@@ -1,9 +1,11 @@
-import gymnasium as gym
-from typing import Optional, Literal
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, Optional
+
+import gymnasium as gym
 import mujoco
 import numpy as np
-from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class GymRenderingSpec:
@@ -11,6 +13,7 @@ class GymRenderingSpec:
     width: int = 128
     camera_id: str | int = -1
     mode: Literal["rgb_array", "human"] = "rgb_array"
+
 
 class MujocoGymEnv(gym.Env):
     """MujocoEnv with gym interface."""
