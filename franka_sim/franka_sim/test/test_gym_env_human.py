@@ -1,7 +1,9 @@
 import time
+
 import mujoco
 import mujoco.viewer
 import numpy as np
+
 from franka_sim import envs
 
 env = envs.PandaPickCubeGymEnv(action_scale=(0.1, 1))
@@ -18,6 +20,7 @@ d = env.data
 
 reset = False
 KEY_SPACE = 32
+
 
 def key_callback(keycode):
     if keycode == KEY_SPACE:
