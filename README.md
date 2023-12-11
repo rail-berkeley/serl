@@ -4,4 +4,4 @@
 
 ## Installation
 - Conda Environment:
-    - create an environment with `conda create -n serl_dev python=3.10`
+    - create an environment with `conda create -n serl python=3.10`
