@@ -1,0 +1,7 @@
+# Ignore Python files
+*.pyc
+__pycache__/
+*.pyo
+
+# MUJOCO_LOG.TXT
+MUJOCO_LOG.TXT
