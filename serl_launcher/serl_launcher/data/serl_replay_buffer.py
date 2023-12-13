@@ -6,7 +6,7 @@ import gymnasium as gym
 import gymnasium.spaces
 import jax
 import numpy as np
-from edgeml.data.serl_dataset import Dataset, DatasetDict
+from serl_launcher.data.serl_dataset import Dataset, DatasetDict
 from flax import jax_utils
 from flax.core.frozen_dict import FrozenDict
 from jax import numpy as jnp

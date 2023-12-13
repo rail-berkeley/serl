@@ -9,8 +9,8 @@ from threading import Lock
 
 import gymnasium as gym
 import jax
-from edgeml.data.data_store import DataStoreBase
-from edgeml.data.serl_replay_buffer import ReplayBuffer
+from serl_launcher.data.data_store import DataStoreBase
+from serl_launcher.data.serl_replay_buffer import ReplayBuffer
 from edgeml.trainer import TrainerConfig
 from jax import nn
 from jaxrl_m.agents.continuous.sac import SACAgent

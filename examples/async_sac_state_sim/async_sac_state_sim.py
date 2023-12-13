@@ -15,7 +15,7 @@ import tqdm
 from absl import app, flags
 from edgeml.data.data_store import QueuedDataStore
 from edgeml.trainer import TrainerClient, TrainerServer, TrainerTunnel
-from edgeml.utils.jaxrl_m_common import (
+from serl_launcher.utils.jaxrl_m_common import (
     ReplayBufferDataStore,
     make_agent,
     make_trainer_config,
