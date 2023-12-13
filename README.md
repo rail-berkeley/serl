@@ -11,6 +11,16 @@
     - To install jaxrl-minimal, `git clone https://github.com/rail-berkeley/jaxrl_minimal/tree/serl_dev`, the `serl_dev` branch is based off the latest `main` branch.
     - `cd` into the `jaxrl_minimal` path
     - run `pip install -e .` and `pip install -r requirements.txt` to install the jaxrl-minimal library and its dependencies.
+    - For GPU: (change cuda12 to cuda11 if you are using older driver versions)
+        ```
+        pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+        ```
+
+    - For TPU
+        ```
+        pip install --upgrade "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+        ```
+    - See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax.
 
 3. Install the serl_launcher
     - `cd` into the `serl_launcher` folder
