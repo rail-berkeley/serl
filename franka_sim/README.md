@@ -13,3 +13,10 @@ It includes a state-based and a vision-based Franka lift cube task environment.
 # Credits:
 - This simulation is initially built by [Kevin Zakka](https://kzakka.com/).
 - Under Kevin's permission, we adopted a Gymnasium environment based on it.
+
+# Notes:
+- Error due to `egl` when running on a CPU machine:
+```bash
+export MUJOCO_GL=egl
+conda install -c conda-forge libstdcxx-ng
+```

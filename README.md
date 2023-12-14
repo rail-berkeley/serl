@@ -4,35 +4,63 @@
 
 ## Installation
 1. Conda Environment:
-    - create an environment with `conda create -n serl python=3.10`
+    create an environment with 
+    ```bash
+    conda create -n serl python=3.10
+    ```
 
 2. Install RL library
     - the examples here use jaxrl-minimal as the RL library.
-    - To install jaxrl-minimal, `git clone https://github.com/rail-berkeley/jaxrl_minimal/tree/serl_dev`, the `serl_dev` branch is based off the latest `main` branch.
-    - `cd` into the `jaxrl_minimal` path
-    - run `pip install -e .` and `pip install -r requirements.txt` to install the jaxrl-minimal library and its dependencies.
-    - For GPU: (change cuda12 to cuda11 if you are using older driver versions)
+    - To install jaxrl-minimal, with `serl_dev` branch is based off the latest `main` branch.
+        ```bash
+        git clone https://github.com/rail-berkeley/jaxrl_minimal/tree/serl_dev
         ```
+    - install and its dependencies
+        ```bash
+        cd jaxrl_minimal
+        pip install -e .
+        pip install -r requirements.txt
+        ```
+    - For GPU: (change cuda12 to cuda11 if you are using older driver versions)
+        ```bash
         pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
         ```
 
     - For TPU
-        ```
+        ```bash
         pip install --upgrade "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
         ```
     - See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax.
 
 3. Install the serl_launcher
-    - `cd` into the `serl_launcher` folder
-    - run `pip install -e .` to install the launcher package and its dependencies.
+    ```bash
+    cd serl_launcher
+    pip install -e .
+    ```
 
-4. Install Franka Sim library (Optional)
-    - `cd` into `franka_sim` path.
-    - run `pip install -e .` and `pip install -r requirements.txt` to install the franka arm simulation package and its dependencies.
+1. Install Franka Sim library (Optional)
+    ```bash
+    cd franka_sim
+    pip install -e .
+    pip install -r requirements.txt
+    ```
 
+Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env_human.py`
 
 ## Quick Start with Franka Arm in Sim
-1. `cd` into `examples/async_sac_state_sim` folder
-2. run `. ./run_learner.sh ` to launch the learner node
-3. run `. ./run_actor.sh` to launch the actor node with rendering window.
-4. You can optionally launch learner and actor on separate machines. For example, if learner node is running on a PC with `ip=x.x.x.x`, you can launch the actor node on a different machine with internet access to `ip=x.x.x.x` and add `--ip x.x.x.` to the commands in `run_actor.sh`.
+```bash
+cd examples/async_sac_state_sim
+```
+
+Run learner node:
+```bash
+bash run_learner.sh
+```
+
+Run actor node with rendering window:
+```bash
+# add --ip x.x.x.x if running on a different machine
+bash run_actor.sh
+```
+
+You can optionally launch learner and actor on separate machines. For example, if learner node is running on a PC with `ip=x.x.x.x`, you can launch the actor node on a different machine with internet access to `ip=x.x.x.x` and add `--ip x.x.x.` to the commands in `run_actor.sh`.
