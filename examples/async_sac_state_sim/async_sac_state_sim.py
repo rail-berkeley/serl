@@ -17,7 +17,7 @@ from edgeml.data.data_store import QueuedDataStore
 from edgeml.trainer import TrainerClient, TrainerServer, TrainerTunnel
 from serl_launcher.utils.jaxrl_m_common import (
     ReplayBufferDataStore,
-    make_agent,
+    make_sac_agent,
     make_trainer_config,
     make_wandb_logger,
 )
@@ -254,7 +254,7 @@ def main(_):
         env = gym.wrappers.FlattenObservation(env)
 
     rng, sampling_rng = jax.random.split(rng)
-    agent: SACAgent = make_agent(
+    agent: SACAgent = make_sac_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
         sample_action=env.action_space.sample(),

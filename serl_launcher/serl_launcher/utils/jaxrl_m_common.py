@@ -54,7 +54,7 @@ class ReplayBufferDataStore(ReplayBuffer, DataStoreBase):
 ##############################################################################
 
 
-def make_agent(seed, sample_obs, sample_action):
+def make_sac_agent(seed, sample_obs, sample_action):
     return SACAgent.create_states(
         jax.random.PRNGKey(seed),
         sample_obs,
