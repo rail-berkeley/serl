@@ -338,7 +338,7 @@ def main(_):
         )
         import pickle as pkl
 
-        with open("trajs.pkl", "rb") as f:
+        with open("franka_lift_cube_image_20_trajs.pkl", "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
                 demo_buffer.insert(traj)
