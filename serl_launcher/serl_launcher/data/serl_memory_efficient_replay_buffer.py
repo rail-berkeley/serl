@@ -151,6 +151,7 @@ class MemoryEfficientReplayBuffer(ReplayBuffer):
                 obs_pixels, self._num_stack + 1, axis=0
             )
             obs_pixels = obs_pixels[indx - self._num_stack]
+            # transpose from (B, H, W, C, T) to (B, T, H, W, C) to follow jaxrl_m convention
             obs_pixels = obs_pixels.transpose((0, 4, 1, 2, 3))
 
             if pack_obs_and_next_obs:
