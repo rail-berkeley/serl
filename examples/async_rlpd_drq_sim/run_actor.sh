@@ -12,4 +12,5 @@ python async_rlpd_drq_sim.py \
     --batch_size 256 \
     --eval_period 2000 \
     --encoder_type resnet \
+    --demo_path franka_lift_cube_image_20_trajs.pkl \
     --debug

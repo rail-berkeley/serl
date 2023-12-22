@@ -65,6 +65,7 @@ flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
 flags.DEFINE_string("encoder_type", "resnet", "Encoder type.")
+flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -344,7 +345,7 @@ def main(_):
         )
         import pickle as pkl
 
-        with open("franka_lift_cube_image_20_trajs.pkl", "rb") as f:
+        with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
                 demo_buffer.insert(traj)
