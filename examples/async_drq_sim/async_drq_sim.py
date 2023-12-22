@@ -66,6 +66,10 @@ flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
 
+devices = jax.local_devices()
+num_devices = len(devices)
+sharding = jax.sharding.PositionalSharding(devices)
+
 
 def print_green(x):
     return print("\033[92m {}\033[00m".format(x))
@@ -170,9 +174,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
 ##############################################################################
 
 
-def learner(
-    rng, agent: DrQAgent, replay_buffer, replay_iterator, wandb_logger=None, tunnel=None
-):
+def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None, tunnel=None):
     """
     The learner loop, which runs when "--learner" is set to True.
     NOTE: tunnel is used the transport layer for multi-threading
@@ -214,6 +216,15 @@ def learner(
     server.publish_network(agent.state.params)
     print_green("sent initial network to actor")
 
+    # create replay buffer iterator
+    replay_iterator = replay_buffer.get_iterator(
+        sample_args={
+            "batch_size": FLAGS.batch_size,
+            "pack_obs_and_next_obs": True,
+        },
+        device=sharding.replicate(),
+    )
+
     # wait till the replay buffer is filled with enough data
     timer = Timer()
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
@@ -249,11 +260,7 @@ def learner(
 
 
 def main(_):
-    devices = jax.local_devices()
-    num_devices = len(devices)
-    sharding = jax.sharding.PositionalSharding(devices)
     assert FLAGS.batch_size % num_devices == 0
-
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
 
@@ -304,13 +311,6 @@ def main(_):
     if FLAGS.learner:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
-        replay_iterator = replay_buffer.get_iterator(
-            sample_args={
-                "batch_size": FLAGS.batch_size,
-                "pack_obs_and_next_obs": True,
-            },
-            device=sharding.replicate(),
-        )
 
         # learner loop
         print_green("starting learner loop")
@@ -318,7 +318,6 @@ def main(_):
             sampling_rng,
             agent,
             replay_buffer,
-            replay_iterator=replay_iterator,
             wandb_logger=wandb_logger,
             tunnel=None,
         )
