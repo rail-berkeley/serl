@@ -63,6 +63,8 @@ flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
+# "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
+flags.DEFINE_string("encoder_type", "resnet", "Encoder type.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -291,7 +293,7 @@ def main(_):
         sample_obs=env.observation_space.sample(),
         sample_action=env.action_space.sample(),
         image_keys=image_keys,
-        encoder_type="mobilenet",
+        encoder_type=FLAGS.encoder_type,
     )
 
     # replicate agent across devices
