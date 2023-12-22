@@ -69,6 +69,10 @@ You can optionally launch learner and actor on separate machines. For example, i
 ### 2. Training from image observation example
 ```bash
 cd examples/async_drq_sim
+
+# to use pre-trained ResNet weights, please download
+# note manual download is only for now, once repo is public, auto download will work
+wget https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl
 ```
 
 Run learner node:
@@ -85,6 +89,11 @@ bash run_actor.sh
 ### 2. Training from image observation with 20 demo trajectories example
 ```bash
 cd examples/async_rlpd_drq_sim
+
+# to use pre-trained ResNet weights, please download
+# note manual download is only for now, once repo is public, auto download will work
+wget https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl
+
 # download 20 demo trajectories
 wget \
 https://github.com/rail-berkeley/serl/releases/download/franka_sim_lift_cube_demos/franka_lift_cube_image_20_trajs.pkl
