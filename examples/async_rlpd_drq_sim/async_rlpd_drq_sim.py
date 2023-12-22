@@ -371,27 +371,7 @@ def main(_):
         actor(agent, data_store, env, sampling_rng, tunnel=None)
 
     else:
-        print_green("starting actor and learner loop with multi-threading")
-
-        # In this example, the tunnel acts as the transport layer for the
-        # trainerServer and trainerClient. Also, both actor and learner shares
-        # the same replay buffer.
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
-
-        tunnel = TrainerTunnel()
-        sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
-
-        import threading
-
-        # Start learner thread
-        learner_thread = threading.Thread(
-            target=learner, args=(agent, replay_buffer, wandb_logger, tunnel)
-        )
-        learner_thread.start()
-
-        # Start actor in main process
-        actor(agent, replay_buffer, env, sampling_rng, tunnel=tunnel)
-        learner_thread.join()
+        raise NotImplementedError("Must be either a learner or an actor")
 
 
 if __name__ == "__main__":
