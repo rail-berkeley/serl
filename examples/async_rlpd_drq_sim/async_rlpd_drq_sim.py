@@ -34,6 +34,8 @@ from serl_launcher.data.serl_memory_efficient_replay_buffer import (
     MemoryEfficientReplayBuffer,
 )
 
+import franka_sim
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "HalfCheetah-v4", "Name of environment.")

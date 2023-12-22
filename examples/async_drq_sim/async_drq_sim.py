@@ -30,6 +30,8 @@ from serl_launcher.utils.jaxrl_m_common import (
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 
+import franka_sim
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "HalfCheetah-v4", "Name of environment.")
