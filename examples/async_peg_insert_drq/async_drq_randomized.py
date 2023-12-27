@@ -67,7 +67,7 @@ flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
-flags.DEFINE_string("encoder_type", "resnet", "Encoder type.")
+flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")

@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import tqdm
 from absl import app, flags
+from flax.training import checkpoints
 
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
@@ -60,7 +61,9 @@ flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
-flags.DEFINE_string("encoder_type", "resnet", "Encoder type.")
+flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
+flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -252,6 +255,12 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None, tunnel=None)
         if update_steps % FLAGS.log_period == 0 and wandb_logger:
             wandb_logger.log(update_info, step=update_steps)
             wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
+
+        if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
+            assert FLAGS.checkpoint_path is not None
+            checkpoints.save_checkpoint(
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+            )
 
         update_steps += 1
 
