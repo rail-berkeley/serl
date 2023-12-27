@@ -7,9 +7,6 @@ from collections import deque
 from functools import partial
 from threading import Lock
 from typing import Union, Iterable
-import pickle as pkl
-import os
-import urllib.request as request
 
 import gymnasium as gym
 import jax
@@ -130,56 +127,11 @@ def make_sac_agent(seed, sample_obs, sample_action):
 def make_drq_agent(
     seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
 ):
-    if encoder_type == "small":
-        encoder_defs = {
-            image_key: SmallEncoder(
-                features=(32, 64, 128, 256),
-                kernel_sizes=(3, 3, 3, 3),
-                strides=(2, 2, 2, 2),
-                padding="VALID",
-                pool_method="avg",
-                bottleneck_dim=256,
-                spatial_block_size=8,
-                name=f"encoder_{image_key}",
-            )
-            for image_key in image_keys
-        }
-    elif encoder_type == "mobilenet":
-        from jeffnet.linen import create_model
-
-        encoder, encoder_params = create_model(
-            "tf_mobilenetv3_small_minimal_100", pretrained=True
-        )
-        encoder_defs = {
-            image_key: MobileNetEncoder(
-                encoder=encoder,
-                params=encoder_params,
-                pool_method="spatial_learned_embeddings",
-                bottleneck_dim=256,
-                spatial_block_size=8,
-                name=f"encoder_{image_key}",
-            )
-            for image_key in image_keys
-        }
-    elif encoder_type == "resnet":
-        encoder_defs = {
-            image_key: resnetv1_configs["resnetv1-10"](
-                pooling_method="spatial_learned_embeddings",
-                num_spatial_blocks=8,
-                bottleneck_dim=256,
-                pre_trained_frozen=True,
-                name=f"encoder_{image_key}",
-            )
-            for image_key in image_keys
-        }
-    else:
-        raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
-
     agent = DrQAgent.create_drq(
         jax.random.PRNGKey(seed),
         sample_obs,
         sample_action,
-        encoder=encoder_defs,
+        encoder_type=encoder_type,
         use_proprio=True,
         image_keys=image_keys,
         policy_kwargs={
@@ -199,75 +151,12 @@ def make_drq_agent(
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.99,
+        discount=0.97,  # 0.99
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
     )
-
-    if encoder_type == "resnet":  # load pretrained weights for ResNet-10
-        # agent = load_resnet10_params(agent, image_keys)
-        # the auto-download would only work if we make the repo public.
-        # We can uncomment the above line once we make the repo public.
-        with open("resnet10_params.pkl", "rb") as f:
-            encoder_params = pkl.load(f)
-            param_count = sum(x.size for x in jax.tree_leaves(encoder_params))
-            print(
-                f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
-            )
-
-        new_params = agent.state.params.unfreeze()
-        for image_key in image_keys:
-            for k in new_params["modules_actor"]["encoder"][f"encoder_{image_key}"]:
-                if k in encoder_params:
-                    new_params["modules_actor"]["encoder"][f"encoder_{image_key}"][
-                        k
-                    ] = encoder_params[k]
-                    print(f"replaced {k} in encoder_{image_key}")
-        from flax.core.frozen_dict import freeze
-
-        new_params = freeze(new_params)
-        agent = agent.replace(state=agent.state.replace(params=new_params))
-
     return agent
-
-
-def load_resnet10_params(agent, image_keys=("image",)):
-    file_name = "resnet10_params.pkl"
-    # Construct the full path to the file
-    file_path = os.path.expanduser(f"~/.serl/{file_name}")
-
-    # Check if the file exists
-    if os.path.exists(file_path):
-        print(f"The ResNet-10 weights already exists at '{file_path}'.")
-    else:
-        url = "https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl"
-        print(f"Downloading file from {url}")
-        try:
-            request.urlretrieve(url, file_path)
-        except Exception as e:
-            raise RuntimeError(e)
-        print("Download complete!")
-
-    with open(file_path, "rb") as f:
-        encoder_params = pkl.load(f)
-        param_count = sum(x.size for x in jax.tree_leaves(encoder_params))
-        print(
-            f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
-        )
-
-    new_params = agent.state.params.unfreeze()
-    for image_key in image_keys:
-        for k in new_params["modules_actor"]["encoder"][f"encoder_{image_key}"]:
-            if k in encoder_params:
-                new_params["modules_actor"]["encoder"][f"encoder_{image_key}"][
-                    k
-                ] = encoder_params[k]
-                print(f"replaced {k} in encoder_{image_key}")
-    from flax.core.frozen_dict import freeze
-
-    new_params = freeze(new_params)
-    agent = agent.replace(state=agent.state.replace(params=new_params))
 
 
 def make_trainer_config():

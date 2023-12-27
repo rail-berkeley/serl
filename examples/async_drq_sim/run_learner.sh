@@ -10,5 +10,5 @@ python async_drq_sim.py \
     --utd_ratio 4 \
     --batch_size 256 \
     --eval_period 2000 \
-    --encoder_type resnet \
+    --encoder_type resnet-pretrained \
     --debug
