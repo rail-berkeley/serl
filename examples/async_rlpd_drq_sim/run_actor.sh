@@ -1,6 +1,6 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
-python async_rlpd_drq_sim.py \
+python async_rlpd_drq_sim.py "$@" \
     --actor \
     --render \
     --env PandaPickCubeVision-v0 \

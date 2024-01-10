@@ -1,6 +1,6 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
-python async_drq_randomized.py \
+python async_drq_randomized.py "$@" \
     --actor \
     --render \
     --env FrankaRobotiqPegInsert-Vision-v0 \
