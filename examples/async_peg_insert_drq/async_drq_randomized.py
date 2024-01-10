@@ -121,16 +121,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
                 obs = next_obs
         return  # after done eval, return and exit
 
-    if tunnel:
-        client = tunnel
-    else:
-        client = TrainerClient(
-            "actor_env",
-            FLAGS.ip,
-            make_trainer_config(),
-            data_store,
-            wait_for_server=True,
-        )
+    client = TrainerClient(
+        "actor_env",
+        FLAGS.ip,
+        make_trainer_config(),
+        data_store,
+        wait_for_server=True,
+    )
 
     # Function to update the agent with new params
     def update_params(params):
@@ -221,13 +218,9 @@ def learner(
         return {}  # not expecting a response
 
     # Create server
-    if tunnel:
-        tunnel.register_request_callback(stats_callback)
-        server = tunnel
-    else:
-        server = TrainerServer(make_trainer_config(), request_callback=stats_callback)
-        server.register_data_store("actor_env", replay_buffer)
-        server.start(threaded=True)
+    server = TrainerServer(make_trainer_config(), request_callback=stats_callback)
+    server.register_data_store("actor_env", replay_buffer)
+    server.start(threaded=True)
 
     # Loop to wait until replay_buffer is filled
     pbar = tqdm.tqdm(
