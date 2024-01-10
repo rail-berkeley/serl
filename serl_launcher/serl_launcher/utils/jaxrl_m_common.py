@@ -151,7 +151,7 @@ def make_drq_agent(
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.97,  # 0.99
+        discount=0.96,  # 0.99
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
