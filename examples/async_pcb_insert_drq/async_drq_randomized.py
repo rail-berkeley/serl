@@ -21,15 +21,15 @@ from jaxrl_m.utils.timer_utils import Timer
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 from jaxrl_m.utils.train_utils import concat_batches
 
-from edgeml.trainer import TrainerServer, TrainerClient, TrainerTunnel
-from edgeml.data.data_store import QueuedDataStore
+from agentlace.trainer import TrainerServer, TrainerClient
+from agentlace.data.data_store import QueuedDataStore
 
 from serl_launcher.utils.jaxrl_m_common import (
-    MemoryEfficientReplayBufferDataStore,
     make_drq_agent,
     make_trainer_config,
     make_wandb_logger,
 )
+from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (

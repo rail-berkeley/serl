@@ -15,14 +15,15 @@ import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 
-from edgeml.data.data_store import QueuedDataStore
-from edgeml.trainer import TrainerClient, TrainerServer, TrainerTunnel
+from agentlace.data.data_store import QueuedDataStore
+from agentlace.trainer import TrainerClient, TrainerServer
 from serl_launcher.utils.jaxrl_m_common import (
-    ReplayBufferDataStore,
     make_sac_agent,
     make_trainer_config,
     make_wandb_logger,
 )
+from serl_launcher.data.data_store import ReplayBufferDataStore
+
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from jaxrl_m.agents.continuous.sac import SACAgent
 from jaxrl_m.common.evaluation import evaluate

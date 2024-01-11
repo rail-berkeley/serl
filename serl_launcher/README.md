@@ -1,3 +1,3 @@
 # Serl Launcher
 
- - Dependencies: `jax`, `edgeml`, `jaxrl_m`
+ - Dependencies: `jax`, `agentlace`, `jaxrl_m`

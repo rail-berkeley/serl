@@ -58,7 +58,7 @@ bash examples/async_sac_state_sim/tmux_launch.sh
 ```
 
 <details>
-  <summary>Execute Specific Commands</summary>
+  <summary>Click to show detailed commands</summary>
 
 ```bash
 cd examples/async_sac_state_sim
@@ -87,7 +87,7 @@ bash examples/async_sac_image_sim/tmux_launch.sh
 ```
 
 <details>
-  <summary>Execute Specific Commands</summary>
+  <summary>Click to show detailed commands</summary>
 
 ```bash
 cd examples/async_drq_sim
@@ -118,7 +118,7 @@ bash examples/async_sac_image_sim/tmux_launch.sh
 ```
 
 <details>
-  <summary>Execute Specific Commands</summary>
+  <summary>Click to show detailed commands</summary>
 
 ```bash
 cd examples/async_rlpd_drq_sim
