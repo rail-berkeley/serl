@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium.spaces import Box
 import copy
-from franka_env.spacemouse.spacemouse_teleop import SpaceMouseExpert
+from robot_infra.spacemouse.spacemouse_expert import SpaceMouseExpert
 from franka_env.utils.rotations import quat_2_euler
 
 
@@ -71,13 +71,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         if self.action_space.shape == (6,):
             self.gripper_enabled = False
 
-        self.expert = SpaceMouseExpert(
-            xyz_dims=3,
-            xyz_remap=[0, 1, 2],
-            xyz_scale=200,
-            rot_scale=200,
-            all_angles=True,
-        )
+        self.expert = SpaceMouseExpert()
         self.last_intervene = 0
         self.left, self.right = False, False
 
@@ -88,17 +82,11 @@ class SpacemouseIntervention(gym.ActionWrapper):
         Output:
         - action: spacemouse action if nonezero; else, policy action
         """
-        controller_a, _, left, right = self.expert.get_action()
-        self.left, self.right = left, right
-        expert_a = np.zeros((6,))
-        if self.gripper_enabled:
-            expert_a = np.zeros((7,))
-            expert_a[-1] = np.random.uniform(-1, 0)
+        expert_a, buttons = self.expert.get_action()
+        self.left, self.right = tuple(buttons)
 
-        expert_a[:3] = controller_a[:3]  # XYZ
-        expert_a[3] = controller_a[4]  # Roll
-        expert_a[4] = controller_a[5]  # Pitch
-        expert_a[5] = -controller_a[6]  # Yaw
+        if self.gripper_enabled:
+            expert_a = np.append(expert_a, 0)
 
         if np.linalg.norm(expert_a) > 0.001:
             self.last_intervene = time.time()
