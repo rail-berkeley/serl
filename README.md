@@ -1,5 +1,7 @@
 # SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning
 
+Website: https://serl-robot.github.io/
+
 ![](https://github.com/rail-berkeley/serl/workflows/pre-commit/badge.svg)
 
 ## Installation
@@ -50,7 +52,7 @@ Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env
 ## Quick Start with Franka Arm in Sim
 ### 1. Training from state observation example
 
-One-liner launcher: 
+One-liner launcher (requires `tmux`):
 ```bash
 bash examples/async_sac_state_sim/tmux_launch.sh
 ```
@@ -79,7 +81,10 @@ You can optionally launch learner and actor on separate machines. For example, i
 
 ### 2. Training from image observation example
 
-> One-liner launcher: `bash examples/async_sac_image_sim/tmux_launch.sh`
+One-liner launcher (requires `tmux`):
+```bash
+bash examples/async_sac_image_sim/tmux_launch.sh
+```
 
 <details>
   <summary>Execute Specific Commands</summary>
@@ -107,8 +112,7 @@ bash run_actor.sh
 
 ### 3. Training from image observation with 20 demo trajectories example
 
-One-liner launcher: 
-
+One-liner launcher (requires `tmux`):
 ```bash
 bash examples/async_sac_image_sim/tmux_launch.sh
 ```
@@ -140,3 +144,19 @@ bash run_actor.sh
 ```
 
 </details>
+
+## Run with Franka Arm on Real Robot
+
+Install:
+- [serl_franka_controller](https://github.com/rail-berkeley/serl_franka_controller)
+- `serl_robot_infra`
+
+(TODO)
+
+## Citation
+
+If you use this code for your research, please cite our paper:
+
+```
+TODO
+```
