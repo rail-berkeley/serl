@@ -25,7 +25,7 @@ flags.DEFINE_string(
 
 
 class FrankaServer:
-    """Handles the starting and stopping of the impedence controller
+    """Handles the starting and stopping of the impedance controller
     (as well as backup) joint recovery policy."""
 
     def __init__(
@@ -54,13 +54,13 @@ class FrankaServer:
             self.set_jacobian,
         )
 
-    def start_impedence(self):
-        """Launches the impedence controller"""
+    def start_impedance(self):
+        """Launches the impedance controller"""
         self.imp = subprocess.Popen(
             [
                 "roslaunch",
                 self.ros_pkg_name,
-                "impedence.launch",
+                "impedance.launch",
                 "robot_ip:=" + self.robot_ip,
                 f"load_gripper:={'true' if self.gripper_type == 'Franka' else 'false'}",
             ],
@@ -68,8 +68,8 @@ class FrankaServer:
         )
         time.sleep(5)
 
-    def stop_impedence(self):
-        """Stops the impedence controller"""
+    def stop_impedance(self):
+        """Stops the impedance controller"""
         self.imp.terminate()
         time.sleep(1)
 
@@ -95,12 +95,12 @@ class FrankaServer:
 
     def reset_joint(self):
         """Resets Joints (needed after running for hours)"""
-        # First Stop Impedence
+        # First Stop impedance
         try:
-            self.stop_impedence()
+            self.stop_impedance()
             self.clear()
         except:
-            print("Impedence Not Running")
+            print("impedance Not Running")
         time.sleep(3)
         self.clear()
 
@@ -146,8 +146,8 @@ class FrankaServer:
         print("KILLED JOINT RESET", self.pos)
 
         # Restart impedece controller
-        self.start_impedence()
-        print("IMPEDENCE STARTED")
+        self.start_impedance()
+        print("impedance STARTED")
 
     def move(self, pose):
         msg = geom_msg.PoseStamped()
@@ -199,7 +199,7 @@ def main(_):
     else:
         raise NotImplementedError("Gripper Type Not Implemented")
 
-    """Starts Impedence controller"""
+    """Starts impedance controller"""
     robot_server = FrankaServer(
         robot_ip=ROBOT_IP,
         gripper_ip=GRIPPER_IP,
@@ -207,7 +207,7 @@ def main(_):
         ros_pkg_name=ROS_PKG_NAME,
         reset_joint_target=RESET_JOINT_TARGET,
     )
-    robot_server.start_impedence()
+    robot_server.start_impedance()
 
     # Defines the ros topics to publish to
     rospy.init_node("franka_control_api")
@@ -233,18 +233,18 @@ def main(_):
         "cartesian_impedance_controllerdynamic_reconfigure_compliance_param_node"
     )
 
-    # Route for Starting Impedence
+    # Route for Starting impedance
     @webapp.route("/startimp", methods=["POST"])
-    def start_impedence():
+    def start_impedance():
         robot_server.clear()
-        robot_server.start_impedence()
-        return "Started Impedence"
+        robot_server.start_impedance()
+        return "Started impedance"
 
-    # Route for Stopping Impedence
+    # Route for Stopping impedance
     @webapp.route("/stopimp", methods=["POST"])
-    def stop_impedence():
-        robot_server.stop_impedence()
-        return "Stopped Impedence"
+    def stop_impedance():
+        robot_server.stop_impedance()
+        return "Stopped impedance"
 
     # Route for Getting Pose
     @webapp.route("/getpos", methods=["POST"])
@@ -357,39 +357,39 @@ def main(_):
     # cable routing configs
     @webapp.route("/cable_wrap_compliance_mode", methods=["POST"])
     def cable_wrap_compliance_mode():
-        from robot_servers.configs.cable_route_config import impedence_config
+        from robot_servers.configs.cable_route_config import impedance_config
 
-        client.update_configuration(impedence_config)
+        client.update_configuration(impedance_config)
         return "cable wrap compliance Mode"
 
     # PCB
     @webapp.route("/pcb_compliance_mode", methods=["POST"])
     def pcb_compliance_mode():
-        from robot_servers.configs.pcb_config import impedence_config
+        from robot_servers.configs.pcb_config import impedance_config
 
-        client.update_configuration(impedence_config)
+        client.update_configuration(impedance_config)
         return "pcb compliance Mode"
 
     # Peg
     @webapp.route("/peg_compliance_mode", methods=["POST"])
     def peg_compliance_mode():
-        from robot_servers.configs.peg_config import impedence_config
+        from robot_servers.configs.peg_config import impedance_config
 
-        client.update_configuration(impedence_config)
+        client.update_configuration(impedance_config)
         return "peg compliance Mode"
 
     # precision mode for reset
     @webapp.route("/precision_mode", methods=["POST"])
     def precision_mode():
-        from robot_servers.configs.precision_config import impedence_config
+        from robot_servers.configs.precision_config import impedance_config
 
-        client.update_configuration(impedence_config)
+        client.update_configuration(impedance_config)
         return "precision Mode"
 
     # try:
     #     webapp.run(host="0.0.0.0")
     # except Exception as e:
-    #     robot_server.stop_impedence()
+    #     robot_server.stop_impedance()
     #     robot_server.joint_controller.terminate()
     #     roscore.terminate()
     #     raise Exception("robot server errored: ", e)

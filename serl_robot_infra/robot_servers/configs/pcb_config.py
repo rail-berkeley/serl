@@ -1,4 +1,4 @@
-impedence_config = {
+impedance_config = {
     "translational_stiffness": 3000,
     "translational_damping": 180,
     "rotational_stiffness": 150,
