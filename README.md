@@ -50,7 +50,13 @@ Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env
 ## Quick Start with Franka Arm in Sim
 ### 1. Training from state observation example
 
-> One-liner launcher: `bash examples/async_sac_state_sim/tmux_launch.sh`
+One-liner launcher: 
+```bash
+bash examples/async_sac_state_sim/tmux_launch.sh
+```
+
+<details>
+  <summary>Execute Specific Commands</summary>
 
 ```bash
 cd examples/async_sac_state_sim
@@ -69,9 +75,14 @@ bash run_actor.sh
 
 You can optionally launch learner and actor on separate machines. For example, if learner node is running on a PC with `ip=x.x.x.x`, you can launch the actor node on a different machine with internet access to `ip=x.x.x.x` and add `--ip x.x.x.` to the commands in `run_actor.sh`.
 
+</details>
+
 ### 2. Training from image observation example
 
 > One-liner launcher: `bash examples/async_sac_image_sim/tmux_launch.sh`
+
+<details>
+  <summary>Execute Specific Commands</summary>
 
 ```bash
 cd examples/async_drq_sim
@@ -92,9 +103,18 @@ Run actor node with rendering window:
 bash run_actor.sh
 ```
 
+</details>
+
 ### 3. Training from image observation with 20 demo trajectories example
 
-> One-liner launcher: `bash examples/async_sac_image_sim/tmux_launch.sh`
+One-liner launcher: 
+
+```bash
+bash examples/async_sac_image_sim/tmux_launch.sh
+```
+
+<details>
+  <summary>Execute Specific Commands</summary>
 
 ```bash
 cd examples/async_rlpd_drq_sim
@@ -118,3 +138,5 @@ Run actor node with rendering window:
 # add --ip x.x.x.x if running on a different machine
 bash run_actor.sh
 ```
+
+</details>
