@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import tqdm
 from absl import app, flags
+from flax.training import checkpoints
 
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
@@ -64,8 +65,10 @@ flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
-flags.DEFINE_string("encoder_type", "resnet", "Encoder type.")
+flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
+flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -88,16 +91,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
     This is the actor loop, which runs when "--actor" is set to True.
     NOTE: tunnel is used the transport layer for multi-threading
     """
-    if tunnel:
-        client = tunnel
-    else:
-        client = TrainerClient(
-            "actor_env",
-            FLAGS.ip,
-            make_trainer_config(),
-            data_store,
-            wait_for_server=True,
-        )
+    client = TrainerClient(
+        "actor_env",
+        FLAGS.ip,
+        make_trainer_config(),
+        data_store,
+        wait_for_server=True,
+    )
 
     # Function to update the agent with new params
     def update_params(params):
@@ -202,13 +202,9 @@ def learner(
         return {}  # not expecting a response
 
     # Create server
-    if tunnel:
-        tunnel.register_request_callback(stats_callback)
-        server = tunnel
-    else:
-        server = TrainerServer(make_trainer_config(), request_callback=stats_callback)
-        server.register_data_store("actor_env", replay_buffer)
-        server.start(threaded=True)
+    server = TrainerServer(make_trainer_config(), request_callback=stats_callback)
+    server.register_data_store("actor_env", replay_buffer)
+    server.start(threaded=True)
 
     # Loop to wait until replay_buffer is filled
     pbar = tqdm.tqdm(
@@ -277,6 +273,12 @@ def learner(
         if update_steps % FLAGS.log_period == 0 and wandb_logger:
             wandb_logger.log(update_info, step=update_steps)
             wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
+
+        if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
+            assert FLAGS.checkpoint_path is not None
+            checkpoints.save_checkpoint(
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+            )
 
         update_steps += 1
 
@@ -349,7 +351,7 @@ def main(_):
             trajs = pkl.load(f)
             for traj in trajs:
                 demo_buffer.insert(traj)
-        print(f"replay buffer size: {len(demo_buffer)}")
+        print(f"demo buffer size: {len(demo_buffer)}")
 
         # learner loop
         print_green("starting learner loop")

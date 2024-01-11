@@ -2,12 +2,9 @@
 
 # NOTE: this requires jaxrl_m to be installed:
 #       https://github.com/rail-berkeley/jaxrl_minimal
-# Requires mujoco_py and mujoco==2.2.2
 
 import time
 from functools import partial
-
-import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -15,34 +12,47 @@ import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 
+import gymnasium as gym
+from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+
+from jaxrl_m.agents.continuous.drq import DrQAgent
+from jaxrl_m.common.evaluation import evaluate
+from jaxrl_m.utils.timer_utils import Timer
+from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
+from jaxrl_m.utils.train_utils import concat_batches
+
+from edgeml.trainer import TrainerServer, TrainerClient, TrainerTunnel
 from edgeml.data.data_store import QueuedDataStore
-from edgeml.trainer import TrainerClient, TrainerServer, TrainerTunnel
+
 from serl_launcher.utils.jaxrl_m_common import (
-    ReplayBufferDataStore,
-    make_sac_agent,
+    MemoryEfficientReplayBufferDataStore,
+    make_drq_agent,
     make_trainer_config,
     make_wandb_logger,
 )
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
-from jaxrl_m.agents.continuous.sac import SACAgent
-from jaxrl_m.common.evaluation import evaluate
-from jaxrl_m.utils.timer_utils import Timer
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from franka_env.envs.relative_env import RelativeFrame
+from franka_env.envs.wrappers import (
+    GripperCloseEnv,
+    SpacemouseIntervention,
+    Quat2EulerWrapper,
+)
 
-import franka_sim
+import franka_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "HalfCheetah-v4", "Name of environment.")
-flags.DEFINE_string("agent", "sac", "Name of agent.")
+flags.DEFINE_string("env", "FrankaRobotiq-Vision-v0", "Name of environment.")
+flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
+flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
+flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
@@ -50,19 +60,30 @@ flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the ser
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
-flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 
 # flag to indicate if this is a leaner or a actor
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
+# "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
+flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
+flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
+
+flags.DEFINE_integer(
+    "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
+)
+flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
+
+devices = jax.local_devices()
+num_devices = len(devices)
+sharding = jax.sharding.PositionalSharding(devices)
 
 
 def print_green(x):
@@ -72,11 +93,33 @@ def print_green(x):
 ##############################################################################
 
 
-def actor(agent: SACAgent, data_store, env, sampling_rng, tunnel=None):
+def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     NOTE: tunnel is used the transport layer for multi-threading
     """
+    if FLAGS.eval_checkpoint_step:
+        ckpt = checkpoints.restore_checkpoint(
+            FLAGS.checkpoint_path,
+            agent.state,
+            step=FLAGS.eval_checkpoint_step,
+        )
+        agent = agent.replace(state=ckpt)
+
+        for _ in range(FLAGS.eval_n_trajs):
+            obs, _ = env.reset()
+            done = False
+            for step in range(FLAGS.max_traj_length):
+                actions = agent.sample_actions(
+                    observations=jax.device_put(obs),
+                    argmax=True,
+                )
+                actions = np.asarray(jax.device_get(actions))
+
+                next_obs, reward, done, truncated, info = env.step(actions)
+                obs = next_obs
+        return  # after done eval, return and exit
+
     client = TrainerClient(
         "actor_env",
         FLAGS.ip,
@@ -92,17 +135,13 @@ def actor(agent: SACAgent, data_store, env, sampling_rng, tunnel=None):
 
     client.recv_network_callback(update_params)
 
-    eval_env = gym.make(FLAGS.env)
-    if FLAGS.env == "PandaPickCube-v0":
-        eval_env = gym.wrappers.FlattenObservation(eval_env)
-    eval_env = RecordEpisodeStatistics(eval_env)
-
     obs, _ = env.reset()
     done = False
 
     # training loop
     timer = Timer()
     running_return = 0.0
+
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True):
         timer.tick("total")
 
@@ -122,42 +161,33 @@ def actor(agent: SACAgent, data_store, env, sampling_rng, tunnel=None):
         with timer.context("step_env"):
 
             next_obs, reward, done, truncated, info = env.step(actions)
-            next_obs = np.asarray(next_obs, dtype=np.float32)
+
+            # override the action with the intervention action
+            if "intervene_action" in info:
+                actions = info.pop("intervene_action")
+
             reward = np.asarray(reward, dtype=np.float32)
-
+            info = np.asarray(info)
             running_return += reward
-
-            data_store.insert(
-                dict(
-                    observations=obs,
-                    actions=actions,
-                    next_observations=next_obs,
-                    rewards=reward,
-                    masks=1.0 - done,
-                    dones=done,
-                )
+            transition = dict(
+                observations=obs,
+                actions=actions,
+                next_observations=next_obs,
+                rewards=reward,
+                masks=1.0 - done,
+                dones=done,
             )
+            data_store.insert(transition)
 
             obs = next_obs
             if done or truncated:
+                stats = {"train": info}  # send stats to the learner to log
+                client.request("send-stats", stats)
                 running_return = 0.0
                 obs, _ = env.reset()
 
-        if FLAGS.render:
-            env.render()
-
         if step % FLAGS.steps_per_update == 0:
             client.update()
-
-        if step % FLAGS.eval_period == 0:
-            with timer.context("eval"):
-                evaluate_info = evaluate(
-                    policy_fn=partial(agent.sample_actions, argmax=True),
-                    env=eval_env,
-                    num_episodes=FLAGS.eval_n_trajs,
-                )
-            stats = {"eval": evaluate_info}
-            client.request("send-stats", stats)
 
         timer.tock("total")
 
@@ -170,7 +200,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng, tunnel=None):
 
 
 def learner(
-    rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=None, tunnel=None
+    rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None, tunnel=None
 ):
     """
     The learner loop, which runs when "--learner" is set to True.
@@ -209,18 +239,48 @@ def learner(
     server.publish_network(agent.state.params)
     print_green("sent initial network to actor")
 
+    # 50/50 sampling from RLPD, half from demo and half from online experience
+    replay_iterator = replay_buffer.get_iterator(
+        sample_args={
+            "batch_size": FLAGS.batch_size // 2,
+            "pack_obs_and_next_obs": True,
+        },
+        device=sharding.replicate(),
+    )
+    demo_iterator = demo_buffer.get_iterator(
+        sample_args={
+            "batch_size": FLAGS.batch_size // 2,
+            "pack_obs_and_next_obs": True,
+        },
+        device=sharding.replicate(),
+    )
+
     # wait till the replay buffer is filled with enough data
     timer = Timer()
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
-        # Train the networks
-        with timer.context("sample_replay_buffer"):
-            batch = next(replay_iterator)
+        # run n-1 critic updates and 1 critic + actor update.
+        # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
+        for critic_step in range(FLAGS.utd_ratio - 1):
+            with timer.context("sample_replay_buffer"):
+                batch = next(replay_iterator)
+                demo_batch = next(demo_iterator)
+                batch = concat_batches(batch, demo_batch, axis=0)
+
+            with timer.context("train_critics"):
+                agent, critics_info = agent.update_critics(
+                    batch,
+                )
+                agent = jax.block_until_ready(agent)
 
         with timer.context("train"):
-            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
+            batch = next(replay_iterator)
+            demo_batch = next(demo_iterator)
+            batch = concat_batches(batch, demo_batch, axis=0)
+            agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
             agent = jax.block_until_ready(agent)
 
-            # publish the updated network
+        # publish the updated network
+        if step > 0 and step % (FLAGS.steps_per_update) == 0:
             server.publish_network(agent.state.params)
 
         if update_steps % FLAGS.log_period == 0 and wandb_logger:
@@ -230,7 +290,7 @@ def learner(
         if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
-                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
             )
 
         update_steps += 1
@@ -240,43 +300,47 @@ def learner(
 
 
 def main(_):
-    devices = jax.local_devices()
-    num_devices = len(devices)
-    sharding = jax.sharding.PositionalSharding(devices)
     assert FLAGS.batch_size % num_devices == 0
-
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    if FLAGS.render:
-        env = gym.make(FLAGS.env, render_mode="human")
-    else:
-        env = gym.make(FLAGS.env)
+    env = gym.make(
+        FLAGS.env, fake_env=FLAGS.learner, save_video=FLAGS.eval_checkpoint_step
+    )
+    env = GripperCloseEnv(env)
+    if FLAGS.actor:
+        env = SpacemouseIntervention(env)
+    env = RelativeFrame(env)
+    env = Quat2EulerWrapper(env)
+    env = SERLObsWrapper(env)
+    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    env = RecordEpisodeStatistics(env)
 
-    if FLAGS.env == "PandaPickCube-v0":
-        env = gym.wrappers.FlattenObservation(env)
+    image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
     rng, sampling_rng = jax.random.split(rng)
-    agent: SACAgent = make_sac_agent(
+    agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
         sample_action=env.action_space.sample(),
+        image_keys=image_keys,
+        encoder_type=FLAGS.encoder_type,
     )
 
     # replicate agent across devices
     # need the jnp.array to avoid a bug where device_put doesn't recognize primitives
-    agent: SACAgent = jax.device_put(
+    agent: DrQAgent = jax.device_put(
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
     def create_replay_buffer_and_wandb_logger():
-        replay_buffer = ReplayBufferDataStore(
+        replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=FLAGS.replay_buffer_capacity,
+            image_keys=image_keys,
         )
-
         # set up wandb and logging
         wandb_logger = make_wandb_logger(
             project="serl_dev",
@@ -288,19 +352,27 @@ def main(_):
     if FLAGS.learner:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
-        replay_iterator = replay_buffer.get_iterator(
-            sample_args={
-                "batch_size": FLAGS.batch_size * FLAGS.utd_ratio,
-            },
-            device=sharding.replicate(),
+        demo_buffer = MemoryEfficientReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            capacity=10000,
+            image_keys=image_keys,
         )
+        import pickle as pkl
+
+        with open(FLAGS.demo_path, "rb") as f:
+            trajs = pkl.load(f)
+            for traj in trajs:
+                demo_buffer.insert(traj)
+        print(f"demo buffer size: {len(demo_buffer)}")
+
         # learner loop
         print_green("starting learner loop")
         learner(
             sampling_rng,
             agent,
             replay_buffer,
-            replay_iterator=replay_iterator,
+            demo_buffer=demo_buffer,
             wandb_logger=wandb_logger,
             tunnel=None,
         )
