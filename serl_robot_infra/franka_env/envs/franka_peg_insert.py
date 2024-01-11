@@ -2,11 +2,11 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-from franka_env.envs.franka_robotiq_env import FrankaRobotiq
+from franka_env.envs.franka_robotiq_env import FrankaRobotiqEnv
 from franka_env.utils.rotations import euler_2_quat
 
 
-class FrankaRobotiqPegInsert(FrankaRobotiq):
+class FrankaRobotiqPegInsert(FrankaRobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._TARGET_POSE = np.array(

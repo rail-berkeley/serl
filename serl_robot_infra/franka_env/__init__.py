@@ -2,8 +2,8 @@ from gymnasium.envs.registration import register
 import numpy as np
 
 register(
-    id="FrankaRobotiq-Vision-v0",
-    entry_point="franka_env.envs:FrankaRobotiq",
+    id="FrankaRobotiqEnv-Vision-v0",
+    entry_point="franka_env.envs:FrankaRobotiqEnv",
     max_episode_steps=100,
 )
 

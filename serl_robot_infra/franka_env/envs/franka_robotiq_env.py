@@ -36,7 +36,25 @@ class ImageDisplayer(threading.Thread):
             cv2.waitKey(1)
 
 
-class FrankaRobotiq(gym.Env):
+class DefaultEnvConfig:
+    """Default configuration for FrankaRobotiqEnv."""
+
+    SERVER_URL = "http://127.0.0.1:5000/"
+    WRIST_CAM1_SERIAL = "130322274175"
+    WRIST_CAM2_SERIAL = "127122270572"
+    TARGET_POSE = [
+        0.5907729022946797,
+        0.05342705145048531,
+        0.09071618754222505,
+        3.1339503,
+        0.009167,
+        1.5550434,
+    ]
+    REWARD_THRESHOLD = [0.01, 0.01, 0.01, 0.2, 0.2, 0.2]
+    ACTION_SCALE = (0.02, 0.1, 1)
+
+
+class FrankaRobotiqEnv(gym.Env):
     def __init__(
         self,
         randomReset=False,
@@ -44,21 +62,16 @@ class FrankaRobotiq(gym.Env):
         random_rz_range=np.pi / 36,
         hz=10,
         start_gripper=0,
-        action_scale=(0.02, 0.1, 1),
         fake_env=False,
         save_video=False,
+        config=DefaultEnvConfig,
     ):
+        self.action_scale = config.ACTION_SCALE
+        self._TARGET_POSE = config.TARGET_POSE
+        self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
+        self.url = config.SERVER_URL
+        self.config = config
 
-        self.action_scale = action_scale
-        self._TARGET_POSE = [
-            0.5907729022946797,
-            0.05342705145048531,
-            0.09071618754222505,
-            3.1339503,
-            0.009167,
-            1.5550434,
-        ]
-        self._REWARD_THRESHOLD = [0.01, 0.01, 0.01, 0.2, 0.2, 0.2]
         self.resetpos = np.zeros(7)
 
         self.resetpos[:3] = self._TARGET_POSE[:3]
@@ -85,10 +98,6 @@ class FrankaRobotiq(gym.Env):
             print("Saving videos!")
         self.save_video = save_video
         self.recording_frames = []
-
-        # NUC
-        self.ip = "127.0.0.1"
-        self.url = "http://" + self.ip + ":5000/"
 
         # Bouding box
         self.xyz_bounding_box = gym.spaces.Box(
@@ -135,18 +144,7 @@ class FrankaRobotiq(gym.Env):
         if fake_env:
             return
 
-        self.cap_wrist_1 = VideoCapture(
-            RSCapture(name="wrist_1", serial_number="130322274175", depth=False)
-        )
-        self.cap_wrist_2 = VideoCapture(
-            RSCapture(name="wrist_2", serial_number="127122270572", depth=False)
-        )
-
-        self.cap = {
-            "wrist_1": self.cap_wrist_1,
-            "wrist_2": self.cap_wrist_2,
-        }
-
+        self.init_cameras()
         self.img_queue = queue.Queue()
         self.displayer = ImageDisplayer(self.img_queue)
         self.displayer.start()
@@ -218,8 +216,6 @@ class FrankaRobotiq(gym.Env):
 
         self.update_currpos()
         ob = self._get_obs()
-        obs_xyz = ob["state"]["tcp_pose"][:3]
-        obs_rpy = ob["state"]["tcp_pose"][3:]
         reward = self.compute_reward(ob)
         done = self.curr_path_length >= 100 or reward
         return ob, int(reward), done, False, {}
@@ -262,17 +258,7 @@ class FrankaRobotiq(gym.Env):
                     f"{key} camera frozen. Check connect, then press enter to relaunch..."
                 )
                 cap.close()
-                if key == "wrist_1":
-                    cap = RSCapture(
-                        name="wrist_1", serial_number="130322274175", depth=False
-                    )
-                elif key == "wrist_2":
-                    cap = RSCapture(
-                        name="wrist_2", serial_number="127122270572", depth=False
-                    )
-                else:
-                    raise KeyError
-                self.cap[key] = VideoCapture(cap)
+                self.init_cameras()
                 return self.get_im()
 
         self.recording_frames.append(
@@ -353,6 +339,24 @@ class FrankaRobotiq(gym.Env):
         except Exception as e:
             print(f"Failed to save video: {e}")
 
-    def close_camera(self):
-        self.cap_wrist_2.close()
-        self.cap_wrist_1.close()
+    def init_cameras(self):
+        """Init both wrist cameras."""
+        cap_wrist_1 = VideoCapture(
+            RSCapture(
+                name="wrist_1", serial_number=self.config.WRIST_CAM1_SERIAL, depth=False
+            )
+        )
+        cap_wrist_2 = VideoCapture(
+            RSCapture(
+                name="wrist_2", serial_number=self.config.WRIST_CAM2_SERIAL, depth=False
+            )
+        )
+        self.cap = {
+            "wrist_1": cap_wrist_1,
+            "wrist_2": cap_wrist_2,
+        }
+
+    def close_cameras(self):
+        """Close both wrist cameras."""
+        self.cap["wrist_1"].close()
+        self.cap["wrist_2"].close()

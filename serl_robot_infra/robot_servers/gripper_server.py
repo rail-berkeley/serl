@@ -8,7 +8,7 @@ class GripperServer:
     def close(self):
         pass
 
-    def move(self, position):
+    def move(self, position: int):
         pass
 
     def activate_gripper(self):

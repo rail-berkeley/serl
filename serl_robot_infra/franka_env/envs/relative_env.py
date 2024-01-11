@@ -1,5 +1,5 @@
 from scipy.spatial.transform import Rotation as R
-import gym
+import gymnasium as gym
 import numpy as np
 from gym import Env
 
@@ -60,7 +60,10 @@ class RelativeFrame(gym.Wrapper):
         return self.transform_observation(obs), info
 
     def transform_observation(self, obs):
-        # Transform observations from spatial(base) frame into body(end-effector) frame using the adjoint matrix
+        """
+        Transform observations from spatial(base) frame into body(end-effector) frame
+        using the adjoint matrix
+        """
         adjoint_inv = np.linalg.inv(self.adjoint_matrix)
         R_inv = adjoint_inv[:3, :3]
         obs["state"]["tcp_vel"] = adjoint_inv @ obs["state"]["tcp_vel"]
@@ -80,13 +83,18 @@ class RelativeFrame(gym.Wrapper):
         return obs
 
     def transform_action(self, action):
-        # Transform action from body(end-effector) frame into into spatial(base) frame using the adjoint matrix
+        """
+        Transform action from body(end-effector) frame into into spatial(base) frame
+        using the adjoint matrix
+        """
         action = np.array(action)  # in case action is a jax read-only array
         action[:6] = self.adjoint_matrix @ action[:6]
         return action
 
     def construct_adjoint_matrix(self, tcp_pose):
-        # Construct the adjoint matrix for a spatial velocity vector
+        """
+        Construct the adjoint matrix for a spatial velocity vector
+        """
         rotation = R.from_quat(tcp_pose[3:]).as_matrix()
         translation = np.array(tcp_pose[:3])
         skew_matrix = np.array(
@@ -103,7 +111,9 @@ class RelativeFrame(gym.Wrapper):
         return adjoint_matrix
 
     def construct_T_matrix(self, tcp_pose):
-        # Construct the transformation matrix from relative frame to base frame
+        """
+        Construct the transformation matrix from relative frame to base frame
+        """
         rotation = R.from_quat(tcp_pose[3:]).as_matrix()
         translation = np.array(tcp_pose[:3])
         T = np.zeros((4, 4))
@@ -113,7 +123,9 @@ class RelativeFrame(gym.Wrapper):
         return T
 
     def construct_T_matrix_inv(self, tcp_pose):
-        # Construct the inverse of the transformation matrix from relative frame to base frame
+        """
+        Construct the inverse of the transformation matrix from relative frame to base frame
+        """
         rotation = R.from_quat(tcp_pose[3:]).as_matrix()
         translation = np.array(tcp_pose[:3])
         T = np.zeros((4, 4))

@@ -1,7 +1,10 @@
-# Franka Robot Envs
+# SERL Robot Infra
 
 All robot code is structured as follows:
 There is a Flask server which sends commands to the robot via ROS. There is a gym env for the robot which communicates with the Flask server via post requests.
+
+- `robot_server`: hosts a Flask server which sends commands to the robot via ROS
+- `franka_env`: gym env for the robot which communicates with the Flask server via post requests
 
 ### Installation
 

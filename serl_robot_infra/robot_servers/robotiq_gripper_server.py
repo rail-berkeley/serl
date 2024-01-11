@@ -31,7 +31,31 @@ class RobotiqGripperServer(GripperServer):
         )
         self.gripper_command = outputMsg.Robotiq2FGripper_robot_output()
 
-    def generate_gripper_command(self, char, command):
+    def activate_gripper(self):
+        self.gripper_command = self._generate_gripper_command("a", self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+
+    def reset_gripper(self):
+        self.gripper_command = self._generate_gripper_command("r", self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+        self.activate_gripper()
+
+    def open(self):
+        self.gripper_command = self._generate_gripper_command("o", self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+
+    def close(self):
+        self.gripper_command = self._generate_gripper_command("c", self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+
+    def move(self, position):
+        gripper_command = self._generate_gripper_command(position, self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+
+    def update_gripper(self, msg):
+        self.gripper_pos = msg.gPO
+
+    def _generate_gripper_command(self, char, command):
         """Update the gripper command according to the character entered by the user."""
         if char == "a":
             command = outputMsg.Robotiq2FGripper_robot_output()
@@ -61,27 +85,3 @@ class RobotiqGripperServer(GripperServer):
         except ValueError:
             pass
         return command
-
-    def activate_gripper(self):
-        self.gripper_command = self.generate_gripper_command("a", self.gripper_command)
-        self.gripperpub.publish(self.gripper_command)
-
-    def reset_gripper(self):
-        self.gripper_command = self.generate_gripper_command("r", self.gripper_command)
-        self.gripperpub.publish(self.gripper_command)
-        self.activate_gripper()
-
-    def open(self):
-        self.gripper_command = self.generate_gripper_command("o", self.gripper_command)
-        self.gripperpub.publish(self.gripper_command)
-
-    def close(self):
-        self.gripper_command = self.generate_gripper_command("c", self.gripper_command)
-        self.gripperpub.publish(self.gripper_command)
-
-    def move(self, position):
-        gripper_command = self.generate_gripper_command(position, self.gripper_command)
-        self.gripperpub.publish(self.gripper_command)
-
-    def update_gripper(self, msg):
-        self.gripper_pos = msg.gPO

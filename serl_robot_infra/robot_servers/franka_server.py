@@ -12,7 +12,7 @@ from absl import app, flags
 
 from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState, ZeroJacobian
 import geometry_msgs.msg as geom_msg
-from dynamic_reconfigure.client import Client
+from dynamic_reconfigure.client import Client as ReconfClient
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -43,12 +43,12 @@ class FrankaServer:
             "/franka_control/error_recovery/goal", ErrorRecoveryActionGoal, queue_size=1
         )
         self.state_sub = rospy.Subscriber(
-            "franka_state_controller/franka_states", FrankaState, self.set_currpos
+            "franka_state_controller/franka_states", FrankaState, self._set_currpos
         )
         self.jacobian_sub = rospy.Subscriber(
             "/cartesian_impedance_controller/franka_jacobian",
             ZeroJacobian,
-            self.set_jacobian,
+            self._set_jacobian,
         )
 
     def start_impedance(self):
@@ -74,21 +74,6 @@ class FrankaServer:
         """Clears any errors"""
         msg = ErrorRecoveryActionGoal()
         self.resetpub.publish(msg)
-
-    def set_currpos(self, msg):
-        tmatrix = np.array(list(msg.O_T_EE)).reshape(4, 4).T
-        r = R.from_matrix(tmatrix[:3, :3])
-        pose = np.concatenate([tmatrix[:3, -1], r.as_quat()])
-        self.pos = pose
-        self.dq = np.array(list(msg.dq)).reshape((7,))
-        self.q = np.array(list(msg.q)).reshape((7,))
-        self.force = np.array(list(msg.O_F_ext_hat_K)[:3])
-        self.torque = np.array(list(msg.O_F_ext_hat_K)[3:])
-        self.vel = self.jacobian @ self.dq
-
-    def set_jacobian(self, msg):
-        jacobian = np.array(list(msg.zero_jacobian)).reshape((6, 7), order="F")
-        self.jacobian = jacobian
 
     def reset_joint(self):
         """Resets Joints (needed after running for hours)"""
@@ -147,12 +132,32 @@ class FrankaServer:
         print("impedance STARTED")
 
     def move(self, pose):
+        """Moves to a pose: [x, y, z, qx, qy, qz, qw]"""
+        assert len(pose) == 7
         msg = geom_msg.PoseStamped()
         msg.header.frame_id = "0"
         msg.header.stamp = rospy.Time.now()
         msg.pose.position = geom_msg.Point(pose[0], pose[1], pose[2])
         msg.pose.orientation = geom_msg.Quaternion(pose[3], pose[4], pose[5], pose[6])
         self.eepub.publish(msg)
+
+    def _set_currpos(self, msg):
+        tmatrix = np.array(list(msg.O_T_EE)).reshape(4, 4).T
+        r = R.from_matrix(tmatrix[:3, :3])
+        pose = np.concatenate([tmatrix[:3, -1], r.as_quat()])
+        self.pos = pose
+        self.dq = np.array(list(msg.dq)).reshape((7,))
+        self.q = np.array(list(msg.q)).reshape((7,))
+        self.force = np.array(list(msg.O_F_ext_hat_K)[:3])
+        self.torque = np.array(list(msg.O_F_ext_hat_K)[3:])
+        self.vel = self.jacobian @ self.dq
+
+    def _set_jacobian(self, msg):
+        jacobian = np.array(list(msg.zero_jacobian)).reshape((6, 7), order="F")
+        self.jacobian = jacobian
+
+
+###############################################################################
 
 
 def main(_):
@@ -170,6 +175,9 @@ def main(_):
         time.sleep(1)
     except Exception as e:
         raise Exception("roscore not running", e)
+
+    # Start ros node
+    rospy.init_node("franka_control_api")
 
     if GRIPPER_TYPE == "Robotiq":
         from robot_servers.robotiq_gripper_server import RobotiqGripperServer
@@ -193,27 +201,7 @@ def main(_):
     )
     robot_server.start_impedance()
 
-    # Defines the ros topics to publish to
-    rospy.init_node("franka_control_api")
-
-    eepub = rospy.Publisher(
-        "/cartesian_impedance_controller/equilibrium_pose",
-        geom_msg.PoseStamped,
-        queue_size=10,
-    )
-    resetpub = rospy.Publisher(
-        "/franka_control/error_recovery/goal", ErrorRecoveryActionGoal, queue_size=1
-    )
-    state_sub = rospy.Subscriber(
-        "franka_state_controller/franka_states", FrankaState, robot_server.set_currpos
-    )
-    jacobian_sub = rospy.Subscriber(
-        "/cartesian_impedance_controller/franka_jacobian",
-        ZeroJacobian,
-        robot_server.set_jacobian,
-    )
-
-    client = Client(
+    reconf_client = ReconfClient(
         "cartesian_impedance_controllerdynamic_reconfigure_compliance_param_node"
     )
 
@@ -343,7 +331,7 @@ def main(_):
     def cable_wrap_compliance_mode():
         from robot_servers.configs.cable_route_config import impedance_config
 
-        client.update_configuration(impedance_config)
+        reconf_client.update_configuration(impedance_config)
         return "cable wrap compliance Mode"
 
     # PCB
@@ -351,7 +339,7 @@ def main(_):
     def pcb_compliance_mode():
         from robot_servers.configs.pcb_config import impedance_config
 
-        client.update_configuration(impedance_config)
+        reconf_client.update_configuration(impedance_config)
         return "pcb compliance Mode"
 
     # Peg
@@ -359,7 +347,7 @@ def main(_):
     def peg_compliance_mode():
         from robot_servers.configs.peg_config import impedance_config
 
-        client.update_configuration(impedance_config)
+        reconf_client.update_configuration(impedance_config)
         return "peg compliance Mode"
 
     # precision mode for reset
@@ -367,7 +355,7 @@ def main(_):
     def precision_mode():
         from robot_servers.configs.precision_config import impedance_config
 
-        client.update_configuration(impedance_config)
+        reconf_client.update_configuration(impedance_config)
         return "precision Mode"
 
     # try:

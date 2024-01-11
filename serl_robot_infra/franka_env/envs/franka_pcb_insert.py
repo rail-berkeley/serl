@@ -4,16 +4,12 @@ from gymnasium import spaces
 import time
 import requests
 import copy
-import cv2
-import queue
 
-from franka_env.camera.rs_capture import RSCapture
-from franka_env.camera.video_capture import VideoCapture
-from franka_env.envs.franka_robotiq_env import FrankaRobotiq
+from franka_env.envs.franka_robotiq_env import FrankaRobotiqEnv
 from franka_env.utils.rotations import euler_2_quat
 
 
-class FrankaRobotiqPCBInsert(FrankaRobotiq):
+class FrankaRobotiqPCBInsert(FrankaRobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._TARGET_POSE = np.array(
