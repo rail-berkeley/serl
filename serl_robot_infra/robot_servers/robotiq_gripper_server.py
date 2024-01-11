@@ -1,6 +1,7 @@
 import subprocess
 import rospy
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output as outputMsg
+from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_input as inputMsg
 
 from robot_servers.gripper_server import GripperServer
 
@@ -16,6 +17,12 @@ class RobotiqGripperServer(GripperServer):
                 gripper_ip,
             ],
             stdout=subprocess.PIPE,
+        )
+        self.gripper_state_sub = rospy.Subscriber(
+            "Robotiq2FGripperRobotInput",
+            inputMsg.Robotiq2FGripper_robot_input,
+            self.update_gripper,
+            queue_size=1,
         )
         self.gripperpub = rospy.Publisher(
             "Robotiq2FGripperRobotOutput",
@@ -77,4 +84,4 @@ class RobotiqGripperServer(GripperServer):
         self.gripperpub.publish(self.gripper_command)
 
     def update_gripper(self, msg):
-        raise NotImplementedError("Not implemented for Robotiq Gripper")
+        self.gripper_pos = msg.gPO

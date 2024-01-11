@@ -28,14 +28,11 @@ class FrankaServer:
     """Handles the starting and stopping of the impedance controller
     (as well as backup) joint recovery policy."""
 
-    def __init__(
-        self, robot_ip, gripper_ip, gripper_type, ros_pkg_name, reset_joint_target
-    ):
+    def __init__(self, robot_ip, gripper_type, ros_pkg_name, reset_joint_target):
         self.robot_ip = robot_ip
-        self.gripper_ip = gripper_ip
-        self.gripper_type = gripper_type
         self.ros_pkg_name = ros_pkg_name
         self.reset_joint_target = reset_joint_target
+        self.gripper_type = gripper_type
 
         self.eepub = rospy.Publisher(
             "/cartesian_impedance_controller/equilibrium_pose",
@@ -157,18 +154,6 @@ class FrankaServer:
         msg.pose.orientation = geom_msg.Quaternion(pose[3], pose[4], pose[5], pose[6])
         self.eepub.publish(msg)
 
-    def open(self):
-        pass
-
-    def close(self):
-        pass
-
-    def activate_gripper(self):
-        pass
-
-    def reset_gripper(self):
-        pass
-
 
 def main(_):
     RESET_JOINT_TARGET = [0, 0, 0, -1.9, -0, 2, 0]
@@ -202,7 +187,6 @@ def main(_):
     """Starts impedance controller"""
     robot_server = FrankaServer(
         robot_ip=ROBOT_IP,
-        gripper_ip=GRIPPER_IP,
         gripper_type=GRIPPER_TYPE,
         ros_pkg_name=ROS_PKG_NAME,
         reset_joint_target=RESET_JOINT_TARGET,
@@ -276,9 +260,9 @@ def main(_):
         return jsonify({"jacobian": np.array(robot_server.jacobian).tolist()})
 
     # Route for getting gripper distance
-    @webapp.route("/getgripper", methods=["POST"])
-    def gg():
-        return jsonify({"gripper": robot_server.gripper_dist})
+    @webapp.route("/get_gripper", methods=["POST"])
+    def get_gripper():
+        return jsonify({"gripper": gripper_server.gripper_pos})
 
     # Route for Running Joint Reset
     @webapp.route("/jointreset", methods=["POST"])
@@ -302,24 +286,24 @@ def main(_):
         return "Reset"
 
     # Route for Opening the Gripper
-    @webapp.route("/open", methods=["POST"])
+    @webapp.route("/open_gripper", methods=["POST"])
     def open():
         print("open")
         gripper_server.open()
         return "Opened"
 
     # Route for Closing the Gripper
-    @webapp.route("/close", methods=["POST"])
+    @webapp.route("/close_gripper", methods=["POST"])
     def close():
         print("close")
         gripper_server.close()
         return "Closed"
 
     # Route for moving the gripper
-    @webapp.route("/move", methods=["POST"])
+    @webapp.route("/move_gripper", methods=["POST"])
     def move_gripper():
         gripper_pos = request.json
-        pos = int(gripper_pos["gripper_pos"] * 255)  # convert from 0-1 to 0-255
+        pos = np.clip(int(gripper_pos["gripper_pos"]), 0, 255)  # 0-255
         print(f"move gripper to {pos}")
         gripper_server.move(pos)
         return "Moved Gripper"
@@ -350,7 +334,7 @@ def main(_):
                 "q": np.array(robot_server.q).tolist(),
                 "dq": np.array(robot_server.dq).tolist(),
                 "jacobian": np.array(robot_server.jacobian).tolist(),
-                "gripper": gripper_server.gripper_dist,
+                "gripper": gripper_server.gripper_pos,
             }
         )
 

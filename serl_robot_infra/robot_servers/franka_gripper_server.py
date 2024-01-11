@@ -35,4 +35,4 @@ class FrankaGripperServer(GripperServer):
         self.grippergrasppub.publish(msg)
 
     def update_gripper(self, msg):
-        self.gripper_dist = np.sum(msg.position)
+        self.gripper_pos = np.sum(msg.position)

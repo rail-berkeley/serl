@@ -1,6 +1,6 @@
 class GripperServer:
     def __init__(self):
-        self.gripper_dist = 0
+        self.gripper_pos = 0
 
     def open(self):
         pass
