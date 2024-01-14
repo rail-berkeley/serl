@@ -20,7 +20,7 @@ class SpaceMouseExpert:
             with self.state_lock:
                 self.latest_data["action"] = np.array(
                     [-state.y, state.x, state.z, -state.roll, -state.pitch, -state.yaw]
-                ) # spacemouse axis matched with robot base frame
+                )  # spacemouse axis matched with robot base frame
                 self.latest_data["buttons"] = state.buttons
 
     def get_action(self):
