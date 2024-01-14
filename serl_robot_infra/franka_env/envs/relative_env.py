@@ -107,7 +107,7 @@ class RelativeFrame(gym.Wrapper):
         adjoint_matrix = np.zeros((6, 6))
         adjoint_matrix[:3, :3] = rotation
         adjoint_matrix[3:, 3:] = rotation
-        adjoint_matrix[:3, 3:] = skew_matrix @ rotation
+        adjoint_matrix[3:, :3] = skew_matrix @ rotation
         return adjoint_matrix
 
     def construct_homogeneous_matrix(self, tcp_pose):
