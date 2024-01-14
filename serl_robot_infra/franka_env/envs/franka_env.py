@@ -6,7 +6,6 @@ import copy
 from scipy.spatial.transform import Rotation
 import time
 import requests
-from gymnasium import spaces
 import queue
 import threading
 from datetime import datetime
@@ -37,7 +36,7 @@ class ImageDisplayer(threading.Thread):
 
 
 class DefaultEnvConfig:
-    """Default configuration for FrankaRobotiqEnv."""
+    """Default configuration for FrankaEnv."""
 
     SERVER_URL = "http://127.0.0.1:5000/"
     WRIST_CAM1_SERIAL = "130322274175"
@@ -54,7 +53,7 @@ class DefaultEnvConfig:
     ACTION_SCALE = (0.02, 0.1, 1)
 
 
-class FrankaRobotiqEnv(gym.Env):
+class FrankaEnv(gym.Env):
     def __init__(
         self,
         randomReset=False,
@@ -114,25 +113,25 @@ class FrankaRobotiqEnv(gym.Env):
             np.ones((7,), dtype=np.float32),
         )
 
-        self.observation_space = spaces.Dict(
+        self.observation_space = gym.spaces.Dict(
             {
-                "state": spaces.Dict(
+                "state": gym.spaces.Dict(
                     {
-                        "tcp_pose": spaces.Box(
+                        "tcp_pose": gym.spaces.Box(
                             -np.inf, np.inf, shape=(7,)
                         ),  # xyz + quat
-                        "tcp_vel": spaces.Box(-np.inf, np.inf, shape=(6,)),
-                        "gripper_pose": spaces.Box(-1, 1, shape=(1,)),
-                        "tcp_force": spaces.Box(-np.inf, np.inf, shape=(3,)),
-                        "tcp_torque": spaces.Box(-np.inf, np.inf, shape=(3,)),
+                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
+                        "gripper_pose": gym.spaces.Box(-1, 1, shape=(1,)),
+                        "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                        "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
                 ),
-                "images": spaces.Dict(
+                "images": gym.spaces.Dict(
                     {
-                        "wrist_1": spaces.Box(
+                        "wrist_1": gym.spaces.Box(
                             0, 255, shape=(128, 128, 3), dtype=np.uint8
                         ),
-                        "wrist_2": spaces.Box(
+                        "wrist_2": gym.spaces.Box(
                             0, 255, shape=(128, 128, 3), dtype=np.uint8
                         ),
                     }

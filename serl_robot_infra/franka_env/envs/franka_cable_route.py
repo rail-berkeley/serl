@@ -3,13 +3,12 @@ import gymnasium as gym
 import time
 import requests
 import copy
-from scipy.spatial.transform import Rotation
 
-from franka_env.envs.franka_robotiq_env import FrankaRobotiqEnv
+from franka_env.envs.franka_env import FrankaEnv
 from franka_env.utils.rotations import euler_2_quat
 
 
-class FrankaRobotiqCableRoute(FrankaRobotiqEnv):
+class FrankaCableRoute(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._TARGET_POSE = np.array(

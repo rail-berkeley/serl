@@ -1,15 +1,14 @@
 import numpy as np
 import gymnasium as gym
-from gymnasium import spaces
 import time
 import requests
 import copy
 
-from franka_env.envs.franka_robotiq_env import FrankaRobotiqEnv
+from franka_env.envs.franka_env import FrankaEnv
 from franka_env.utils.rotations import euler_2_quat
 
 
-class FrankaRobotiqPCBInsert(FrankaRobotiqEnv):
+class FrankaPCBInsert(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._TARGET_POSE = np.array(
@@ -17,7 +16,6 @@ class FrankaRobotiqPCBInsert(FrankaRobotiqEnv):
                 0.5668657154487453,
                 0.002050321710641817,
                 0.05462772570641611,
-                # 0.9998817571282431,-0.010581843089284471,0.008902600824764906,0.0067260729646395475
                 3.1279511,
                 0.0176617,
                 0.0212859,
