@@ -358,13 +358,6 @@ def main(_):
         reconf_client.update_configuration(impedance_config)
         return "precision Mode"
 
-    # try:
-    #     webapp.run(host="0.0.0.0")
-    # except Exception as e:
-    #     robot_server.stop_impedance()
-    #     robot_server.joint_controller.terminate()
-    #     roscore.terminate()
-    #     raise Exception("robot server errored: ", e)
     webapp.run(host="0.0.0.0")
 
 
