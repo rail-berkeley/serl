@@ -148,8 +148,8 @@ class FrankaServer:
         self.pos = pose
         self.dq = np.array(list(msg.dq)).reshape((7,))
         self.q = np.array(list(msg.q)).reshape((7,))
-        self.force = np.array(list(msg.O_F_ext_hat_K)[:3])
-        self.torque = np.array(list(msg.O_F_ext_hat_K)[3:])
+        self.force = np.array(list(msg.K_F_ext_hat_K)[:3])
+        self.torque = np.array(list(msg.K_F_ext_hat_K)[3:])
         self.vel = self.jacobian @ self.dq
 
     def _set_jacobian(self, msg):
