@@ -177,15 +177,17 @@ class FrankaEnv(gym.Env):
             pose[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
         euler = Rotation.from_quat(pose[3:]).as_euler("xyz")
-        old_sign = np.sign(euler[0])
-        euler[0] = (
+
+        # Clip first euler angle separately due to discontinuity from pi to -pi
+        sign = np.sign(euler[0])
+        euler[0] = sign * (
             np.clip(
-                euler[0] * old_sign,
+                np.abs(euler[0]),
                 self.rpy_bounding_box.low[0],
                 self.rpy_bounding_box.high[0],
             )
-            * old_sign
         )
+
         euler[1:] = np.clip(
             euler[1:], self.rpy_bounding_box.low[1:], self.rpy_bounding_box.high[1:]
         )
