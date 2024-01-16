@@ -4,27 +4,29 @@ import time
 import requests
 import copy
 
-from franka_env.envs.franka_env import FrankaEnv
+from franka_env.envs.franka_env import FrankaEnv, FrankaEnvConfig
 from franka_env.utils.rotations import euler_2_quat
+
+
+# TODO: Move this to a example config file, and have an example script
+class FrankaCableRouteConfig(FrankaEnvConfig):
+    TARGET_POSE = np.array(
+        [
+            0.460639895728905,
+            -0.02439473272513422,
+            0.026321125814908725,
+            3.1331234,
+            0.0182487,
+            1.5824805,
+        ]
+    )
+    RESET_POSE = TARGET_POSE + np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
+    ACTION_SCALE = (0.05, 0.3, 1)
 
 
 class FrankaCableRoute(FrankaEnv):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._TARGET_POSE = np.array(
-            [
-                0.460639895728905,
-                -0.02439473272513422,
-                0.026321125814908725,
-                3.1331234,
-                0.0182487,
-                1.5824805,
-            ]
-        )
-        self.resetpos[:3] = self._TARGET_POSE[:3]
-        self.resetpos[2] += 0.1
-        self.resetpos[3:] = euler_2_quat(self._TARGET_POSE[3:])
-
+        super().__init__(**kwargs, config=FrankaCableRouteConfig)
         # Bouding box
         self.xyz_bounding_box = gym.spaces.Box(
             self._TARGET_POSE[:3]
@@ -39,8 +41,6 @@ class FrankaCableRoute(FrankaEnv):
             self._TARGET_POSE[3:] + rpy_delta_range,
             dtype=np.float32,
         )
-
-        self.action_scale = (0.05, 0.3, 1)
 
     def crop_image(self, image):
         return image[:, 80:560, :]

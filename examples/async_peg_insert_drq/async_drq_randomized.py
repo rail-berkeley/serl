@@ -39,10 +39,12 @@ from franka_env.envs.wrappers import (
 )
 
 import franka_env
+from config import ExampleEnvConfig
+
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "FrankaRobotiqEnv-Vision-v0", "Name of environment.")
+flags.DEFINE_string("env", "FrankaEnv-Vision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
@@ -112,8 +114,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
             for step in range(FLAGS.max_traj_length):
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    seed=sampling_rng,
-                    deterministic=True,
+                    argmax=True,
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -291,7 +292,7 @@ def learner(
         if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
-                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
             )
 
         update_steps += 1
@@ -306,7 +307,12 @@ def main(_):
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    env = gym.make(FLAGS.env, fake_env=FLAGS.learner)
+    env = gym.make(
+        FLAGS.env,
+        fake_env=FLAGS.learner,
+        save_video=FLAGS.eval_checkpoint_step,
+        config=ExampleEnvConfig,
+    )
     env = GripperCloseEnv(env)
     if FLAGS.actor:
         env = SpacemouseIntervention(env)

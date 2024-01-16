@@ -6,6 +6,8 @@ import pickle as pkl
 import datetime
 
 import franka_env
+from config import ExampleEnvConfig
+
 
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
@@ -19,7 +21,9 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 
 if __name__ == "__main__":
-    env = gym.make("FrankaRobotiqPCBInsert-Vision-v0", save_video=False)
+    env = gym.make(
+        "FrankaPCBInsert-Vision-v0", save_video=False, config=ExampleEnvConfig
+    )
     env = GripperCloseEnv(env)
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)

@@ -11,19 +11,6 @@ from franka_env.utils.rotations import euler_2_quat
 class FrankaPCBInsert(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._TARGET_POSE = np.array(
-            [
-                0.5668657154487453,
-                0.002050321710641817,
-                0.05462772570641611,
-                3.1279511,
-                0.0176617,
-                0.0212859,
-            ]
-        )
-        self.resetpos[:3] = self._TARGET_POSE[:3]
-        self.resetpos[2] += 0.04
-        self.resetpos[3:] = euler_2_quat(self._TARGET_POSE[3:])
 
         # Bouding box
         self.xyz_bounding_box = gym.spaces.Box(
@@ -39,9 +26,6 @@ class FrankaPCBInsert(FrankaEnv):
             self._TARGET_POSE[3:] + rpy_delta_range,
             dtype=np.float32,
         )
-
-        self._REWARD_THRESHOLD = [0.005, 0.005, 0.001, 0.1, 0.1, 0.1]
-        self.action_scale = (0.02, 0.2, 1)
 
     def crop_image(self, image):
         return image[90:390, 170:470, :]

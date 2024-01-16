@@ -35,22 +35,45 @@ class ImageDisplayer(threading.Thread):
             cv2.waitKey(1)
 
 
+##############################################################################
+
+
+# move this to a seperate config.py file?
 class DefaultEnvConfig:
+    """Default configuration for FrankaEnv. Fill in the values below."""
+
+    SERVER_URL: str = "http://127.0.0.1:5000/"
+    WRIST_CAM1_SERIAL: str = "REALSENSE_SERIAL_NUM"
+    WRIST_CAM2_SERIAL: str = "REALSENSE_SERIAL_NUM"
+    TARGET_POSE: np.ndarray = np.zeros((6,))
+    REWARD_THRESHOLD: np.ndarray = np.zeros((6,))
+    ACTION_SCALE = np.zeros((3,))
+    RESET_POSE = np.zeros((6,))
+
+
+# TODO: clean this or remove this?
+class FrankaEnvConfig(DefaultEnvConfig):
     """Default configuration for FrankaEnv."""
 
-    SERVER_URL = "http://127.0.0.1:5000/"
-    WRIST_CAM1_SERIAL = "130322274175"
-    WRIST_CAM2_SERIAL = "127122270572"
-    TARGET_POSE = [
-        0.5907729022946797,
-        0.05342705145048531,
-        0.09071618754222505,
-        3.1339503,
-        0.009167,
-        1.5550434,
-    ]
-    REWARD_THRESHOLD = [0.01, 0.01, 0.01, 0.2, 0.2, 0.2]
-    ACTION_SCALE = (0.02, 0.1, 1)
+    SERVER_URL: str = "http://127.0.0.1:5000/"
+    WRIST_CAM1_SERIAL: str = "130322274175"
+    WRIST_CAM2_SERIAL: str = "127122270572"
+    TARGET_POSE: np.ndarray = np.array(
+        [
+            0.5907729022946797,
+            0.05342705145048531,
+            0.09071618754222505,
+            3.1339503,
+            0.009167,
+            1.5550434,
+        ]
+    )
+    REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
+    ACTION_SCALE = np.array([0.02, 0.1, 1])
+    RESET_POSE = TARGET_POSE + np.array([0.0, 0.2, 0.0, 0.0, 0.0, 0.0])
+
+
+##############################################################################
 
 
 class FrankaEnv(gym.Env):
@@ -60,10 +83,9 @@ class FrankaEnv(gym.Env):
         random_xy_range=0.05,
         random_rz_range=np.pi / 36,
         hz=10,
-        start_gripper=0,
         fake_env=False,
         save_video=False,
-        config=DefaultEnvConfig,
+        config=FrankaEnvConfig,
     ):
         self.action_scale = config.ACTION_SCALE
         self._TARGET_POSE = config.TARGET_POSE
@@ -71,11 +93,10 @@ class FrankaEnv(gym.Env):
         self.url = config.SERVER_URL
         self.config = config
 
-        self.resetpos = np.zeros(7)
-
-        self.resetpos[:3] = self._TARGET_POSE[:3]
-        self.resetpos[2] += 0.2
-        self.resetpos[3:] = euler_2_quat(self._TARGET_POSE[3:])
+        # convert last 3 elements from euler to quat, from size (6,) to (7,)
+        self.resetpos = np.concatenate(
+            [config.RESET_POSE[:3], euler_2_quat(config.RESET_POSE[3:])]
+        )
 
         self.currpos = self.resetpos.copy()
         self.currvel = np.zeros((6,))
