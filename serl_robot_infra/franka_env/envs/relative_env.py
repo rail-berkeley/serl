@@ -2,6 +2,10 @@ from scipy.spatial.transform import Rotation as R
 import gymnasium as gym
 import numpy as np
 from gym import Env
+from franka_env.utils.transformations import (
+    construct_adjoint_matrix,
+    construct_homogeneous_matrix,
+)
 
 
 class RelativeFrame(gym.Wrapper):
@@ -43,7 +47,7 @@ class RelativeFrame(gym.Wrapper):
             info["intervene_action"] = self.transform_action(info["intervene_action"])
 
         # Update adjoint matrix
-        self.adjoint_matrix = self.construct_adjoint_matrix(obs["state"]["tcp_pose"])
+        self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
 
         # Transform observation to spatial frame
         transformed_obs = self.transform_observation(obs)
@@ -53,7 +57,7 @@ class RelativeFrame(gym.Wrapper):
         obs, info = self.env.reset(**kwargs)
 
         # Update adjoint matrix
-        self.adjoint_matrix = self.construct_adjoint_matrix(obs["state"]["tcp_pose"])
+        self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
         if self.include_relative_pose:
             # Update transformation matrix from the reset pose's relative frame to base frame
             self.T_r_o_inv = np.linalg.inv(
@@ -72,7 +76,7 @@ class RelativeFrame(gym.Wrapper):
         obs["state"]["tcp_vel"] = adjoint_inv @ obs["state"]["tcp_vel"]
 
         if self.include_relative_pose:
-            T_b_o = self.construct_homogeneous_matrix(obs["state"]["tcp_pose"])
+            T_b_o = construct_homogeneous_matrix(obs["state"]["tcp_pose"])
             T_b_r = self.T_r_o_inv @ T_b_o
 
             # Reconstruct transformed tcp_pose vector
@@ -90,34 +94,3 @@ class RelativeFrame(gym.Wrapper):
         action = np.array(action)  # in case action is a jax read-only array
         action[:6] = self.adjoint_matrix @ action[:6]
         return action
-
-    def construct_adjoint_matrix(self, tcp_pose):
-        """
-        Construct the adjoint matrix for a spatial velocity vector
-        """
-        rotation = R.from_quat(tcp_pose[3:]).as_matrix()
-        translation = np.array(tcp_pose[:3])
-        skew_matrix = np.array(
-            [
-                [0, -translation[2], translation[1]],
-                [translation[2], 0, -translation[0]],
-                [-translation[1], translation[0], 0],
-            ]
-        )
-        adjoint_matrix = np.zeros((6, 6))
-        adjoint_matrix[:3, :3] = rotation
-        adjoint_matrix[3:, 3:] = rotation
-        adjoint_matrix[3:, :3] = skew_matrix @ rotation
-        return adjoint_matrix
-
-    def construct_homogeneous_matrix(self, tcp_pose):
-        """
-        Construct the homogeneous transformation matrix from given pose.
-        """
-        rotation = R.from_quat(tcp_pose[3:]).as_matrix()
-        translation = np.array(tcp_pose[:3])
-        T = np.zeros((4, 4))
-        T[:3, :3] = rotation
-        T[:3, 3] = translation
-        T[3, 3] = 1
-        return T

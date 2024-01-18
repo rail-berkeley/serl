@@ -21,3 +21,23 @@ class ExampleEnvConfig(DefaultEnvConfig):
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
     REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1])
+    ABS_POSE_LIMIT_LOW = np.array(
+        [
+            TARGET_POSE[0] - 0.05,
+            TARGET_POSE[1] - 0.05,
+            0.0,
+            TARGET_POSE[3] - 0.05,
+            TARGET_POSE[4] - 0.05,
+            TARGET_POSE[5] - np.pi / 9,
+        ]
+    )
+    ABS_POSE_LIMIT_HIGH = np.array(
+        [
+            TARGET_POSE[0] + 0.01,
+            TARGET_POSE[1] + 0.01,
+            0.1,
+            TARGET_POSE[3] + 0.01,
+            TARGET_POSE[4] + 0.01,
+            TARGET_POSE[5] + np.pi / 9,
+        ]
+    )

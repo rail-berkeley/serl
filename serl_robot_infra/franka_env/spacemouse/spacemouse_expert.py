@@ -1,6 +1,7 @@
 import threading
 import pyspacemouse
 import numpy as np
+from typing import Tuple
 
 
 class SpaceMouseExpert:
@@ -23,6 +24,7 @@ class SpaceMouseExpert:
                 )  # spacemouse axis matched with robot base frame
                 self.latest_data["buttons"] = state.buttons
 
-    def get_action(self):
+    def get_action(self) -> Tuple[np.ndarray, list]:
+        """Returns the latest action and button state of the SpaceMouse."""
         with self.state_lock:
             return self.latest_data["action"], self.latest_data["buttons"]

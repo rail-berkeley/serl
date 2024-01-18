@@ -81,7 +81,7 @@ You can optionally launch learner and actor on separate machines. For example, i
 
 ### 2. Training from image observation example
 
-One-liner launcher (requires `tmux`):
+One-liner launcher (requires `tmux`, `sudo apt install tmux`):
 ```bash
 bash examples/async_sac_image_sim/tmux_launch.sh
 ```
@@ -151,7 +151,7 @@ Install:
 - [serl_franka_controller](https://github.com/rail-berkeley/serl_franka_controller)
 - `serl_robot_infra`
 
-(TODO)
+Detailed instruction please refer to the `serl_robot_infra`'s [readme](serl_robot_infra/README.md)
 
 ## Citation
 

@@ -22,25 +22,34 @@ class FrankaCableRouteConfig(FrankaEnvConfig):
     )
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
     ACTION_SCALE = (0.05, 0.3, 1)
+    ABS_POSE_LIMIT_LOW = np.array(
+        [
+            TARGET_POSE[0] - 0.1,
+            TARGET_POSE[1] - 0.1,
+            0.001,
+            TARGET_POSE[3] - 0.01,
+            TARGET_POSE[4] - 0.01,
+            TARGET_POSE[5] - np.pi / 6,
+        ]
+    )
+    ABS_POSE_LIMIT_HIGH = np.array(
+        [
+            TARGET_POSE[0] + 0.1,
+            TARGET_POSE[1] + 0.1,
+            0.1,
+            TARGET_POSE[3] + 0.01,
+            TARGET_POSE[4] + 0.01,
+            TARGET_POSE[5] + np.pi / 6,
+        ]
+    )
+
+
+##############################################################################
 
 
 class FrankaCableRoute(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=FrankaCableRouteConfig)
-        # Bouding box
-        self.xyz_bounding_box = gym.spaces.Box(
-            self._TARGET_POSE[:3]
-            - np.array([self.random_xy_range, self.random_xy_range, 0.001]),
-            self._TARGET_POSE[:3]
-            + np.array([self.random_xy_range, self.random_xy_range, 0.1]),
-            dtype=np.float32,
-        )
-        rpy_delta_range = np.array([0.01, 0.01, self.random_rz_range])
-        self.rpy_bounding_box = gym.spaces.Box(
-            self._TARGET_POSE[3:] - rpy_delta_range,
-            self._TARGET_POSE[3:] + rpy_delta_range,
-            dtype=np.float32,
-        )
 
     def crop_image(self, image):
         return image[:, 80:560, :]

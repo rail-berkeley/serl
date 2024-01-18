@@ -12,21 +12,6 @@ class FrankaPCBInsert(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # Bouding box
-        self.xyz_bounding_box = gym.spaces.Box(
-            self._TARGET_POSE[:3]
-            - np.array([self.random_xy_range, self.random_xy_range, 0.005]),
-            self._TARGET_POSE[:3]
-            + np.array([self.random_xy_range, self.random_xy_range, 0.05]),
-            dtype=np.float32,
-        )
-        rpy_delta_range = np.array([0.05, 0.05, self.random_rz_range])
-        self.rpy_bounding_box = gym.spaces.Box(
-            self._TARGET_POSE[3:] - rpy_delta_range,
-            self._TARGET_POSE[3:] + rpy_delta_range,
-            dtype=np.float32,
-        )
-
     def crop_image(self, image):
         return image[90:390, 170:470, :]
 

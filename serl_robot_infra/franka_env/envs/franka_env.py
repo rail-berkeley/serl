@@ -49,6 +49,8 @@ class DefaultEnvConfig:
     REWARD_THRESHOLD: np.ndarray = np.zeros((6,))
     ACTION_SCALE = np.zeros((3,))
     RESET_POSE = np.zeros((6,))
+    ABS_POSE_LIMIT_HIGH = np.zeros((6,))
+    ABS_POSE_LIMIT_LOW = np.zeros((6,))
 
 
 # TODO: clean this or remove this?
@@ -71,6 +73,8 @@ class FrankaEnvConfig(DefaultEnvConfig):
     REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1])
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.2, 0.0, 0.0, 0.0, 0.0])
+    ABS_POSE_LIMIT_LOW = np.array([0.56, 0.0, 0.05, np.pi - 0.01, -0.01, 1.35])
+    ABS_POSE_LIMIT_HIGH = np.array([0.62, 0.08, 0.2, np.pi + 0.01, 0.01, 1.7])
 
 
 ##############################################################################
@@ -119,13 +123,15 @@ class FrankaEnv(gym.Env):
         self.save_video = save_video
         self.recording_frames = []
 
-        # Bouding box
+        # boundary box
         self.xyz_bounding_box = gym.spaces.Box(
-            np.array((0.56, 0.0, 0.05)), np.array((0.62, 0.08, 0.2)), dtype=np.float64
+            config.ABS_POSE_LIMIT_LOW[:3],
+            config.ABS_POSE_LIMIT_HIGH[:3],
+            dtype=np.float64,
         )
         self.rpy_bounding_box = gym.spaces.Box(
-            np.array((np.pi - 0.01, -0.01, 1.35)),
-            np.array((np.pi + 0.01, 0.01, 1.7)),
+            config.ABS_POSE_LIMIT_LOW[3:],
+            config.ABS_POSE_LIMIT_HIGH[3:],
             dtype=np.float64,
         )
         # Action/Observation Space
@@ -194,6 +200,7 @@ class FrankaEnv(gym.Env):
         self.curr_gripper_pos = np.array(ps["gripper_pos"])
 
     def clip_safety_box(self, pose):
+        """Clip the pose to be within the safety box."""
         pose[:3] = np.clip(
             pose[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )

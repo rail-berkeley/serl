@@ -4,7 +4,7 @@ from pyquaternion import Quaternion
 
 
 def quat_2_euler(quat):
-    # calculates and returns: yaw, pitch, roll from given quaternion
+    """calculates and returns: yaw, pitch, roll from given quaternion"""
     return R.from_quat(quat).as_euler("xyz")
 
 

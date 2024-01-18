@@ -6,20 +6,40 @@ There is a Flask server which sends commands to the robot via ROS. There is a gy
 - `robot_server`: hosts a Flask server which sends commands to the robot via ROS
 - `franka_env`: gym env for the robot which communicates with the Flask server via post requests
 
+```mermaid
+graph LR
+A[Robot] <-- ROS --> B[Robot Server]
+B <-- HTTP --> C[Gym Env]
+C <-- Lib --> D[RL Policy]
+```
+
 ### Installation
 
-First, make sure the NUC meets the specifications [here](https://frankaemika.github.io/docs/requirements.html), and install the real time kernel, and `libfranka` and `franka_ros` as described [here](https://frankaemika.github.io/docs/installation_linux.html).
+First, make sure the NUC meets the specifications [here](https://frankaemika.github.io/docs/requirements.html).
 
-You'll then want to copy the following files from `launchers` to your catkin workspace:
-- copy the two `.launch` files to a `catkin_ws/scripts` folder in your ros workspace
-- copy the `.cfg` files to `catkin_ws/src/franka_ros/franka_example_controllers/cfg`
-- copy the two `.cpp` files to `catkin_ws/src/franka_ros/franka_example_controllers/src`
-- copy the two `.h` files to `catkin_ws/src/franka_ros/franka_example_controllers/include/franka_example_controllers`
+Then install the `serl_franka_controllers` from: https://github.com/rail-berkeley/serl_franka_controllers
 
 ### Usage
 
+**Robot Server**
+
 To start using the robot, first power on the robot (small switch on the back of robot control box on the floor). Unlock the robot from the browser interface by going to robot IP address in your browser, then press the black and white button to put the robot in FCI control mode (blue light).
 
-From there you should be able to navigate to `robot_infra` and then simply run `python franka_server.py`. This should start the impedence controller and the HTTP server. You can test that things are running by trying to move the end effector around, if the impedence controller is running it should be compliant.
+From there you should be able to navigate to `serl_robot_infra` and then simply run the franka server. This requires to be in a ROS environment.
 
-Lastly, any code you write can interact with the robot via the gym interface defined in this repo under `env`. Simply run `pip install -e .` in the `robot_infra` directory, and in your code simply initialize the env via `gym.make("Franka-{ENVIRONMENT NAME}-v0)`.
+```py
+python serl_robot_infra/robot_servers/franka_server.py
+```
+
+This should start ROS node impedence controller and the HTTP server. You can test that things are running by trying to move the end effector around, if the impedence controller is running it should be compliant.
+
+**Robot Env (Client)**
+
+Lastly, we use a gym env interface to interact with the robot server, defined in this repo under `franka_env`. Simply run `pip install -e .` in the `robot_infra` directory, and in your code simply initialize the env via `gym.make("Franka-{ENVIRONMENT NAME}-v0)`.
+
+Example Usage
+```py
+import gymnasium as gym
+import franka_env
+env = gym.make("FrankaEnv-Vision-v0")
+```
