@@ -1,6 +1,7 @@
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
+
 def construct_adjoint_matrix(tcp_pose):
     """
     Construct the adjoint matrix for a spatial velocity vector
