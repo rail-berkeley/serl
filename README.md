@@ -146,8 +146,13 @@ bash run_actor.sh
 </details>
 
 ## Run with Franka Arm on Real Robot
-
-Install:
+```mermaid
+graph LR
+A[Robot] <-- ROS --> B[Robot Server]
+B <-- HTTP --> C[Gym Env]
+C <-- Lib --> D[RL Policy]
+```
+### Install:
 - [serl_franka_controller](https://github.com/rail-berkeley/serl_franka_controller)
 - `serl_robot_infra`
 
