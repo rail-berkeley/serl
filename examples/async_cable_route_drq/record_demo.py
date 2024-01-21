@@ -12,6 +12,7 @@ from franka_env.envs.wrappers import (
     GripperCloseEnv,
     SpacemouseIntervention,
     Quat2EulerWrapper,
+    BinaryRewardClassifierWrapper,
 )
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
@@ -19,19 +20,31 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 
 if __name__ == "__main__":
-    env = gym.make("FrankaPegInsert-Vision-v0")
+    env = gym.make("FrankaCableRoute-Vision-v0", save_video=False)
     env = GripperCloseEnv(env)
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    image_keys = [k for k in env.observation_space.keys() if "state" not in k]
+
+    from train_reward_classifier import load_classifier_func
+    import jax
+
+    rng = jax.random.PRNGKey(0)
+    rng, key = jax.random.split(rng)
+    classifier_func = load_classifier_func(
+        key=key, sample=env.observation_space.sample(), image_keys=image_keys
+    )
+    env = BinaryRewardClassifierWrapper(env, classifier_func)
 
     obs, _ = env.reset()
 
     transitions = []
     success_count = 0
-    success_needed = 20
+    success_needed = 70
+
     pbar = tqdm(total=success_needed)
 
     while success_count < success_needed:
@@ -53,12 +66,13 @@ if __name__ == "__main__":
         obs = next_obs
 
         if done:
-            obs, _ = env.reset()
+            print(rew)
             success_count += 1
             pbar.update(1)
+            obs, _ = env.reset()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"peg_insert_{success_needed}_demos_{uuid}.pkl"
+    file_name = f"./bc_demos/cable_route_{success_needed}_demos_{uuid}.pkl"
     with open(file_name, "wb") as f:
         pkl.dump(transitions, f)
-        print(f"saved {success_needed} demos to {file_name}")
+        print(f"saved {len(transitions)} transitions to {file_name}")

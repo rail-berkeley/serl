@@ -19,7 +19,7 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 
 if __name__ == "__main__":
-    env = gym.make("FrankaRobotiqPCBInsert-Vision-v0", save_video=False)
+    env = gym.make("FrankaPCBInsert-Vision-v0", save_video=False)
     env = GripperCloseEnv(env)
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     transitions = []
     success_count = 0
-    success_needed = 20
+    success_needed = 40
     pbar = tqdm(total=success_needed)
 
     while success_count < success_needed:
@@ -53,12 +53,13 @@ if __name__ == "__main__":
         obs = next_obs
 
         if done:
+            print(rew)
             success_count += rew
             pbar.update(rew)
             obs, _ = env.reset()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"pcb_insert_{success_needed}_demos_{uuid}.pkl"
+    file_name = f"./bc_demos/pcb_insert_{success_needed}_demos_{uuid}.pkl"
     with open(file_name, "wb") as f:
         pkl.dump(transitions, f)
         print(f"saved {success_needed} demos to {file_name}")

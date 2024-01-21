@@ -2,7 +2,7 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
 python async_drq_randomized.py "$@" \
     --learner \
-    --env FrankaRobotiqPCBInsert-Vision-v0 \
+    --env FrankaPCBInsert-Vision-v0 \
     --exp_name=serl_dev_drq_rlpd10demos_peg_insert_random_resnet_096 \
     --seed 0 \
     --random_steps 1000 \

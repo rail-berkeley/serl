@@ -21,15 +21,15 @@ from jaxrl_m.utils.timer_utils import Timer
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 from jaxrl_m.utils.train_utils import concat_batches
 
-from edgeml.trainer import TrainerServer, TrainerClient, TrainerTunnel
-from edgeml.data.data_store import QueuedDataStore
+from agentlace.trainer import TrainerServer, TrainerClient
+from agentlace.data.data_store import QueuedDataStore
 
 from serl_launcher.utils.jaxrl_m_common import (
-    MemoryEfficientReplayBufferDataStore,
     make_drq_agent,
     make_trainer_config,
     make_wandb_logger,
 )
+from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
@@ -42,7 +42,7 @@ import franka_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "FrankaRobotiq-Vision-v0", "Name of environment.")
+flags.DEFINE_string("env", "FrankaEnv-Vision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
@@ -112,8 +112,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
             for step in range(FLAGS.max_traj_length):
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    seed=sampling_rng,
-                    deterministic=True,
+                    argmax=True,
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -291,7 +290,7 @@ def learner(
         if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
-                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
             )
 
         update_steps += 1
@@ -306,7 +305,11 @@ def main(_):
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    env = gym.make(FLAGS.env, fake_env=FLAGS.learner)
+    env = gym.make(
+        FLAGS.env,
+        fake_env=FLAGS.learner,
+        save_video=FLAGS.eval_checkpoint_step,
+    )
     env = GripperCloseEnv(env)
     if FLAGS.actor:
         env = SpacemouseIntervention(env)
