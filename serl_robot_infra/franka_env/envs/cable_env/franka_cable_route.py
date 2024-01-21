@@ -4,55 +4,16 @@ import time
 import requests
 import copy
 
-from franka_env.envs.franka_env import FrankaEnv, FrankaEnvConfig
+from franka_env.envs.franka_env import FrankaEnv
 from franka_env.utils.rotations import euler_2_quat
-
-
-# TODO: Move this to a example config file, and have an example script
-class FrankaCableRouteConfig(FrankaEnvConfig):
-    TARGET_POSE = np.array(
-        [
-            0.460639895728905,
-            -0.02439473272513422,
-            0.026321125814908725,
-            3.1331234,
-            0.0182487,
-            1.5824805,
-        ]
-    )
-    RESET_POSE = TARGET_POSE + np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
-    ACTION_SCALE = (0.05, 0.3, 1)
-    ABS_POSE_LIMIT_LOW = np.array(
-        [
-            TARGET_POSE[0] - 0.1,
-            TARGET_POSE[1] - 0.1,
-            0.001,
-            TARGET_POSE[3] - 0.01,
-            TARGET_POSE[4] - 0.01,
-            TARGET_POSE[5] - np.pi / 6,
-        ]
-    )
-    ABS_POSE_LIMIT_HIGH = np.array(
-        [
-            TARGET_POSE[0] + 0.1,
-            TARGET_POSE[1] + 0.1,
-            0.1,
-            TARGET_POSE[3] + 0.01,
-            TARGET_POSE[4] + 0.01,
-            TARGET_POSE[5] + np.pi / 6,
-        ]
-    )
-
+from franka_env.envs.cable_env.config import CableEnvConfig
 
 ##############################################################################
 
 
 class FrankaCableRoute(FrankaEnv):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, config=FrankaCableRouteConfig)
-
-    def crop_image(self, image):
-        return image[:, 80:560, :]
+        super().__init__(**kwargs, config=CableEnvConfig)
 
     def go_to_rest(self, jpos=False):
         self.update_currpos()

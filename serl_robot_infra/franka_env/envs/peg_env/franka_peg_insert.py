@@ -6,11 +6,12 @@ import copy
 
 from franka_env.envs.franka_env import FrankaEnv
 from franka_env.utils.rotations import euler_2_quat
+from franka_env.envs.peg_env.config import PegEnvConfig
 
 
 class FrankaPegInsert(FrankaEnv):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(**kwargs, config=PegEnvConfig)
 
     def go_to_rest(self, jpos=False):
         requests.post(self.url + "peg_compliance_mode")

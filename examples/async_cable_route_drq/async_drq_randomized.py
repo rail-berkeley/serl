@@ -21,25 +21,25 @@ from jaxrl_m.utils.timer_utils import Timer
 from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
 from jaxrl_m.utils.train_utils import concat_batches
 
-from agentlace.trainer import TrainerServer, TrainerClient
+from agentlace.trainer import TrainerServer, TrainerClient, TrainerTunnel
 from agentlace.data.data_store import QueuedDataStore
 
+from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.utils.jaxrl_m_common import (
     make_drq_agent,
     make_trainer_config,
     make_wandb_logger,
 )
-from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
     SpacemouseIntervention,
     Quat2EulerWrapper,
+    BinaryRewardClassifierWrapper,
 )
 
 import franka_env
-
 
 FLAGS = flags.FLAGS
 
@@ -182,6 +182,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
 
             obs = next_obs
             if done or truncated:
+                if reward:
+                    print("cable route success!")
                 stats = {"train": info}  # send stats to the learner to log
                 client.request("send-stats", stats)
                 running_return = 0.0
@@ -304,6 +306,7 @@ def main(_):
     assert FLAGS.batch_size % num_devices == 0
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
+    rng, sampling_rng = jax.random.split(rng)
 
     # create env and load dataset
     env = gym.make(
@@ -318,9 +321,18 @@ def main(_):
     env = Quat2EulerWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
-    env = RecordEpisodeStatistics(env)
-
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
+    if FLAGS.actor:
+        # initialize the classifier and wrap the env
+        from train_reward_classifier import load_classifier_func
+
+        reward_func = load_classifier_func(
+            key=sampling_rng,
+            sample=env.observation_space.sample(),
+            image_keys=image_keys,
+        )
+        env = BinaryRewardClassifierWrapper(env, reward_func)
+    env = RecordEpisodeStatistics(env)
 
     rng, sampling_rng = jax.random.split(rng)
     agent: DrQAgent = make_drq_agent(
@@ -383,7 +395,6 @@ def main(_):
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
         data_store = QueuedDataStore(50000)  # the queue size on the actor
-
         # actor loop
         print_green("starting actor loop")
         actor(agent, data_store, env, sampling_rng, tunnel=None)

@@ -39,8 +39,6 @@ from franka_env.envs.wrappers import (
 )
 
 import franka_env
-from config import ExampleEnvConfig
-
 
 FLAGS = flags.FLAGS
 
@@ -311,7 +309,6 @@ def main(_):
         FLAGS.env,
         fake_env=FLAGS.learner,
         save_video=FLAGS.eval_checkpoint_step,
-        config=ExampleEnvConfig,
     )
     env = GripperCloseEnv(env)
     if FLAGS.actor:

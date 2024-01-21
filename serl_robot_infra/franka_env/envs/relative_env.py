@@ -61,7 +61,7 @@ class RelativeFrame(gym.Wrapper):
         if self.include_relative_pose:
             # Update transformation matrix from the reset pose's relative frame to base frame
             self.T_r_o_inv = np.linalg.inv(
-                self.construct_homogeneous_matrix(obs["state"]["tcp_pose"])
+                construct_homogeneous_matrix(obs["state"]["tcp_pose"])
             )
 
         # Transform observation to spatial frame

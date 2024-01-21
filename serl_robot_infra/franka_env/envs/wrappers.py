@@ -4,8 +4,31 @@ import gymnasium as gym
 import numpy as np
 from gymnasium.spaces import Box
 import copy
-from robot_infra.spacemouse.spacemouse_expert import SpaceMouseExpert
+from franka_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 from franka_env.utils.rotations import quat_2_euler
+
+
+class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
+    """
+    This wrapper uses the front camera images to compute the reward,
+    which is not part of the observation space
+    """
+
+    def __init__(self, env: Env, reward_classifier_func):
+        super().__init__(env)
+        self.reward_classifier_func = reward_classifier_func
+
+    def compute_reward(self, obs):
+        if self.reward_classifier_func is not None:
+            logit = self.reward_classifier_func(obs).item()
+            return (logit >= 0.5) * 1
+        return 0
+
+    def step(self, action):
+        obs, rew, done, truncated, info = self.env.step(action)
+        rew = self.compute_reward(self.env.get_front_cam_obs())
+        done = done or rew
+        return obs, rew, done, truncated, info
 
 
 class BinaryRewardClassifierWrapper(gym.Wrapper):
@@ -24,6 +47,23 @@ class BinaryRewardClassifierWrapper(gym.Wrapper):
         rew = self.compute_reward(obs)
         done = done or rew
         return obs, rew, done, truncated, info
+
+
+class ZOnlyWrapper(gym.ObservationWrapper):
+    def __init__(self, env: Env):
+        super().__init__(env)
+        self.observation_space["state"] = spaces.Box(-np.inf, np.inf, shape=(14,))
+
+    def observation(self, observation):
+        observation["state"] = np.concatenate(
+            (
+                observation["state"][:4],
+                np.array(observation["state"][6])[..., None],
+                observation["state"][10:],
+            ),
+            axis=-1,
+        )
+        return observation
 
 
 class Quat2EulerWrapper(gym.ObservationWrapper):
@@ -51,7 +91,7 @@ class GripperCloseEnv(gym.ActionWrapper):
         self.action_space = Box(ub.low[:6], ub.high[:6])
 
     def action(self, action: np.ndarray) -> np.ndarray:
-        new_action = np.ones((7,), dtype=np.float32)
+        new_action = np.zeros((7,), dtype=np.float32)
         new_action[:6] = action.copy()
         return new_action
 
@@ -85,11 +125,19 @@ class SpacemouseIntervention(gym.ActionWrapper):
         expert_a, buttons = self.expert.get_action()
         self.left, self.right = tuple(buttons)
 
-        if self.gripper_enabled:
-            expert_a = np.append(expert_a, 0)
-
         if np.linalg.norm(expert_a) > 0.001:
             self.last_intervene = time.time()
+
+        if self.gripper_enabled:
+            if self.left:  # close gripper
+                gripper_action = np.random.uniform(-1, -0.9, size=(1,))
+                self.last_intervene = time.time()
+            elif self.right:  # open gripper
+                gripper_action = np.random.uniform(0.9, 1, size=(1,))
+                self.last_intervene = time.time()
+            else:
+                gripper_action = np.zeros((1,))
+            expert_a = np.concatenate((expert_a, gripper_action), axis=0)
 
         if time.time() - self.last_intervene < 0.5:
             return expert_a

@@ -322,7 +322,7 @@ def main(_):
                 "q": np.array(robot_server.q).tolist(),
                 "dq": np.array(robot_server.dq).tolist(),
                 "jacobian": np.array(robot_server.jacobian).tolist(),
-                "gripper": gripper_server.gripper_pos,
+                "gripper_pos": gripper_server.gripper_pos,
             }
         )
 

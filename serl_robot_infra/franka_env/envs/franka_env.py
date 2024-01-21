@@ -9,6 +9,7 @@ import requests
 import queue
 import threading
 from datetime import datetime
+from collections import OrderedDict
 
 from franka_env.camera.video_capture import VideoCapture
 from franka_env.camera.rs_capture import RSCapture
@@ -28,7 +29,7 @@ class ImageDisplayer(threading.Thread):
                 break
 
             frame = np.concatenate(
-                [img_array["wrist_1_full"], img_array["wrist_2_full"]], axis=0
+                [v for k, v in img_array.items() if "full" not in k], axis=0
             )
 
             cv2.imshow("RealSense Cameras", frame)
@@ -43,38 +44,19 @@ class DefaultEnvConfig:
     """Default configuration for FrankaEnv. Fill in the values below."""
 
     SERVER_URL: str = "http://127.0.0.1:5000/"
-    WRIST_CAM1_SERIAL: str = "REALSENSE_SERIAL_NUM"
-    WRIST_CAM2_SERIAL: str = "REALSENSE_SERIAL_NUM"
+    REALSENSE_CAMERAS = {
+        "wrist_1": "130322274175",
+        "wrist_2": "127122270572",
+    }
     TARGET_POSE: np.ndarray = np.zeros((6,))
     REWARD_THRESHOLD: np.ndarray = np.zeros((6,))
     ACTION_SCALE = np.zeros((3,))
     RESET_POSE = np.zeros((6,))
+    RANDOM_RESET = (False,)
+    RANDOM_XY_RANGE = (0.0,)
+    RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
-
-
-# TODO: clean this or remove this?
-class FrankaEnvConfig(DefaultEnvConfig):
-    """Default configuration for FrankaEnv."""
-
-    SERVER_URL: str = "http://127.0.0.1:5000/"
-    WRIST_CAM1_SERIAL: str = "130322274175"
-    WRIST_CAM2_SERIAL: str = "127122270572"
-    TARGET_POSE: np.ndarray = np.array(
-        [
-            0.5907729022946797,
-            0.05342705145048531,
-            0.09071618754222505,
-            3.1339503,
-            0.009167,
-            1.5550434,
-        ]
-    )
-    REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
-    ACTION_SCALE = np.array([0.02, 0.1, 1])
-    RESET_POSE = TARGET_POSE + np.array([0.0, 0.2, 0.0, 0.0, 0.0, 0.0])
-    ABS_POSE_LIMIT_LOW = np.array([0.56, 0.0, 0.05, np.pi - 0.01, -0.01, 1.35])
-    ABS_POSE_LIMIT_HIGH = np.array([0.62, 0.08, 0.2, np.pi + 0.01, 0.01, 1.7])
 
 
 ##############################################################################
@@ -83,13 +65,10 @@ class FrankaEnvConfig(DefaultEnvConfig):
 class FrankaEnv(gym.Env):
     def __init__(
         self,
-        randomReset=False,
-        random_xy_range=0.05,
-        random_rz_range=np.pi / 36,
         hz=10,
         fake_env=False,
         save_video=False,
-        config=FrankaEnvConfig,
+        config: DefaultEnvConfig = None,
     ):
         self.action_scale = config.ACTION_SCALE
         self._TARGET_POSE = config.TARGET_POSE
@@ -112,9 +91,9 @@ class FrankaEnv(gym.Env):
 
         self.curr_gripper_pos = 0
         self.lastsent = time.time()
-        self.randomreset = randomReset
-        self.random_xy_range = random_xy_range
-        self.random_rz_range = random_rz_range
+        self.randomreset = config.RANDOM_RESET
+        self.random_xy_range = config.RANDOM_XY_RANGE
+        self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
         self.joint_reset_cycle = 200  # reset the robot joint every 200 cycles
 
@@ -170,7 +149,8 @@ class FrankaEnv(gym.Env):
         if fake_env:
             return
 
-        self.init_cameras()
+        self.cap = None
+        self.init_cameras(config.REALSENSE_CAMERAS)
         self.img_queue = queue.Queue()
         self.displayer = ImageDisplayer(self.img_queue)
         self.displayer.start()
@@ -184,6 +164,17 @@ class FrankaEnv(gym.Env):
         arr = np.array(pos).astype(np.float32)
         data = {"arr": arr.tolist()}
         requests.post(self.url + "pose", json=data)
+
+    def send_gripper_command(self, pos, mode="binary"):
+        if mode == "binary":
+            if (pos >= -1) and (pos <= -0.9):  # close gripper
+                requests.post(self.url + "close_gripper")
+            elif (pos >= 0.9) and (pos <= 1):  # open gripper
+                requests.post(self.url + "open_gripper")
+            else:  # do nothing to the gripper
+                return
+        elif mode == "continuous":
+            raise NotImplementedError("Continuous gripper control is optional")
 
     def update_currpos(self):
         ps = requests.post(self.url + "getstate").json()
@@ -237,6 +228,9 @@ class FrankaEnv(gym.Env):
             * Rotation.from_quat(self.currpos[3:])
         ).as_quat()
 
+        gripper_action = action[6] * self.action_scale[2]
+
+        self.send_gripper_command(gripper_action)
         self._send_pos_command(self.clip_safety_box(self.nextpos))
 
         self.curr_path_length += 1
@@ -262,9 +256,14 @@ class FrankaEnv(gym.Env):
             # print(f'Goal not reached, the difference is {delta}, the desired threshold is {_REWARD_THRESHOLD}')
             return False
 
-    def crop_image(self, image):
+    def crop_image(self, name, image):
         """Crop realsense images to be a square."""
-        return image[:, 80:560, :]
+        if name == "wrist_1":
+            return image[:, 80:560, :]
+        elif name == "wrist_2":
+            return image[:, 80:560, :]
+        else:
+            return ValueError(f"Camera {name} not recognized in cropping")
 
     def get_im(self):
         images = {}
@@ -272,10 +271,7 @@ class FrankaEnv(gym.Env):
         for key, cap in self.cap.items():
             try:
                 rgb = cap.read()
-                if key == "wrist_1":
-                    cropped_rgb = self.crop_image(rgb)
-                if key == "wrist_2":
-                    cropped_rgb = self.crop_image(rgb)
+                cropped_rgb = self.crop_image(key, rgb)
                 resized = cv2.resize(
                     cropped_rgb, self.observation_space["images"][key].shape[:2][::-1]
                 )
@@ -287,7 +283,7 @@ class FrankaEnv(gym.Env):
                     f"{key} camera frozen. Check connect, then press enter to relaunch..."
                 )
                 cap.close()
-                self.init_cameras()
+                self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_im()
 
         self.recording_frames.append(
@@ -368,24 +364,22 @@ class FrankaEnv(gym.Env):
         except Exception as e:
             print(f"Failed to save video: {e}")
 
-    def init_cameras(self):
+    def init_cameras(self, name_serial_dict=None):
         """Init both wrist cameras."""
-        cap_wrist_1 = VideoCapture(
-            RSCapture(
-                name="wrist_1", serial_number=self.config.WRIST_CAM1_SERIAL, depth=False
+        if self.cap is not None:  # close cameras if they are already open
+            self.close_cameras()
+
+        self.cap = OrderedDict()
+        for cam_name, cam_serial in name_serial_dict.items():
+            cap = VideoCapture(
+                RSCapture(name=cam_name, serial_number=cam_serial, depth=False)
             )
-        )
-        cap_wrist_2 = VideoCapture(
-            RSCapture(
-                name="wrist_2", serial_number=self.config.WRIST_CAM2_SERIAL, depth=False
-            )
-        )
-        self.cap = {
-            "wrist_1": cap_wrist_1,
-            "wrist_2": cap_wrist_2,
-        }
+            self.cap[cam_name] = cap
 
     def close_cameras(self):
         """Close both wrist cameras."""
-        self.cap["wrist_1"].close()
-        self.cap["wrist_2"].close()
+        try:
+            for cap in self.cap.values():
+                cap.close()
+        except Exception as e:
+            print(f"Failed to close cameras: {e}")
