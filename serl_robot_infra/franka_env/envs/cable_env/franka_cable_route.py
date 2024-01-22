@@ -1,5 +1,4 @@
 import numpy as np
-import gymnasium as gym
 import time
 import requests
 import copy
@@ -53,5 +52,3 @@ class FrankaCableRoute(FrankaEnv):
 
         # Change to compliance mode
         requests.post(self.url + "update_param", json=self.config.COMPLIANCE_PARAM)
-        
-        return True
