@@ -50,6 +50,8 @@ Website: https://serl-robot.github.io/
 Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env_human.py`
 
 ## Quick Start with Franka Arm in Sim
+Note to set MUJOCO_GL as egl if you are doing off-screen rendering.
+```export MUJOCO_GL=egl```
 ### 1. Training from state observation example
 
 One-liner launcher (requires `tmux`):
