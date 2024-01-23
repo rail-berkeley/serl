@@ -1,6 +1,6 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
-python train_bc.py "$@" \
+python ../bc_policy.py "$@" \
     --env FrankaPCBInsert-Vision-v0 \
     --exp_name=serl_dev_bc_pcb_insert_random_resnet \
     --seed 0 \

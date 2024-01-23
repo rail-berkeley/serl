@@ -1,6 +1,6 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
-python train_bc.py "$@" \
+python ../bc_policy.py "$@" \
     --env FrankaCableRoute-Vision-v0 \
     --exp_name=serl_dev_bc_cable_random_resnet \
     --seed 0 \
@@ -13,4 +13,5 @@ python train_bc.py "$@" \
     --checkpoint_path /home/undergrad/code/serl_dev/examples/async_cable_route_drq/10x10_30degs_100demos_rand_cable_route_bc \
     --eval_checkpoint_step 20000 \
     --eval_n_trajs 100 \
+    --reward_classifier_ckpt_path "/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt" \
     # --debug

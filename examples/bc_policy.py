@@ -2,7 +2,10 @@ from tqdm import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 import jax
+from jax import numpy as jnp
+import pickle as pkl
 import numpy as np
+from copy import deepcopy
 import time
 
 import gymnasium as gym
@@ -21,19 +24,21 @@ from serl_launcher.data.data_store import (
     populate_data_store,
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.networks.reward_classifier import load_classifier_func
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
     SpacemouseIntervention,
     Quat2EulerWrapper,
     ZOnlyWrapper,
+    BinaryRewardClassifierWrapper,
 )
 
 import franka_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "FrankaRobotiqEnv-Vision-v0", "Name of environment.")
+flags.DEFINE_string("env", "FrankaEnv-Vision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "bc", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
@@ -57,6 +62,9 @@ flags.DEFINE_integer("eval_n_trajs", 100, "Number of trajectories for evaluation
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
+flags.DEFINE_string(
+    "reward_classifier_ckpt_path", None, "Path to reward classifier checkpoint. Default: None"
+)
 
 devices = jax.local_devices()
 num_devices = len(devices)
@@ -81,9 +89,21 @@ def main(_):
     env = SERLObsWrapper(env)
     env = ZOnlyWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
-    env = RecordEpisodeStatistics(env)
-
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
+
+    # use custom trained image-based reward classifier
+    if FLAGS.reward_classifier_ckpt_path:
+        rng = jax.random.PRNGKey(0)
+        rng, key = jax.random.split(rng)
+        classifier_func = load_classifier_func(
+            key=key,
+            sample=env.observation_space.sample(),
+            image_keys=image_keys,
+            checkpoint_path=FLAGS.reward_classifier_ckpt_path
+        )
+        env = BinaryRewardClassifierWrapper(env, classifier_func)
+
+    env = RecordEpisodeStatistics(env)
 
     rng, sampling_rng = jax.random.split(rng)
     agent: BCAgent = make_bc_agent(
@@ -102,6 +122,13 @@ def main(_):
 
     if not FLAGS.eval_checkpoint_step:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
+        # load demos
+        replay_buffer = MemoryEfficientReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            FLAGS.replay_buffer_capacity,
+            image_keys=image_keys,
+        )
         # load demos and populate to current replay buffer
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
