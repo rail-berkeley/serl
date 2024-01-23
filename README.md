@@ -85,7 +85,7 @@ You can optionally launch learner and actor on separate machines. For example, i
 
 One-liner launcher (requires `tmux`, `sudo apt install tmux`):
 ```bash
-bash examples/async_sac_image_sim/tmux_launch.sh
+bash examples/async_drq_sim/tmux_launch.sh
 ```
 
 <details>

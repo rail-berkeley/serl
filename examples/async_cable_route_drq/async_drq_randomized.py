@@ -43,7 +43,7 @@ import franka_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "FrankaEnv-Vision-v0", "Name of environment.")
+flags.DEFINE_string("env", "FrankaCableRoute-Vision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
@@ -100,6 +100,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
     NOTE: tunnel is used the transport layer for multi-threading
     """
     if FLAGS.eval_checkpoint_step:
+        success_counter = 0
+        time_list = []
+
         ckpt = checkpoints.restore_checkpoint(
             FLAGS.checkpoint_path,
             agent.state,
@@ -107,10 +110,11 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
         )
         agent = agent.replace(state=ckpt)
 
-        for _ in range(FLAGS.eval_n_trajs):
+        for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
             done = False
-            for step in range(FLAGS.max_traj_length):
+            start_time = time.time()
+            while not done:
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     argmax=True,
@@ -119,6 +123,19 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
 
                 next_obs, reward, done, truncated, info = env.step(actions)
                 obs = next_obs
+
+                if done:
+                    if reward:
+                        dt = time.time() - start_time
+                        time_list.append(dt)
+                        print(dt)
+
+                    success_counter += reward
+                    print(reward)
+                    print(f"{success_counter}/{episode + 1}")
+
+        print(f"success rate: {success_counter / FLAGS.eval_n_trajs}")
+        print(f"average time: {np.mean(time_list)}")
         return  # after done eval, return and exit
 
     client = TrainerClient(
@@ -324,12 +341,13 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
     if FLAGS.actor:
         # initialize the classifier and wrap the env
-        from train_reward_classifier import load_classifier_func
+        from serl_launcher.networks.reward_classifier import load_classifier_func
 
         reward_func = load_classifier_func(
             key=sampling_rng,
             sample=env.observation_space.sample(),
             image_keys=image_keys,
+            checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt/",
         )
         env = BinaryRewardClassifierWrapper(env, reward_func)
     env = RecordEpisodeStatistics(env)
