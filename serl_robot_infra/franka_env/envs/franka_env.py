@@ -56,6 +56,8 @@ class DefaultEnvConfig:
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
+    COMPLIANCE_PARAM = {}
+    PRECISION_PARAM = {}
 
 
 ##############################################################################
@@ -307,40 +309,35 @@ class FrankaEnv(gym.Env):
 
         return copy.deepcopy(dict(images=images, state=state_observation))
 
-    def interpolate_move(self, goal, timeout, dt=0.1):
-        steps = int(timeout / dt)
+    def interpolate_move(self, goal, timeout):
+        steps = int(timeout * self.hz)
         self.update_currpos()
         path = np.linspace(self.currpos, goal, steps)
         for p in path:
             self._send_pos_command(p)
-            time.sleep(dt)
+            time.sleep(1 / self.hz)
         self.update_currpos()
 
-    def go_to_rest(self, jpos=False):
+    def go_to_rest(self, joint_reset=False):
         """
         The concrete steps to perform reset should be
         implemented each subclass for the specific task.
         """
         raise NotImplementedError
 
-    def reset(self, jpos=False, gripper=None, **kwargs):
+    def reset(self, joint_reset=False, **kwargs):
+        requests.post(self.url + "update_param", json=self.config.COMPLIANCE_PARAM)
         if self.save_video:
             self.save_video_recording()
 
         self.cycle_count += 1
         if self.cycle_count % self.joint_reset_cycle == 0:
             self.cycle_count = 0
-            jpos = True
+            joint_reset = True
 
-        success = self.go_to_rest(jpos=jpos)
-        self.update_currpos()
-        self.curr_path_length = 0
+        self.go_to_rest(joint_reset=joint_reset)
         self.recover()
-
-        if jpos:
-            self.go_to_rest(jpos=False)
-            self.update_currpos()
-            self.recover()
+        self.curr_path_length = 0
 
         self.update_currpos()
         o = self._get_obs()

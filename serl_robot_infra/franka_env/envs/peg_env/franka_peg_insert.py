@@ -13,22 +13,30 @@ class FrankaPegInsert(FrankaEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=PegEnvConfig)
 
-    def go_to_rest(self, jpos=False):
-        requests.post(self.url + "peg_compliance_mode")
+    def go_to_rest(self, joint_reset=False):
+        self.update_currpos()
+        self._send_pos_command(self.currpos)
+        time.sleep(0.5)
+
+        # Move up to clear the slot
         self.update_currpos()
         reset_pose = copy.deepcopy(self.currpos)
-        reset_pose[2] += 0.03
-        self.interpolate_move(reset_pose, timeout=1.5)
-
-        # time.sleep(2)
-        requests.post(self.url + "precision_mode")
-        time.sleep(1)  # wait for mode switching
-
-        reset_pose = self.resetpos.copy()
+        reset_pose[2] += 0.10
         self.interpolate_move(reset_pose, timeout=1)
 
-        # perform random reset
+        # Change to precision mode for reset
+        requests.post(self.url + "update_param", json=self.config.PRECISION_PARAM)
+        time.sleep(0.5)
+
+        # Perform joint reset if needed
+        if joint_reset:
+            print("JOINT RESET")
+            requests.post(self.url + "jointreset")
+            time.sleep(0.5)
+
+        # Perform Carteasian reset
         if self.randomreset:  # randomize reset position in xy plane
+            reset_pose = self.resetpos.copy()
             reset_pose[:2] += np.random.uniform(
                 -self.random_xy_range, self.random_xy_range, (2,)
             )
@@ -37,12 +45,10 @@ class FrankaPegInsert(FrankaEnv):
                 -self.random_rz_range, self.random_rz_range
             )
             reset_pose[3:] = euler_2_quat(euler_random)
-            self.interpolate_move(reset_pose, timeout=1)
+            self.interpolate_move(reset_pose, timeout=1.5)
+        else:
+            reset_pose = self.resetpos.copy()
+            self.interpolate_move(reset_pose, timeout=1.5)
 
-        if jpos:
-            requests.post(self.url + "precision_mode")
-            print("JOINT RESET")
-            requests.post(self.url + "jointreset")
-
-        requests.post(self.url + "peg_compliance_mode")
-        return True
+        # Change to compliance mode
+        requests.post(self.url + "update_param", json=self.config.COMPLIANCE_PARAM)
