@@ -308,13 +308,13 @@ class FrankaEnv(gym.Env):
 
         return copy.deepcopy(dict(images=images, state=state_observation))
 
-    def interpolate_move(self, goal, timeout, dt=0.1):
-        steps = int(timeout / dt)
+    def interpolate_move(self, goal, timeout):
+        steps = int(timeout * self.hz)
         self.update_currpos()
         path = np.linspace(self.currpos, goal, steps)
         for p in path:
             self._send_pos_command(p)
-            time.sleep(dt)
+            time.sleep(1 / self.hz)
         self.update_currpos()
 
     def go_to_rest(self, joint_reset=False):

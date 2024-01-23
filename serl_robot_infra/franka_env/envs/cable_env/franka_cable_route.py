@@ -16,7 +16,7 @@ class FrankaCableRoute(FrankaEnv):
 
     def go_to_rest(self, joint_reset=False):
         self.update_currpos()
-        self._send_pos_command(self.clip_safety_box(self.currpos))
+        self._send_pos_command(self.currpos)
         time.sleep(0.5)
 
         # Move up to clear the slot
@@ -48,7 +48,7 @@ class FrankaCableRoute(FrankaEnv):
             self.interpolate_move(reset_pose, timeout=1.5)
         else:
             reset_pose = self.resetpos.copy()
-            self.interpolate_move(reset_pose, timeout=1)
+            self.interpolate_move(reset_pose, timeout=1.5)
 
         # Change to compliance mode
         requests.post(self.url + "update_param", json=self.config.COMPLIANCE_PARAM)
