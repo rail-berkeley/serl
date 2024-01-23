@@ -28,11 +28,11 @@ class BinaryClassifier(nn.Module):
 
 
 def create_classifier(
-        key: jnp.ndarray,
-        sample: Dict,
-        image_keys: List[str],
-        pretrained_encoder_path: str="./resnet10_params.pkl"
-    ):
+    key: jnp.ndarray,
+    sample: Dict,
+    image_keys: List[str],
+    pretrained_encoder_path: str = "./resnet10_params.pkl",
+):
     pretrained_encoder = resnetv1_configs["resnetv1-10-frozen"](
         pre_pooling=True,
         name="pretrained_encoder",
@@ -88,11 +88,11 @@ def create_classifier(
 
 
 def load_classifier_func(
-        key: jnp.ndarray, 
-        sample: Dict,
-        image_keys: List[str],
-        checkpoint_path: str,
-    ) -> Callable[[Dict], jnp.ndarray]:
+    key: jnp.ndarray,
+    sample: Dict,
+    image_keys: List[str],
+    checkpoint_path: str,
+) -> Callable[[Dict], jnp.ndarray]:
     """
     # TODO: change the hardcoded path
     Return: a function that takes in an observation

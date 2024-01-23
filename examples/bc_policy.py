@@ -63,7 +63,9 @@ flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
 flags.DEFINE_string(
-    "reward_classifier_ckpt_path", None, "Path to reward classifier checkpoint. Default: None"
+    "reward_classifier_ckpt_path",
+    None,
+    "Path to reward classifier checkpoint. Default: None",
 )
 
 devices = jax.local_devices()
@@ -99,7 +101,7 @@ def main(_):
             key=key,
             sample=env.observation_space.sample(),
             image_keys=image_keys,
-            checkpoint_path=FLAGS.reward_classifier_ckpt_path
+            checkpoint_path=FLAGS.reward_classifier_ckpt_path,
         )
         env = BinaryRewardClassifierWrapper(env, classifier_func)
 
