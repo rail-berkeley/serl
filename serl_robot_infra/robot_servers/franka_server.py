@@ -326,37 +326,11 @@ def main(_):
             }
         )
 
-    # cable routing configs
-    @webapp.route("/cable_wrap_compliance_mode", methods=["POST"])
-    def cable_wrap_compliance_mode():
-        from robot_servers.configs.cable_route_config import impedance_config
-
-        reconf_client.update_configuration(impedance_config)
-        return "cable wrap compliance Mode"
-
-    # PCB
-    @webapp.route("/pcb_compliance_mode", methods=["POST"])
-    def pcb_compliance_mode():
-        from robot_servers.configs.pcb_config import impedance_config
-
-        reconf_client.update_configuration(impedance_config)
-        return "pcb compliance Mode"
-
-    # Peg
-    @webapp.route("/peg_compliance_mode", methods=["POST"])
-    def peg_compliance_mode():
-        from robot_servers.configs.peg_config import impedance_config
-
-        reconf_client.update_configuration(impedance_config)
-        return "peg compliance Mode"
-
     # precision mode for reset
-    @webapp.route("/precision_mode", methods=["POST"])
-    def precision_mode():
-        from robot_servers.configs.precision_config import impedance_config
-
-        reconf_client.update_configuration(impedance_config)
-        return "precision Mode"
+    @webapp.route("/update_param", methods=["POST"])
+    def update_param():
+        reconf_client.update_configuration(request.json)
+        return "Updated compliance parameters"
 
     webapp.run(host="0.0.0.0")
 
