@@ -36,6 +36,7 @@ class FrankaPegInsert(FrankaEnv):
 
         # Perform Carteasian reset
         if self.randomreset:  # randomize reset position in xy plane
+            reset_pose = self.resetpos.copy()
             reset_pose[:2] += np.random.uniform(
                 -self.random_xy_range, self.random_xy_range, (2,)
             )
