@@ -74,3 +74,41 @@ class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStor
     # NOTE: method for DataStoreBase
     def get_latest_data(self, from_id: int):
         raise NotImplementedError  # TODO
+
+
+def populate_data_store(
+    data_store: DataStoreBase,
+    demos_path: str,
+):
+    """
+    Utility function to populate demonstrations data into data_store.
+    :return data_store
+    """
+    import pickle as pkl
+    import numpy as np
+    from copy import deepcopy
+
+    for demo_path in demos_path:
+        with open(demo_path, "rb") as f:
+            demo = pkl.load(f)
+            for transition in demo:
+                tmp = deepcopy(transition)
+                tmp["observations"]["state"] = np.concatenate(
+                    (
+                        tmp["observations"]["state"][:, :4],
+                        tmp["observations"]["state"][:, 6][None, ...],
+                        tmp["observations"]["state"][:, 10:],
+                    ),
+                    axis=-1,
+                )
+                tmp["next_observations"]["state"] = np.concatenate(
+                    (
+                        tmp["next_observations"]["state"][:, :4],
+                        tmp["next_observations"]["state"][:, 6][None, ...],
+                        tmp["next_observations"]["state"][:, 10:],
+                    ),
+                    axis=-1,
+                )
+                data_store.insert(tmp)
+        print(f"Loaded {len(data_store)} transitions.")
+    return data_store

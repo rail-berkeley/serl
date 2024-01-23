@@ -19,9 +19,12 @@ from serl_launcher.utils.jaxrl_m_common import (
     make_bc_agent,
     make_wandb_logger,
 )
-from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
+from serl_launcher.data.data_store import (
+    MemoryEfficientReplayBufferDataStore,
+    populate_data_store,
+)
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-
+from serl_launcher.networks.reward_classifier import load_classifier_func
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
@@ -85,13 +88,15 @@ def main(_):
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
-    from train_reward_classifier import load_classifier_func
-
     rng = jax.random.PRNGKey(0)
     rng, key = jax.random.split(rng)
     classifier_func = load_classifier_func(
-        key=key, sample=env.observation_space.sample(), image_keys=image_keys
+        key=key,
+        sample=env.observation_space.sample(),
+        image_keys=image_keys,
+        checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt",
     )
+
     env = BinaryRewardClassifierWrapper(env, classifier_func)
     env = RecordEpisodeStatistics(env)
 
@@ -119,29 +124,14 @@ def main(_):
             FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        for demo_path in FLAGS.demo_paths:
-            with open(demo_path, "rb") as f:
-                demo = pkl.load(f)
-                for transition in demo:
-                    tmp = deepcopy(transition)
-                    tmp["observations"]["state"] = np.concatenate(
-                        (
-                            tmp["observations"]["state"][:, :4],
-                            tmp["observations"]["state"][:, 6][None, ...],
-                            tmp["observations"]["state"][:, 10:],
-                        ),
-                        axis=-1,
-                    )
-                    tmp["next_observations"]["state"] = np.concatenate(
-                        (
-                            tmp["next_observations"]["state"][:, :4],
-                            tmp["next_observations"]["state"][:, 6][None, ...],
-                            tmp["next_observations"]["state"][:, 10:],
-                        ),
-                        axis=-1,
-                    )
-                    replay_buffer.insert(tmp)
-            print(f"Loaded {len(replay_buffer)} transitions.")
+        # load demos and populate to current replay buffer
+        replay_buffer = MemoryEfficientReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            FLAGS.replay_buffer_capacity,
+            image_keys=image_keys,
+        )
+        replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
             sample_args={

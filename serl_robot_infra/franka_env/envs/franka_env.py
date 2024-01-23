@@ -39,7 +39,6 @@ class ImageDisplayer(threading.Thread):
 ##############################################################################
 
 
-# move this to a seperate config.py file?
 class DefaultEnvConfig:
     """Default configuration for FrankaEnv. Fill in the values below."""
 

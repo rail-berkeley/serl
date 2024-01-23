@@ -2,10 +2,7 @@ from tqdm import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 import jax
-from jax import numpy as jnp
-import pickle as pkl
 import numpy as np
-from copy import deepcopy
 import time
 
 import gymnasium as gym
@@ -19,9 +16,11 @@ from serl_launcher.utils.jaxrl_m_common import (
     make_bc_agent,
     make_wandb_logger,
 )
-from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
+from serl_launcher.data.data_store import (
+    MemoryEfficientReplayBufferDataStore,
+    populate_data_store,
+)
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
@@ -103,36 +102,14 @@ def main(_):
 
     if not FLAGS.eval_checkpoint_step:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        # load demos
+        # load demos and populate to current replay buffer
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        for demo_path in FLAGS.demo_paths:
-            with open(demo_path, "rb") as f:
-                demo = pkl.load(f)
-                for transition in demo:
-                    tmp = deepcopy(transition)
-                    tmp["observations"]["state"] = np.concatenate(
-                        (
-                            tmp["observations"]["state"][:, :4],
-                            tmp["observations"]["state"][:, 6][None, ...],
-                            tmp["observations"]["state"][:, 10:],
-                        ),
-                        axis=-1,
-                    )
-                    tmp["next_observations"]["state"] = np.concatenate(
-                        (
-                            tmp["next_observations"]["state"][:, :4],
-                            tmp["next_observations"]["state"][:, 6][None, ...],
-                            tmp["next_observations"]["state"][:, 10:],
-                        ),
-                        axis=-1,
-                    )
-                    replay_buffer.insert(tmp)
-            print(f"Loaded {len(replay_buffer)} transitions.")
+        replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
