@@ -27,13 +27,16 @@ if __name__ == "__main__":
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     image_keys = [k for k in env.observation_space.keys() if "state" not in k]
 
-    from train_reward_classifier import load_classifier_func
+    from serl_launcher.networks.reward_classifier import load_classifier_func
     import jax
 
     rng = jax.random.PRNGKey(0)
     rng, key = jax.random.split(rng)
     classifier_func = load_classifier_func(
-        key=key, sample=env.observation_space.sample(), image_keys=image_keys
+        key=key,
+        sample=env.observation_space.sample(),
+        image_keys=image_keys,
+        checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt/",
     )
     env = BinaryRewardClassifierWrapper(env, classifier_func)
 

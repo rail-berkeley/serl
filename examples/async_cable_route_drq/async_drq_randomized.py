@@ -341,12 +341,13 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
     if FLAGS.actor:
         # initialize the classifier and wrap the env
-        from train_reward_classifier import load_classifier_func
+        from serl_launcher.networks.reward_classifier import load_classifier_func
 
         reward_func = load_classifier_func(
             key=sampling_rng,
             sample=env.observation_space.sample(),
             image_keys=image_keys,
+            checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt/",
         )
         env = BinaryRewardClassifierWrapper(env, reward_func)
     env = RecordEpisodeStatistics(env)
