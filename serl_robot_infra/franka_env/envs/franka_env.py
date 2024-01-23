@@ -57,6 +57,8 @@ class DefaultEnvConfig:
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
+    COMPLIANCE_PARAM = {}
+    PRECISION_PARAM = {}
 
 
 ##############################################################################
@@ -325,6 +327,7 @@ class FrankaEnv(gym.Env):
         raise NotImplementedError
 
     def reset(self, joint_reset=False, **kwargs):
+        requests.post(self.url + "update_param", json=self.config.COMPLIANCE_PARAM)
         if self.save_video:
             self.save_video_recording()
 
