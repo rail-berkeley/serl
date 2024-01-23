@@ -22,6 +22,7 @@ from serl_launcher.utils.jaxrl_m_common import (
 from serl_launcher.data.data_store import (
     MemoryEfficientReplayBufferDataStore,
     populate_data_store,
+    populate_data_store_with_z_axis_only,
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from serl_launcher.networks.reward_classifier import load_classifier_func
@@ -48,7 +49,11 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 
 flags.DEFINE_integer("max_steps", 100, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 10000, "Replay buffer capacity.")
-
+flags.DEFINE_bool(
+    "remove_xy",
+    False,
+    "Whether to remove x y cartesian coordinates from state and next_state to avoid causal confusion.",
+)
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_multi_string("demo_paths", None, "paths to demos")
@@ -89,7 +94,8 @@ def main(_):
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SERLObsWrapper(env)
-    env = ZOnlyWrapper(env)
+    if FLAGS.remove_xy:
+        env = ZOnlyWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
@@ -138,7 +144,13 @@ def main(_):
             FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
+        if FLAGS.remove_xy:
+            # load demos, remove x y cartesian coordinates from state and next_state to avoid causal confusion
+            replay_buffer = populate_data_store_with_z_axis_only(
+                replay_buffer, FLAGS.demo_paths
+            )
+        else:
+            replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
