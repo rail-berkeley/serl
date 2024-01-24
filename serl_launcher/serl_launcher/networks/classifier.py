@@ -1,6 +1,7 @@
 import flax.linen as nn
 from einops import rearrange
 
+
 class BinaryClassifier(nn.Module):
     pretrained_encoder: nn.Module
     encoder: nn.Module

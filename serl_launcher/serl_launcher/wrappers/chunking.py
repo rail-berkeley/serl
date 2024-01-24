@@ -10,7 +10,7 @@ import numpy as np
 def stack_obs(obs):
     dict_list = {k: [dic[k] for dic in obs] for k in obs[0]}
     return jax.tree_map(
-        lambda x: np.stack(x), dict_list, is_leaf=lambda x: type(x) == list
+        lambda x: np.stack(x), dict_list, is_leaf=lambda x: isinstance(x, list)
     )
 
 

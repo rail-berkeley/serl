@@ -17,6 +17,7 @@ from serl_launcher.networks.mlp import MLP
 from serl_launcher.utils.train_utils import _unpack
 from serl_launcher.vision.data_augmentations import batched_random_crop
 
+
 class BCAgent(flax.struct.PyTreeNode):
     state: JaxRLTrainState
     config: dict = nonpytree_field()
@@ -81,7 +82,7 @@ class BCAgent(flax.struct.PyTreeNode):
         *,
         seed: Optional[PRNGKey] = None,
         temperature: float = 1.0,
-        argmax=False
+        argmax=False,
     ) -> jnp.ndarray:
         dist = self.state.apply_fn(
             {"params": self.state.params},
@@ -196,7 +197,7 @@ class BCAgent(flax.struct.PyTreeNode):
                 encoder_def,
                 MLP(**network_kwargs),
                 action_dim=actions.shape[-1],
-                **policy_kwargs
+                **policy_kwargs,
             )
         }
 

@@ -22,8 +22,8 @@ from serl_launcher.networks.classifier import BinaryClassifier
 
 from serl_launcher.utils.train_utils import _unpack, concat_batches
 
-class VICEAgent(DrQAgent):
 
+class VICEAgent(DrQAgent):
     @classmethod
     def create(
         cls,
@@ -56,7 +56,7 @@ class VICEAgent(DrQAgent):
         backup_entropy: bool = False,
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
-        image_keys: Iterable[str] = ('image', ),
+        image_keys: Iterable[str] = ("image",),
     ):
         networks = {
             "actor": actor_def,
@@ -128,7 +128,9 @@ class VICEAgent(DrQAgent):
             "hidden_dims": [256, 256],
         },
         vice_network_kwargs: dict = {
-            "hidden_dims": [256,],
+            "hidden_dims": [
+                256,
+            ],
             "activations": nn.leaky_relu,
             "use_layer_norm": True,
             "dropout_rate": 0.1,
@@ -140,7 +142,7 @@ class VICEAgent(DrQAgent):
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
         temperature_init: float = 1.0,
-        image_keys: Iterable[str] = ('image', ),
+        image_keys: Iterable[str] = ("image",),
         **kwargs,
     ):
         """
@@ -153,6 +155,7 @@ class VICEAgent(DrQAgent):
 
         if encoder_type == "small":
             from serl_launcher.vision.small_encoders import SmallEncoder
+
             encoders = {
                 image_key: SmallEncoder(
                     features=(32, 64, 128, 256),
@@ -181,6 +184,7 @@ class VICEAgent(DrQAgent):
             }
         elif encoder_type == "resnet":
             from serl_launcher.vision.resnet_v1 import resnetv1_configs
+
             encoders = {
                 image_key: resnetv1_configs["resnetv1-10"](
                     pooling_method="spatial_learned_embeddings",
@@ -202,7 +206,11 @@ class VICEAgent(DrQAgent):
                 for image_key in image_keys
             }
         elif encoder_type == "resnet-pretrained":
-            from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
+            from serl_launcher.vision.resnet_v1 import (
+                resnetv1_configs,
+                PreTrainedResNetEncoder,
+            )
+
             pretrained_encoder = resnetv1_configs["resnetv1-10-frozen"](
                 pre_pooling=True,
                 name="pretrained_encoder",
@@ -236,7 +244,8 @@ class VICEAgent(DrQAgent):
             encoder=encoders,
             use_proprio=use_proprio,
             enable_stacking=True,
-            image_keys=image_keys,)
+            image_keys=image_keys,
+        )
 
         encoders = {
             "critic": encoder_def,
@@ -247,7 +256,8 @@ class VICEAgent(DrQAgent):
             encoder=vice_encoders,
             use_proprio=False,
             enable_stacking=True,
-            image_keys=image_keys,)
+            image_keys=image_keys,
+        )
 
         # Define networks
         critic_backbone = partial(MLP, **critic_network_kwargs)
@@ -297,17 +307,22 @@ class VICEAgent(DrQAgent):
 
         if encoder_type == "resnet-pretrained":  # load pretrained weights for ResNet-10
             from serl_launcher.utils.train_utils import load_resnet10_params
-            agent = load_resnet10_params(agent,
+
+            agent = load_resnet10_params(
+                agent,
                 image_keys,
-                public=False,)
+                public=False,
+            )
 
         return agent
 
     def data_augmentation_fn(self, rng, observations):
-        for pixel_key in self.config['image_keys']:
+        for pixel_key in self.config["image_keys"]:
             observations = observations.copy(
                 add_or_replace={
-                    pixel_key: batched_random_crop(observations[pixel_key], rng, padding=4, num_batch_dims=2)
+                    pixel_key: batched_random_crop(
+                        observations[pixel_key], rng, padding=4, num_batch_dims=2
+                    )
                 }
             )
         return observations
@@ -343,24 +358,28 @@ class VICEAgent(DrQAgent):
             "vice": lambda params, rng: (0.0, {}),
         }
 
-    @partial(jax.jit, static_argnames=("pmap_axis", ))
-    def update_vice(self, batch, pmap_axis: Optional[str] = None,):
-        '''
+    @partial(jax.jit, static_argnames=("pmap_axis",))
+    def update_vice(
+        self,
+        batch,
+        pmap_axis: Optional[str] = None,
+    ):
+        """
         update the VICE reward classifier using the BCE loss.
         addtional regularization techniques are also used: mixup, label smoothing, and gradient penalty regularization
         to prevent GAN mode collapse.
 
         NOTE: assumes that the second half of the batch contains the goal images, so labels = 1
-        '''
+        """
         new_agent = self
         rng = new_agent.state.rng
-        if self.config['image_keys'][0] not in batch["next_observations"]:
+        if self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
         def mixup_data_rng(key_0, key_1, x: jnp.ndarray, y: jnp.ndarray, alpha=1):
-            '''
+            """
             performs mixup regularization on the input images and labels
-            '''
+            """
             if alpha > 0:
                 lam = jax.random.beta(key_0, alpha, alpha)
             else:
@@ -379,14 +398,14 @@ class VICEAgent(DrQAgent):
         gp_observations = observations.unfreeze()
         all_info = {}
 
-        for image_key in self.config['image_keys']:
+        for image_key in self.config["image_keys"]:
             pixels = observations[image_key]
             batch_size = pixels.shape[0]
 
-            pixels = observations[image_key][:batch_size // 2]
-            aug_pixels = aug_observations[image_key][:batch_size // 2]
-            goal_pixels = observations[image_key][batch_size // 2:]
-            aug_goal_pixels = aug_observations[image_key][batch_size // 2:]
+            pixels = observations[image_key][: batch_size // 2]
+            aug_pixels = aug_observations[image_key][: batch_size // 2]
+            goal_pixels = observations[image_key][batch_size // 2 :]
+            aug_goal_pixels = aug_observations[image_key][batch_size // 2 :]
 
             # concatenate all images for update
             all_obs_pixels = jnp.concatenate([pixels, aug_pixels], axis=0)
@@ -400,33 +419,42 @@ class VICEAgent(DrQAgent):
             y_batch = y_batch.squeeze(-1)
 
             # label smoothing, help with bad numerical issue with large negative logits
-            y_batch = y_batch * (1- 0.2) + 0.5 * 0.2
+            y_batch = y_batch * (1 - 0.2) + 0.5 * 0.2
 
             # encode images into embeddings
             key, rng = jax.random.split(rng)
             encoded = self.encode_images(all_pixels, key, train=True)
 
             # perform mixup
-            key_0, key_1, rng = jax.random.split(rng, 3)            
-            mix_encoded, y_a_0, y_b_0, lam_0 = mixup_data_rng(key_0, key_1, encoded, y_batch)
+            key_0, key_1, rng = jax.random.split(rng, 3)
+            mix_encoded, y_a_0, y_b_0, lam_0 = mixup_data_rng(
+                key_0, key_1, encoded, y_batch
+            )
             mix_observations[image_key] = mix_encoded
 
-            
             # interpolate for Gradient Penalty regularization
             key, rng = jax.random.split(rng)
-            '''
+            """
             generate random epsilon for each sample in the batch, the shape here depends on the shape of the encoded embeddings.
             Here are some examples:
             epsilon = jax.random.uniform(key, shape=(all_obs_pixels.shape[0], 1, 1, 1, 1))
             epsilon = jax.random.uniform(key, shape=(all_obs_pixels.shape[0], 1))
-            '''
+            """
             # epsilon = jax.random.uniform(key, shape=(all_obs_pixels.shape[0], 1, 1, 1))
-            epsilon = jax.random.uniform(key, shape=(len(mix_encoded) // 2, *([1] * (len(mix_encoded.shape[1:])))))
-            gp_encoded = epsilon * mix_encoded[:len(mix_encoded) // 2] + (1 - epsilon) * mix_encoded[len(mix_encoded) // 2:]
+            epsilon = jax.random.uniform(
+                key,
+                shape=(len(mix_encoded) // 2, *([1] * (len(mix_encoded.shape[1:])))),
+            )
+            gp_encoded = (
+                epsilon * mix_encoded[: len(mix_encoded) // 2]
+                + (1 - epsilon) * mix_encoded[len(mix_encoded) // 2 :]
+            )
             gp_observations[image_key] = gp_encoded
 
         # remove all non pixel inputs keys from the batch
-        remove_keys = [k for k in gp_observations.keys() if k not in self.config['image_keys']]
+        remove_keys = [
+            k for k in gp_observations.keys() if k not in self.config["image_keys"]
+        ]
         for k in remove_keys:
             gp_observations.pop(k)
 
@@ -434,39 +462,49 @@ class VICEAgent(DrQAgent):
         gp_observations = frozen_dict.freeze(gp_observations)
 
         key, rng = jax.random.split(rng, 2)
+
         def mixup_loss_fn(params, rng) -> Tuple[jnp.ndarray, Dict[str, float]]:
             y_hat = new_agent.state.apply_fn(
-                {'params': params,},
+                {
+                    "params": params,
+                },
                 mix_observations,
                 name="vice",
                 train=True,
                 classify_encoded=True,
-                rngs={'dropout': rng},
+                rngs={"dropout": rng},
             )
             bce_loss_a = jnp.mean(optax.sigmoid_binary_cross_entropy(y_hat, y_a_0))
             bce_loss_b = jnp.mean(optax.sigmoid_binary_cross_entropy(y_hat, y_b_0))
             bce_loss = lam_0 * bce_loss_a + (1 - lam_0) * bce_loss_b
-            return bce_loss, {f'bce_loss': bce_loss,}
+            return bce_loss, {
+                "bce_loss": bce_loss,
+            }
 
         def gp_loss_fn(params, rng) -> Tuple[jnp.ndarray, Dict[str, float]]:
             bce_loss, info = mixup_loss_fn(params, key)
             helper_fn = lambda x: new_agent.state.apply_fn(
-                {'params': params,},
+                {
+                    "params": params,
+                },
                 x,
                 name="vice",
                 train=True,
                 classify_encoded=True,
-                rngs={'dropout': rng},
+                rngs={"dropout": rng},
             )
 
             grad_wrt_input = jax.vmap(jax.grad(helper_fn), in_axes=0, out_axes=0)
             gradients = grad_wrt_input(gp_observations)
             gradients = jnp.concatenate([grads for grads in gradients.values()], axis=0)
             gradients = gradients.reshape((gradients.shape[0], -1))
-            grad_norms = jnp.sqrt(jnp.sum((gradients ** 2 + 1e-6), axis=1))
+            grad_norms = jnp.sqrt(jnp.sum((gradients**2 + 1e-6), axis=1))
             grad_penalty = jnp.mean((grad_norms - 1) ** 2)
 
-            return bce_loss + 10 * grad_penalty, {f"bce_loss": bce_loss ,"grad_norm": grad_norms.mean()}
+            return bce_loss + 10 * grad_penalty, {
+                "bce_loss": bce_loss,
+                "grad_norm": grad_norms.mean(),
+            }
 
         loss_fns = {
             "actor": lambda params, rng: (0.0, {}),
@@ -474,7 +512,9 @@ class VICEAgent(DrQAgent):
             "temperature": lambda params, rng: (0.0, {}),
             "vice": gp_loss_fn,
         }
-        new_state, info = new_agent.state.apply_loss_fns(loss_fns, pmap_axis=pmap_axis, has_aux=True)
+        new_state, info = new_agent.state.apply_loss_fns(
+            loss_fns, pmap_axis=pmap_axis, has_aux=True
+        )
         new_state = new_state.replace(rng=rng)
         all_info.update(info)
 
@@ -482,15 +522,17 @@ class VICEAgent(DrQAgent):
 
     @partial(jax.jit)
     def vice_reward(self, observation):
-        rews = nn.sigmoid(self.state.apply_fn(
-            {"params": self.state.params},
-            observation,
-            name="vice",
-            train=False,
-        ))
+        rews = nn.sigmoid(
+            self.state.apply_fn(
+                {"params": self.state.params},
+                observation,
+                name="vice",
+                train=False,
+            )
+        )
         return rews
 
-    @partial(jax.jit, static_argnames=("pmap_axis", ))
+    @partial(jax.jit, static_argnames=("pmap_axis",))
     def update_critics(
         self,
         batch: Batch,
@@ -498,19 +540,19 @@ class VICEAgent(DrQAgent):
         pmap_axis: Optional[str] = None,
     ) -> Tuple["DrQAgent", dict]:
         new_agent = self
-        if self.config['image_keys'][0] not in batch["next_observations"]:
+        if self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
         rng = new_agent.state.rng
         rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
-        obs = self.data_augmentation_fn(obs_rng, batch['observations'])
-        next_obs = self.data_augmentation_fn(next_obs_rng, batch['next_observations'])
+        obs = self.data_augmentation_fn(obs_rng, batch["observations"])
+        next_obs = self.data_augmentation_fn(next_obs_rng, batch["next_observations"])
         rewards = (self.vice_reward(next_obs) >= 0.5) * 1.0
         batch = batch.copy(
             add_or_replace={
-                'observations': obs,
-                'next_observations': next_obs,
-                'rewards': rewards,
+                "observations": obs,
+                "next_observations": next_obs,
+                "rewards": rewards,
             }
         )
 
@@ -546,25 +588,27 @@ class VICEAgent(DrQAgent):
         before updating the network.
         """
         new_agent = self
-        if self.config['image_keys'][0] not in batch["next_observations"]:
+        if self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
         rng = new_agent.state.rng
         rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
-        obs = self.data_augmentation_fn(obs_rng, batch['observations'])
-        next_obs = self.data_augmentation_fn(next_obs_rng, batch['next_observations'])
+        obs = self.data_augmentation_fn(obs_rng, batch["observations"])
+        next_obs = self.data_augmentation_fn(next_obs_rng, batch["next_observations"])
         rewards = (self.vice_reward(next_obs) >= 0.5) * 1.0
         batch = batch.copy(
             add_or_replace={
-                'observations': obs,
-                'next_observations': next_obs,
-                'rewards': rewards,
+                "observations": obs,
+                "next_observations": next_obs,
+                "rewards": rewards,
             }
         )
 
         new_state = self.state.replace(rng=rng)
 
         new_agent = self.replace(state=new_state)
-        new_agnet, info = SACAgent.update_high_utd(new_agent, batch, utd_ratio=utd_ratio, pmap_axis=pmap_axis)
+        new_agnet, info = SACAgent.update_high_utd(
+            new_agent, batch, utd_ratio=utd_ratio, pmap_axis=pmap_axis
+        )
         info["vice_rewards"] = rewards.mean()
         return new_agent, info

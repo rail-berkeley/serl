@@ -168,7 +168,7 @@ def parallel_evaluate(policy_fn, eval_envs, num_eval, verbose=True):
 
     obs = eval_envs.reset()
     if verbose:
-        print(f"Evaluating Envs")
+        print("Evaluating Envs")
     n_per = int(math.ceil(num_eval / n_envs))
     n_to_eval = n_per * n_envs
     while len(eval_episode_rewards) < n_to_eval:

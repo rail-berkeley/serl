@@ -15,10 +15,10 @@ from flax.core import frozen_dict
 def concat_batches(offline_batch, online_batch, axis=1):
     batch = defaultdict(list)
 
-    if type(offline_batch) != dict:
+    if not isinstance(offline_batch, dict):
         offline_batch = offline_batch.unfreeze()
 
-    if type(online_batch) != dict:
+    if not isinstance(online_batch, dict):
         online_batch = online_batch.unfreeze()
 
     for k, v in offline_batch.items():

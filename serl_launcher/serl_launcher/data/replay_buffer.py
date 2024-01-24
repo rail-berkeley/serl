@@ -6,6 +6,7 @@ import jax
 import numpy as np
 from serl_launcher.data.dataset import Dataset, DatasetDict
 
+
 def _init_replay_dict(
     obs_space: gym.Space, capacity: int
 ) -> Union[np.ndarray, DatasetDict]:
