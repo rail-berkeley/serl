@@ -1,16 +1,10 @@
 import collections
-import threading
 from typing import Any, Iterator, Optional, Sequence, Tuple, Union
 
 import gymnasium as gym
-import gymnasium.spaces
 import jax
 import numpy as np
-from serl_launcher.data.serl_dataset import Dataset, DatasetDict
-from flax import jax_utils
-from flax.core.frozen_dict import FrozenDict
-from jax import numpy as jnp
-
+from serl_launcher.data.dataset import Dataset, DatasetDict
 
 def _init_replay_dict(
     obs_space: gym.Space, capacity: int

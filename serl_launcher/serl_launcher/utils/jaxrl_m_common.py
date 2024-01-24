@@ -1,20 +1,15 @@
 # !/usr/bin/env python3
 
-# NOTE: this requires jaxrl_m to be installed:
-#       https://github.com/rail-berkeley/jaxrl_minimal
-
 import jax
 from jax import nn
 
 from agentlace.trainer import TrainerConfig
 
-from jaxrl_m.common.wandb import WandBLogger
-from jaxrl_m.agents.continuous.bc import BCAgent
-from jaxrl_m.agents.continuous.sac import SACAgent
-from jaxrl_m.agents.continuous.drq import DrQAgent
-
-from jaxrl_m.agents.continuous.vice import VICEAgent
-
+from serl_launcher.common.wandb import WandBLogger
+from serl_launcher.agents.continuous.bc import BCAgent
+from serl_launcher.agents.continuous.sac import SACAgent
+from serl_launcher.agents.continuous.drq import DrQAgent
+from serl_launcher.agents.continuous.vice import VICEAgent
 
 ##############################################################################
 
@@ -162,7 +157,7 @@ def make_trainer_config():
 
 def make_wandb_logger(
     project: str = "agentlace",
-    description: str = "jaxrl_m",
+    description: str = "serl_launcher",
     debug: bool = False,
 ):
     wandb_config = WandBLogger.get_default_config()

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# NOTE: this requires jaxrl_m to be installed:
-#       https://github.com/rail-berkeley/jaxrl_minimal
-
 import time
 from functools import partial
 import jax
@@ -15,11 +12,11 @@ from flax.training import checkpoints
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
-from jaxrl_m.agents.continuous.drq import DrQAgent
-from jaxrl_m.common.evaluation import evaluate
-from jaxrl_m.utils.timer_utils import Timer
-from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
-from jaxrl_m.utils.train_utils import concat_batches
+from serl_launcher.agents.continuous.drq import DrQAgent
+from serl_launcher.common.evaluation import evaluate
+from serl_launcher.utils.timer_utils import Timer
+from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.utils.train_utils import concat_batches
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore

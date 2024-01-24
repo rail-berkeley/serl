@@ -8,8 +8,8 @@ import optax
 from typing import Callable, Dict, List
 
 
-from jaxrl_m.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
-from jaxrl_m.common.encoding import EncodingWrapper
+from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
+from serl_launcher.common.encoding import EncodingWrapper
 
 
 class BinaryClassifier(nn.Module):
