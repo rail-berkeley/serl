@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-# NOTE: this requires jaxrl_m to be installed:
-#       https://github.com/rail-berkeley/jaxrl_minimal
-# Requires mujoco_py and mujoco==2.2.2
-
 import time
 from functools import partial
 
@@ -25,9 +21,9 @@ from serl_launcher.utils.jaxrl_m_common import (
 from serl_launcher.data.data_store import ReplayBufferDataStore
 
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
-from jaxrl_m.agents.continuous.sac import SACAgent
-from jaxrl_m.common.evaluation import evaluate
-from jaxrl_m.utils.timer_utils import Timer
+from serl_launcher.agents.continuous.sac import SACAgent
+from serl_launcher.common.evaluation import evaluate
+from serl_launcher.utils.timer_utils import Timer
 
 import franka_sim
 

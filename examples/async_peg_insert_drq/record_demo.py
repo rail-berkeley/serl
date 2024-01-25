@@ -16,7 +16,7 @@ from franka_env.envs.wrappers import (
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 
-from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
+from serl_launcher.wrappers.chunking import ChunkingWrapper
 
 if __name__ == "__main__":
     env = gym.make("FrankaPegInsert-Vision-v0")

@@ -11,9 +11,9 @@ import time
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
-from jaxrl_m.utils.timer_utils import Timer
-from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
-from jaxrl_m.agents.continuous.bc import BCAgent
+from serl_launcher.utils.timer_utils import Timer
+from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.agents.continuous.bc import BCAgent
 
 from serl_launcher.utils.jaxrl_m_common import (
     make_bc_agent,
