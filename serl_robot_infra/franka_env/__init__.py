@@ -24,3 +24,9 @@ register(
     entry_point="franka_env.envs.cable_env:FrankaCableRoute",
     max_episode_steps=100,
 )
+
+register(
+    id="FrankaBinRelocation-Vision-v0",
+    entry_point="franka_env.envs.bin_relocation_env:FrankaBinRelocation",
+    max_episode_steps=100,
+)

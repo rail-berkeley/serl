@@ -7,6 +7,47 @@ import copy
 from franka_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 from franka_env.utils.rotations import quat_2_euler
 
+sigmoid = lambda x: 1 / (1 + np.exp(-x))
+
+
+class FWBWFrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
+    """
+    This wrapper uses the front camera images to compute the reward,
+    which is not part of the observation space
+    """
+
+    def __init__(self, env: Env, fw_reward_classifier_func, bw_reward_classifier_func):
+        # check if env.task_id exists
+        assert hasattr(env, "task_id"), "fwbw env must have task_idx attribute"
+        assert hasattr(env, "task_graph"), "fwbw env must have a task_graph method"
+
+        super().__init__(env)
+        self.reward_classifier_funcs = [
+            fw_reward_classifier_func,
+            bw_reward_classifier_func,
+        ]
+
+    def task_graph(self, obs):
+        """
+        predict the next task to transition into based on the current observation
+        if the current task is not successful, stay in the current task
+        else transition to the next task
+        """
+        success = self.compute_reward(obs)
+        if success:
+            return (self.task_id + 1) % 2
+        return self.task_id
+
+    def compute_reward(self, obs):
+        reward = self.reward_classifier_funcs[self.task_id](obs).item()
+        return (sigmoid(reward) >= 0.5) * 1
+
+    def step(self, action):
+        obs, rew, done, truncated, info = self.env.step(action)
+        rew = self.compute_reward(self.env.get_front_cam_obs())
+        done = done or rew
+        return obs, rew, done, truncated, info
+
 
 class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
     """
@@ -21,7 +62,7 @@ class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
     def compute_reward(self, obs):
         if self.reward_classifier_func is not None:
             logit = self.reward_classifier_func(obs).item()
-            return (logit >= 0.5) * 1
+            return (sigmoid(logit) >= 0.5) * 1
         return 0
 
     def step(self, action):
@@ -39,7 +80,7 @@ class BinaryRewardClassifierWrapper(gym.Wrapper):
     def compute_reward(self, obs):
         if self.reward_classifier_func is not None:
             logit = self.reward_classifier_func(obs).item()
-            return (logit >= 0.5) * 1
+            return (sigmoid(logit) >= 0.5) * 1
         return 0
 
     def step(self, action):
