@@ -11,7 +11,7 @@ Website: https://serl-robot.github.io/
     conda create -n serl python=3.10
     ```
 
-2. Install Jax RL
+2. Install Jax as follows:
     - For CPU (not recommended):
         ```bash
         pip install --upgrade "jax[cpu]"
