@@ -3,8 +3,8 @@ from typing import Union, Iterable
 
 import gymnasium as gym
 import jax
-from serl_launcher.data.serl_replay_buffer import ReplayBuffer
-from serl_launcher.data.serl_memory_efficient_replay_buffer import (
+from serl_launcher.data.replay_buffer import ReplayBuffer
+from serl_launcher.data.memory_efficient_replay_buffer import (
     MemoryEfficientReplayBuffer,
 )
 

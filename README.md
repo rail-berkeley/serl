@@ -11,18 +11,12 @@ Website: https://serl-robot.github.io/
     conda create -n serl python=3.10
     ```
 
-2. Install RL library
-    - the examples here use jaxrl-minimal as the RL library.
-    - To install jaxrl-minimal, with `serl_dev` branch is based off the latest `main` branch.
+2. Install Jax as follows:
+    - For CPU (not recommended):
         ```bash
-        git clone https://github.com/rail-berkeley/jaxrl_minimal/tree/serl_dev
+        pip install --upgrade "jax[cpu]"
         ```
-    - install and its dependencies
-        ```bash
-        cd jaxrl_minimal
-        pip install -e .
-        pip install -r requirements.txt
-        ```
+
     - For GPU: (change cuda12 to cuda11 if you are using older driver versions)
         ```bash
         pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
@@ -38,9 +32,10 @@ Website: https://serl-robot.github.io/
     ```bash
     cd serl_launcher
     pip install -e .
+    pip install -r requirements.txt
     ```
 
-1. Install Franka Sim library (Optional)
+4. Install Franka Sim library (Optional)
     ```bash
     cd franka_sim
     pip install -e .

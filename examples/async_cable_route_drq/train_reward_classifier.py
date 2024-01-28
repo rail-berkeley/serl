@@ -7,9 +7,9 @@ import optax
 from tqdm import tqdm
 import gymnasium as gym
 
-from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
-from jaxrl_m.utils.train_utils import concat_batches
-from jaxrl_m.vision.data_augmentations import batched_random_crop
+from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.utils.train_utils import concat_batches
+from serl_launcher.vision.data_augmentations import batched_random_crop
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
