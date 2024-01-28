@@ -11,11 +11,11 @@ import gymnasium as gym
 import os
 from absl import app, flags
 
-from jaxrl_m.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
-from jaxrl_m.common.encoding import EncodingWrapper
-from jaxrl_m.envs.wrappers.chunking import ChunkingWrapper
-from jaxrl_m.utils.train_utils import concat_batches
-from jaxrl_m.vision.data_augmentations import batched_random_crop
+from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
+from serl_launcher.common.encoding import EncodingWrapper
+from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.utils.train_utils import concat_batches
+from serl_launcher.vision.data_augmentations import batched_random_crop
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from serl_launcher.wrappers.front_camera_wrapper import FrontCameraWrapper
