@@ -106,16 +106,20 @@ def make_vice_agent(
     seed,
     sample_obs,
     sample_action,
+    sample_vice_obs,
     image_keys=("image",),
+    vice_image_keys=("image",),
     encoder_type="small",
 ):
     agent = VICEAgent.create_vice(
         jax.random.PRNGKey(seed),
         sample_obs,
         sample_action,
+        sample_vice_obs,
         encoder_type=encoder_type,
         use_proprio=True,
         image_keys=image_keys,
+        vice_image_keys=vice_image_keys,
         policy_kwargs={
             "tanh_squash_distribution": True,
             "std_parameterization": "exp",
@@ -149,9 +153,11 @@ def make_vice_agent(
     return agent
 
 
-def make_trainer_config():
+def make_trainer_config(port_number: int = 5488, broadcast_port: int = 5489):
     return TrainerConfig(
-        port_number=5488, broadcast_port=5489, request_types=["send-stats"]
+        port_number=port_number,
+        broadcast_port=broadcast_port,
+        request_types=["send-stats"],
     )
 
 

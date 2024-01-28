@@ -33,6 +33,7 @@ from franka_env.envs.wrappers import (
     Quat2EulerWrapper,
     ZOnlyWrapper,
     BinaryRewardClassifierWrapper,
+    FrontCameraBinaryRewardClassifierWrapper,
 )
 
 import franka_env
@@ -49,6 +50,11 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 
 flags.DEFINE_integer("max_steps", 100, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 10000, "Replay buffer capacity.")
+flags.DEFINE_bool(
+    "gripper",
+    False,
+    "Whether to use GripperClose Env wrapper.",
+)
 flags.DEFINE_bool(
     "remove_xy",
     False,
@@ -87,8 +93,10 @@ def main(_):
         FLAGS.env,
         fake_env=not FLAGS.eval_checkpoint_step,
         save_video=FLAGS.eval_checkpoint_step,
+        max_episode_length=200,
     )
-    env = GripperCloseEnv(env)
+    if not FLAGS.gripper:
+        env = GripperCloseEnv(env)
     if FLAGS.eval_checkpoint_step:
         env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
@@ -178,14 +186,22 @@ def main(_):
         from pynput import keyboard
 
         is_failure = False
+        is_success = False
 
-        def on_press(key):
+        def esc_on_press(key):
             nonlocal is_failure
             if key == keyboard.Key.esc:
                 is_failure = True
 
-        listener = keyboard.Listener(on_press=on_press)
-        listener.start()
+        def space_on_press(key):
+            nonlocal is_success
+            if key == keyboard.Key.space and not is_success:
+                is_success = True
+
+        esc_listener = keyboard.Listener(on_press=esc_on_press)
+        esc_listener.start()
+        space_listener = keyboard.Listener(on_press=space_on_press)
+        space_listener.start()
 
         ckpt = checkpoints.restore_checkpoint(
             FLAGS.checkpoint_path,
@@ -201,6 +217,7 @@ def main(_):
             obs, _ = env.reset()
             done = False
             is_failure = False
+            is_success = False
             start_time = time.time()
             while not done:
                 actions = agent.sample_actions(
@@ -215,6 +232,11 @@ def main(_):
                 if is_failure:
                     done = True
                     print("terminated by user")
+
+                if is_success:
+                    reward = 1
+                    done = True
+                    print("success, reset now")
 
                 if done:
                     if not is_failure:

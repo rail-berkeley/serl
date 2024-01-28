@@ -70,12 +70,14 @@ class FrankaEnv(gym.Env):
         fake_env=False,
         save_video=False,
         config: DefaultEnvConfig = None,
+        max_episode_length=100,
     ):
         self.action_scale = config.ACTION_SCALE
         self._TARGET_POSE = config.TARGET_POSE
         self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
         self.url = config.SERVER_URL
         self.config = config
+        self.max_episode_length = max_episode_length
 
         # convert last 3 elements from euler to quat, from size (6,) to (7,)
         self.resetpos = np.concatenate(
@@ -241,7 +243,7 @@ class FrankaEnv(gym.Env):
         self.update_currpos()
         ob = self._get_obs()
         reward = self.compute_reward(ob)
-        done = self.curr_path_length >= 100 or reward
+        done = self.curr_path_length >= self.max_episode_length or reward
         return ob, int(reward), done, False, {}
 
     def compute_reward(self, obs):
