@@ -13,7 +13,12 @@ sigmoid = lambda x: 1 / (1 + np.exp(-x))
 class FWBWFrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
     """
     This wrapper uses the front camera images to compute the reward,
-    which is not part of the observation space
+    which is not part of the RL policy's observation space. This is used for the
+    forward backward reset-free bin picking task, where there are two classifiers,
+    one for classifying success + failure for the forward and one for the
+    backward task. Here we also use these two classifiers to decide which
+    task to transition into next at the end of the episode to maximize the
+    learning efficiency.
     """
 
     def __init__(self, env: Env, fw_reward_classifier_func, bw_reward_classifier_func):

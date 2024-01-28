@@ -21,6 +21,12 @@ class FrankaBinRelocation(FrankaEnv):
             }
         )
         self.task_id = 0  # 0 for forward task, 1 for backward task
+        """
+        the inner safety box is used to prevent the gripper from hitting the two walls of the bins in the center.
+        it is particularly useful when there is things you want to avoid running into within the bounding box.
+        it uses the intersect_line_bbox function to detect whether the gripper is going to hit the wall
+        and clips actions that will lead to collision.
+        """
         self.inner_safety_box = gym.spaces.Box(
             self._TARGET_POSE[:3] - np.array([0.07, 0.03, 0.001]),
             self._TARGET_POSE[:3] + np.array([0.07, 0.03, 0.04]),
