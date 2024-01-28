@@ -33,7 +33,7 @@ from franka_env.envs.relative_env import RelativeFrame
 FLAGS = flags.FLAGS
 flags.DEFINE_multi_string("positive_demo_paths", None, "paths to positive demos")
 flags.DEFINE_multi_string("negative_demo_paths", None, "paths to negative demos")
-flags.DEFINE_string("classifier_name", "fw", "Name of classifier: fw or bw")
+flags.DEFINE_string("classifier_ckpt_path", None, "Path to classifier checkpoint")
 
 
 def main(_):
@@ -148,7 +148,7 @@ def main(_):
         )
 
     checkpoints.save_checkpoint(
-        f"/home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/{FLAGS.classifier_name}_classifier_ckpt",
+        FLAGS.classifier_ckpt_path,
         classifier,
         step=num_epochs,
         overwrite=True,
