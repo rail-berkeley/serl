@@ -94,7 +94,6 @@ def load_classifier_func(
     checkpoint_path: str,
 ) -> Callable[[Dict], jnp.ndarray]:
     """
-    # TODO: change the hardcoded path
     Return: a function that takes in an observation
             and returns the logits of the classifier.
     """

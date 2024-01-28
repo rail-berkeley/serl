@@ -137,6 +137,9 @@ def main(_):
     )
 
     if not FLAGS.eval_checkpoint_step:
+        """
+        Training Mode
+        """
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         # load demos
         replay_buffer = MemoryEfficientReplayBufferDataStore(
@@ -183,6 +186,9 @@ def main(_):
                 )
 
     else:
+        """
+        Evaluation Mode
+        """
         from pynput import keyboard
 
         is_failure = False
