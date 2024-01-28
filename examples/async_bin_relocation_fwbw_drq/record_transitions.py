@@ -3,7 +3,7 @@ Script to record goals and failed transitions for the bin relocation task.
 
 Usage:
     python record_transitions.py --transitions_needed 400
-    
+
 add `--record_failed_only` to only record failed transitions
 """
 
@@ -81,16 +81,23 @@ if __name__ == "__main__":
     bw_pbar = tqdm(total=args.transitions_needed, desc="bw")
 
     if args.record_failed_only:
+
         def check_all_done():
-            return len(fw_failed_transitions) >= args.transitions_needed or \
-                len(bw_failed_transitions) >= args.transitions_needed
+            return (
+                len(fw_failed_transitions) >= args.transitions_needed
+                or len(bw_failed_transitions) >= args.transitions_needed
+            )
+
     else:
+
         def check_all_done():
-            return len(fw_success_transitions) >= args.transitions_needed or \
-                len(bw_success_transitions) >= args.transitions_needed
+            return (
+                len(fw_success_transitions) >= args.transitions_needed
+                or len(bw_success_transitions) >= args.transitions_needed
+            )
 
     # Loop until we have enough transitions
-    while (check_all_done()):
+    while check_all_done():
         next_obs, rew, done, truncated, info = env.step(action=np.zeros((7,)))
         next_obs = env.get_front_cam_obs()
         actions = info["intervene_action"]
@@ -108,10 +115,16 @@ if __name__ == "__main__":
 
         # Append data to buffer list
         if is_success and not args.record_failed_only:
-            if env.task_id == 0 and len(fw_success_transitions) < args.transitions_needed:
+            if (
+                env.task_id == 0
+                and len(fw_success_transitions) < args.transitions_needed
+            ):
                 fw_success_transitions.append(transition)
                 fw_pbar.update(1)
-            elif env.task_id == 1 and len(bw_success_transitions) < args.transitions_needed:
+            elif (
+                env.task_id == 1
+                and len(bw_success_transitions) < args.transitions_needed
+            ):
                 bw_success_transitions.append(transition)
                 bw_pbar.update(1)
         else:
@@ -137,11 +150,15 @@ if __name__ == "__main__":
 
     # save success transitions
     if not args.record_failed_only:
-        file_name = f"fw_bin_relocate_{args.transitions_needed}_front_cam_goal_{uuid}.pkl"
+        file_name = (
+            f"fw_bin_relocate_{args.transitions_needed}_front_cam_goal_{uuid}.pkl"
+        )
         with open(file_name, "wb") as f:
             pkl.dump(fw_success_transitions, f)
             print(f"saved {len(fw_success_transitions)} transitions to {file_name}")
-        file_name = f"bw_bin_relocate_{args.transitions_needed}_front_cam_goal_{uuid}.pkl"
+        file_name = (
+            f"bw_bin_relocate_{args.transitions_needed}_front_cam_goal_{uuid}.pkl"
+        )
         with open(file_name, "wb") as f:
             pkl.dump(bw_success_transitions, f)
             print(f"saved {len(bw_success_transitions)} transitions to {file_name}")
