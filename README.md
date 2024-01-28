@@ -16,10 +16,10 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
     - [2. Training from image observation example](#2-training-from-image-observation-example)
     - [3. Training from image observation with 20 demo trajectories example](#3-training-from-image-observation-with-20-demo-trajectories-example)
   - [Run with Franka Arm on Real Robot](#run-with-franka-arm-on-real-robot)
-    - [1. Peg Insertion](#1-peg-insertion)
-    - [2. PCB Insertion](#2-pcb-insertion)
-    - [3. Cable Routing](#3-cable-routing)
-    - [4. Bin Relocation](#4-bin-relocation)
+    - [1. Peg Insertion 📍](#1-peg-insertion-)
+    - [2. PCB Insertion 🖥️](#2-pcb-insertion-️)
+    - [3. Cable Routing 🔌](#3-cable-routing-)
+    - [4. Bin Relocation 🗑️](#4-bin-relocation-️)
   - [Citation](#citation)
 
 ---
@@ -191,10 +191,11 @@ This requires installation of the following packages:
 
 *NOTE: the following code will not run as it is, since it will requires custom datas, checkpoints and robot env. We provide the code as a reference for how to use SERL with real robots. Learn this section in incremental order, starting from the first task (peg insertion) to the last task (bin relocation). Modify the code according to your need*
 
-### 1. Peg Insertion
+### 1. Peg Insertion 📍
 
 > Example is located in `examples/async_peg_insert_drq/`
-Env and default config is located in `franka_env/envs/peg_env/`
+
+> Env and default config is located in `franka_env/envs/peg_env/`
 
 We record 20 demo trajectories with the robot. The trajectories are saved in `examples/async_peg_insert_drq/peg_insertion_20_trajs_{UUID}.pkl`.
 ```bash
@@ -212,10 +213,11 @@ bash run_actor.sh
 Reward is given when the peg is inserted into the hole. This is done by checking the target pose of the peg and the current pose of the peg, defined in the `peg_env/config.py`
 
 
-### 2. PCB Insertion
+### 2. PCB Insertion 🖥️
 
 > Example is located in `examples/async_pcb_insert_drq`
-Env and default config is located in `franka_env/envs/pcb_env/`
+
+> Env and default config is located in `franka_env/envs/pcb_env/`
 
 Similar to peg insertion, here we record demo trajectories with the robot, then run the learner and actor nodes.
 ```bash
@@ -237,28 +239,31 @@ To run the BC policy, simply run the following command:
 bash run_bc.sh
 ```
 
-### 3. Cable Routing
+### 3. Cable Routing 🔌
 
 > Example is located in `examples/async_cable_routing_drq`
-Env and default config is located in `franka_env/envs/cable_env/`
 
-In this cable routing, we provided an example of a reward classfier. This replaced hardcoded reward classifier which depends on known `TARGET_POSE` defined in the `config.py`. The reward classifier is image based classifier (pretrained resnet) which is trained to classify whether the cable is routed successfully or not. The reward classifier is trained with demo trajectories of successful and failed samples. The code to train the reward classifier
+> Env and default config is located in `franka_env/envs/cable_env/`
+
+In this cable routing task, we provided an example of a reward classfier. This replaced hardcoded reward classifier which depends on known `TARGET_POSE` defined in the `config.py`. The reward classifier is an image-based classifier (pretrained resnet), which is trained to classify whether the cable is routed successfully or not. The reward classifier is trained with demo trajectories of successful and failed samples.
+
 ```bash
 # NOTE: custom paths are used in this script
 python train_reward_classifier.py
 ```
 
-The reward classifier is now used as a gym wrapper `franka_env.envs.wrapper.BinaryRewardClassifier`. The gym wrapper will classify the current observation and return a reward of 1 if the observation is classified as successful, and 0 otherwise.
+The reward classifier is used as a gym wrapper `franka_env.envs.wrapper.BinaryRewardClassifier`. The wrapper classifies the current observation and return a reward of 1 if the observation is classified as successful, and 0 otherwise.
 
 The reward classifier is then used in the BC policy and DRQ policy for the actor node, path is provided as `--reward_classifier_ckpt_path` argument in `run_bc.sh` and `run_actor.sh`
 
 
-### 4. Bin Relocation
+### 4. Bin Relocation 🗑️
 
 > Example is located in `examples/async_bin_relocation_fwbw_drq`
-Env and default config is located in `franka_env/envs/bin_env/`
 
-This bin relocation example demonstrates the usage of a forward and backward policies. This is helpful for RL tasks, which requires the robot to "reset". In this case, the robot is moving an object from one location to another. The forward policy is used to move the object from left bin to right bin, and the backward policy is used to move the object from right bin to left bin.
+> Env and default config is located in `franka_env/envs/bin_env/`
+
+This bin relocation example demonstrates the usage of a forward and backward policies. This is helpful for RL tasks, which requires the robot to "reset". In this case, the robot is moving an object from one bin to another. The forward policy is used to move the object from left bin to right bin, and the backward policy is used to move the object from right bin to left bin.
 
 1. Record demo trajectories
 
@@ -266,11 +271,11 @@ Multiple utility scripts has been provided to record demo trajectories. (e.g. `r
 
 2. Reward Classifier
 
-Similar to the cable routing example, we need to train two reward classifiers for both forward and backward policies, shown in `train_fwd_reward_classifier.sh` and `train_bwd_reward_classifier.sh`. The reward classifiers are then used in the BC policy and DRQ policy for the actor node, path is provided as `--reward_classifier_ckpt_path` argument in `run_bc.sh` and `run_actor.sh`.
+Similar to the cable routing example, we need to train two reward classifiers for both forward and backward policies, shown in `train_fwd_reward_classifier.sh` and `train_bwd_reward_classifier.sh`. The reward classifiers are then used in the BC and DRQ policy for the actor node, checkpoint path is provided as `--reward_classifier_ckpt_path` argument in `run_bc.sh` and `run_actor.sh`.
 
 3. Run 2 learners and 1 actor with 2 policies
 
-Here, 2 learners node will learn both forward and backward policies respectively. The actor node will switch between running the forward and backward policies and their respective reward classifiers.
+Finally, 2 learners node will learn both forward and backward policies respectively. The actor node will switch between running the forward and backward policies with their respective reward classifiers during the RL training process.
 
 ```bash
 bash run_actor.sh
