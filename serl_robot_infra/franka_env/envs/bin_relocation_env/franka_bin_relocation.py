@@ -95,7 +95,10 @@ class FrankaBinRelocation(FrankaEnv):
                 )
                 images[key] = resized[..., ::-1]
                 display_images[key] = resized
-                display_images[key + "_full"] = cropped_rgb
+                if key == "front":
+                    display_images[key + "_full"] = cv2.resize(cropped_rgb, (480, 480))
+                else:
+                    display_images[key + "_full"] = cropped_rgb
             except queue.Empty:
                 input(
                     f"{key} camera frozen. Check connect, then press enter to relaunch..."
@@ -104,9 +107,7 @@ class FrankaBinRelocation(FrankaEnv):
                 return self.get_im()
 
         self.recording_frames.append(
-            np.concatenate(
-                [display_images[f"{k}_full"] for k in self.cap if "wrist" in k], axis=0
-            )
+            np.concatenate([display_images[f"{k}_full"] for k in self.cap], axis=0)
         )  # only record wrist images since front image is not used for training
         self.img_queue.put(display_images)
         return images
