@@ -1,5 +1,5 @@
 import numpy as np
-from serl_robot_infra.franka_env.envs.franka_env import DefaultEnvConfig
+from franka_env.envs.franka_env import DefaultEnvConfig
 
 
 class PegEnvConfig(DefaultEnvConfig):
@@ -23,9 +23,9 @@ class PegEnvConfig(DefaultEnvConfig):
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
     REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1])
-    RANDOM_RESET = (True,)
-    RANDOM_XY_RANGE = (0.05,)
-    RANDOM_RZ_RANGE = (np.pi / 9,)
+    RANDOM_RESET = True
+    RANDOM_XY_RANGE = 0.05
+    RANDOM_RZ_RANGE = np.pi / 6
     ABS_POSE_LIMIT_LOW = np.array(
         [
             TARGET_POSE[0] - RANDOM_XY_RANGE,
