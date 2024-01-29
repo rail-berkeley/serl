@@ -66,19 +66,22 @@ def _unpack(batch):
 
 
 def load_resnet10_params(agent, image_keys=("image",), public=False):
+    """
+    load pretrained resnet10 params from github release to an agent
+    :return: agent with pretrained resnet10 params
+    """
+    file_name = "resnet10_params.pkl"
     if not public:  # if github repo is not public, load from local file
-        with open("resnet10_params.pkl", "rb") as f:
+        with open(file_name, "rb") as f:
             encoder_params = pkl.load(f)
     else:  # when repo is released, download from url
-        file_name = "resnet10_params.pkl"
         # Construct the full path to the file
         file_path = os.path.expanduser(f"~/.serl/{file_name}")
-
         # Check if the file exists
         if os.path.exists(file_path):
             print(f"The ResNet-10 weights already exists at '{file_path}'.")
         else:
-            url = "https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl"
+            url = f"https://github.com/rail-berkeley/serl/releases/download/resnet10/{file_name}"
             print(f"Downloading file from {url}")
             try:
                 request.urlretrieve(url, file_path)
@@ -94,7 +97,12 @@ def load_resnet10_params(agent, image_keys=("image",), public=False):
         f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
     )
 
-    new_params = agent.state.params.unfreeze()
+    # check if unfreeze is needed
+    if not isinstance(agent.state.params, dict):
+        new_params = agent.state.params.unfreeze()
+    else:
+        new_params = agent.state.params
+
     for image_key in image_keys:
         new_encoder_params = new_params["modules_actor"]["encoder"][
             f"encoder_{image_key}"
