@@ -204,15 +204,7 @@ We demonstrate how to use SERL with real robot manipulators with 4 different tas
 
 When running with a real robot, a separate gym env is needed. For our examples, we isolated the gym env as a client to a robot server. The robot server is a Flask server that sends commands to the robot via ROS. The gym env communicates with the robot server via post requests.
 
-<script>mermaid.initialize({startOnLoad:true});</script>
-
-<div class="mermaid">
-graph LR
-A[Franka Robot] <-- ROS --> B[Robot Server]
-B <-- HTTP --> C[Gym Env]
-C <-- Lib --> D[Robot Policy]
-</div>
-<script>mermaid.initialize({startOnLoad:true});</script>
+![](./docs/robot_infra_interfaces.png)
 
 This requires the installation of the following packages:
 
@@ -228,7 +220,7 @@ Follow the README in `serl_robot_infra` for basic robot operation instructions.
 
 ![](./docs/peg.png)
 
-> Example is located in `examples/async_peg_insert_drq/`
+> Example is located in [examples/async_peg_insert_drq/](./examples/async_peg_insert_drq/)
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/peg_env/`
 
@@ -262,7 +254,7 @@ The peg insertion task is best for getting started with running SERL on a real r
 
 ![](./docs/pcb.png)
 
-> Example is located in `examples/async_pcb_insert_drq`
+> Example is located in [examples/async_pcb_insert_drq/](./examples/async_pcb_insert_drq/)
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/pcb_env/`
 
@@ -290,7 +282,7 @@ bash run_bc.sh
 
 ![](./docs/cable.png)
 
-> Example is located in `examples/async_cable_routing_drq`
+> Example is located in [examples/async_cable_routing_drq/](./examples/async_cable_routing_drq/)
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/cable_env/`
 
@@ -312,7 +304,7 @@ The reward classifier is then used in the BC policy and DRQ policy for the actor
 
 ![](./docs/backward.png)
 
-> Example is located in `examples/async_bin_relocation_fwbw_drq`
+> Example is located in [examples/async_bin_relocation_fwbw_drq/](./examples/async_bin_relocation_fwbw_drq/)
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/bin_env/`
 
