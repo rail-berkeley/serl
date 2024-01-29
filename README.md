@@ -204,12 +204,15 @@ We demonstrate how to use SERL with real robot manipulators with 4 different tas
 
 When running with a real robot, a separate gym env is needed. For our examples, we isolated the gym env as a client to a robot server. The robot server is a Flask server that sends commands to the robot via ROS. The gym env communicates with the robot server via post requests.
 
-```mermaid
+<script>mermaid.initialize({startOnLoad:true});</script>
+
+<div class="mermaid">
 graph LR
 A[Franka Robot] <-- ROS --> B[Robot Server]
 B <-- HTTP --> C[Gym Env]
 C <-- Lib --> D[Robot Policy]
-```
+</div>
+<script>mermaid.initialize({startOnLoad:true});</script>
 
 This requires the installation of the following packages:
 
@@ -235,8 +238,8 @@ The peg insertion task is best for getting started with running SERL on a real r
 
 #### Procedure
 1. 3D-print (1) **Assembly Object** of choice and (1) corresponding **Assembly Board** from the **Single-Object Manipulation Objects** section of [FMB](https://functional-manipulation-benchmark.github.io/files/index.html). Fix the board to the workspace and grasp the peg with the gripper.
-2. 3D-print (2) wrist camera mounts for the RealSense D405 and install onto the threads on the Robotiq Gripper. Update the camera serial numbers in `REALSENSE_CAMERAS` located in `serl_robot_infra/franka_env/envs/peg_env/config.py`.
-3. The reward is given by checking the end-effector pose matches a fixed target pose. Manually move the arm into a pose where the peg is inserted into the board and update the `TARGET_POSE` in `serl_robot_infra/franka_env/envs/peg_env/config.py` with the measured end-effector pose.
+2. 3D-print (2) wrist camera mounts for the RealSense D405 and install onto the threads on the Robotiq Gripper. Update the camera serial numbers in `REALSENSE_CAMERAS` located in [peg_env/config.py](./serl_robot_infra/franka_env/envs/peg_env/config.py).
+3. The reward is given by checking the end-effector pose matches a fixed target pose. Manually move the arm into a pose where the peg is inserted into the board and update the `TARGET_POSE` in [peg_env/config.py](./serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
 4. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works. 
 5. Record 20 demo trajectories with the spacemouse. 
     ```bash
