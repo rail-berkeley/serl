@@ -15,5 +15,7 @@ python async_drq_randomized.py "$@" \
     --demo_path fw_bin_2000_demo_2024-01-23_18-49-56.pkl \
     --fw_ckpt_path /home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/bin_fw_096 \
     --bw_ckpt_path /home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/bin_bw_096 \
+    --fw_reward_classifier_ckpt_path "/home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/fw_classifier_ckpt" \
+    --bw_reward_classifier_ckpt_path "/home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/bw_classifier_ckpt" \
     --eval_checkpoint_step 31000 \
     --eval_n_trajs 100

@@ -69,6 +69,9 @@ flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
+flags.DEFINE_string(
+    "reward_classifier_ckpt_path", None, "Path to reward classifier ckpt."
+)
 
 flags.DEFINE_integer(
     "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
@@ -340,11 +343,14 @@ def main(_):
         # initialize the classifier and wrap the env
         from serl_launcher.networks.reward_classifier import load_classifier_func
 
+        if FLAGS.reward_classifier_ckpt_path is None:
+            raise ValueError("reward_classifier_ckpt_path must be specified for actor")
+
         reward_func = load_classifier_func(
             key=sampling_rng,
             sample=env.observation_space.sample(),
             image_keys=image_keys,
-            checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt/",
+            checkpoint_path=FLAGS.reward_classifier_ckpt_path,
         )
         env = BinaryRewardClassifierWrapper(env, reward_func)
     env = RecordEpisodeStatistics(env)

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# NOTE: this requires jaxrl_m to be installed:
-#       https://github.com/rail-berkeley/jaxrl_minimal
-
 import time
 from functools import partial
 import jax
@@ -81,8 +78,22 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 flags.DEFINE_string("fwbw", "fw", "forward or backward task")
+
+# Checkpoints paths
 flags.DEFINE_string("fw_ckpt_path", None, "Path to the fw checkpoint.")
 flags.DEFINE_string("bw_ckpt_path", None, "Path to the bw checkpoint.")
+
+# this is only used in actor node
+flags.DEFINE_string(
+    "fw_reward_classifier_ckpt_path",
+    None,
+    "Path to the fw reward classifier checkpoint.",
+)
+flags.DEFINE_string(
+    "bw_reward_classifier_ckpt_path",
+    None,
+    "Path to the bw reward classifier checkpoint.",
+)
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -434,18 +445,27 @@ def main(_):
 
         rng = jax.random.PRNGKey(0)
         rng, key = jax.random.split(rng)
+
+        if (
+            not FLAGS.fw_reward_classifier_ckpt_path
+            or not FLAGS.bw_reward_classifier_ckpt_path
+        ):
+            raise ValueError(
+                "Must provide both fw and bw reward classifier ckpt paths for actor"
+            )
+
         fw_classifier_func = load_classifier_func(
             key=key,
             sample=env.front_observation_space.sample(),
             image_keys=front_image_keys,
-            checkpoint_path="/home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/fw_classifier_ckpt",
+            checkpoint_path=FLAGS.fw_reward_classifier_ckpt_path,
         )
         rng, key = jax.random.split(rng)
         bw_classifier_func = load_classifier_func(
             key=key,
             sample=env.front_observation_space.sample(),
             image_keys=front_image_keys,
-            checkpoint_path="/home/undergrad/code/serl_dev/examples/async_bin_relocation_fwbw_drq/bw_classifier_ckpt",
+            checkpoint_path=FLAGS.bw_reward_classifier_ckpt_path,
         )
         env = FWBWFrontCameraBinaryRewardClassifierWrapper(
             env, fw_classifier_func, bw_classifier_func

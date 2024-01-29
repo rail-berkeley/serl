@@ -56,39 +56,26 @@ if __name__ == "__main__":
         capacity=10000,
         image_keys=image_keys,
     )
-    demos = pkl.load(open("cable_route_10_demos_2024-01-03_22-22-56.pkl", "rb"))
-    failed_data = [d for d in demos if not d["dones"]]
-    for traj in failed_data:
-        neg_buffer.insert(traj)
-    success_data = [d for d in demos if d["dones"]]
-    for traj in success_data:
-        pos_buffer.insert(traj)
 
-    demos = pkl.load(open("cable_route_10_demos_2024-01-03_22-25-50.pkl", "rb"))
-    failed_data = [d for d in demos if not d["dones"]]
-    success_data = [d for d in demos if d["dones"]]
-    for traj in failed_data:
-        neg_buffer.insert(traj)
-    for traj in success_data:
-        pos_buffer.insert(traj)
+    def add_data_to_buffer(demos_path, neg_only=False):
+        """Helper function to add data to buffer"""
+        demos = pkl.load(open(demos_path, "rb"))
+        # add failed data to negative buffer
+        failed_data = [d for d in demos if not d["dones"]]
+        for traj in failed_data:
+            neg_buffer.insert(traj)
 
-    demos = pkl.load(open("cable_route_20_failed_2024-01-04_12-24-11.pkl", "rb"))
-    failed_data = [d for d in demos if not d["dones"]]
-    for traj in failed_data:
-        neg_buffer.insert(traj)
+        # add success data to positive buffer
+        if not neg_only:
+            success_data = [d for d in demos if d["dones"]]
+            for traj in success_data:
+                pos_buffer.insert(traj)
 
-    demos = pkl.load(open("cable_route_20_failed_2024-01-04_12-50-24.pkl", "rb"))
-    failed_data = [d for d in demos if not d["dones"]]
-    for traj in failed_data:
-        neg_buffer.insert(traj)
-
-    demos = pkl.load(open("cable_route_20_demos_2024-01-04_12-10-54.pkl", "rb"))
-    failed_data = [d for d in demos if not d["dones"]]
-    success_data = [d for d in demos if d["dones"]]
-    for traj in failed_data:
-        neg_buffer.insert(traj)
-    for traj in success_data:
-        pos_buffer.insert(traj)
+    add_data_to_buffer("cable_route_10_demos_2024-01-03_22-22-56.pkl")
+    add_data_to_buffer("cable_route_10_demos_2024-01-03_22-25-50.pkl")
+    add_data_to_buffer("cable_route_20_demos_2024-01-04_12-10-54.pkl")
+    add_data_to_buffer("cable_route_20_failed_2024-01-04_12-24-11.pkl", neg_only=True)
+    add_data_to_buffer("cable_route_20_failed_2024-01-04_12-50-24.pkl", neg_only=True)
 
     print(f"failed buffer size: {len(neg_buffer)}")
     print(f"success buffer size: {len(pos_buffer)}")

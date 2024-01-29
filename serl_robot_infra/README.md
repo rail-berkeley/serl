@@ -44,10 +44,11 @@ import franka_env
 env = gym.make("FrankaEnv-Vision-v0")
 ```
 
-### Run examples
+### Provided Environments
 
 1. peg insertion
 2. pcb insertion
 3. cable routing
+4. bin relocation
 
 Please refer to their respective examples in `serl/examples/` directory.
