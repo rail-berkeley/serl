@@ -1,22 +1,26 @@
 # SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning
 
 ![](https://github.com/rail-berkeley/serl/workflows/pre-commit/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Static Badge](https://img.shields.io/badge/Project-Page-a)](https://serl-robot.github.io/)
 
 ![](./docs/tasks-banner.gif)
 
-**Webpage: https://serl-robot.github.io/**
+**Webpage: [https://serl-robot.github.io/](https://serl-robot.github.io/)**
 
 SERL provides a set of libraries, env wrappers, and examples to train RL policies for robotic manipulation tasks. The following sections describe how to use SERL. We will illustrate the usage with examples.
 
 **Table of Contents**
 - [SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning](#serl-a-software-suite-for-sample-efficient-robotic-reinforcement-learning)
   - [Installation](#installation)
+  - [Overview and Code Structure](#overview-and-code-structure)
   - [Quick Start with Franka Arm in Sim](#quick-start-with-franka-arm-in-sim)
     - [1. Training from state observation example](#1-training-from-state-observation-example)
     - [2. Training from image observation example](#2-training-from-image-observation-example)
     - [3. Training from image observation with 20 demo trajectories example](#3-training-from-image-observation-with-20-demo-trajectories-example)
   - [Run with Franka Arm on Real Robot](#run-with-franka-arm-on-real-robot)
     - [1. Peg Insertion 📍](#1-peg-insertion-)
+      - [Procedure](#procedure)
     - [2. PCB Component Insertion 🖥️](#2-pcb-component-insertion-️)
     - [3. Cable Routing 🔌](#3-cable-routing-)
     - [4. Object Relocation 🗑️](#4-object-relocation-️)
@@ -66,11 +70,35 @@ Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env
 
 ---
 
+## Overview and Code Structure
+
+SERL provides a set of common libraries for users to train RL policies for robotic manipulation tasks. The main structure of running the RL experiments involves having an actor node and a learner node, both of which interact with the robot gym environment. Both nodes run asynchronously, with data being sent from the actor to the learner node via the network using [agentlace](https://github.com/youliangtan/agentlace). The learner will periodically synchronize the policy with the actor. This design provides flexibility for parallel training and inference.
+
+<p align="center">
+  <img src="./docs/software_design.png" width="80%"/>
+</p>
+
+**Table for code structure**
+
+| Code Directory | Description |
+| --- | --- |
+| [serl_launcher](./serl_launcher) | Main code for SERL |
+| [serl_launcher.agents](./serl_launcher/serl_launcher/agents/) | Agent Policies (e.g. DRQ, SAC, BC) |
+| [serl_launcher.wrappers](./serl_launcher/serl_launcher/wrappers) | Gym env wrappers |
+| [serl_launcher.data](./serl_launcher/serl_launcher/data) | Replay buffer and data store |
+| [serl_launcher.vision](./serl_launcher/serl_launcher/vision) | Vision related models and utils |
+| [franka_sim](./franka_sim) | Franka mujoco simulation gym environment |
+| [serl_robot_infra](./serl_robot_infra/) | Robot infra for running with real robots |
+| [serl_robot_infra.robot_servers](./serl_robot_infra/robot_servers/) | Flask server for sending commands to robot via ROS |
+| [serl_robot_infra.franka_env](./serl_robot_infra/franka_env/) | Gym env for real franka robot |
+
+---
+
 ## Quick Start with Franka Arm in Sim
 
-Before beginning, please make sure that the simulation environment with `franka_sim` is working. Please refer to the [Quick Start with Franka Arm in Sim](#quick-start-with-franka-arm-in-sim) section for more details.
+Before beginning, please make sure that the simulation environment with `franka_sim` is working.
 
-Note to set `MUJOCO_GL`` as egl if you are doing off-screen rendering.
+Note to set `MUJOCO_GL` as egl if you are doing off-screen rendering.
 You can do so by ```export MUJOCO_GL=egl``` and remember to set the rendering argument to False in the script.
 
 ### 1. Training from state observation example
@@ -178,9 +206,9 @@ When running with a real robot, a separate gym env is needed. For our examples, 
 
 ```mermaid
 graph LR
-A[Robot] <-- ROS --> B[Robot Server]
+A[Franka Robot] <-- ROS --> B[Robot Server]
 B <-- HTTP --> C[Gym Env]
-C <-- Lib --> D[RL Policy]
+C <-- Lib --> D[Robot Policy]
 ```
 
 This requires the installation of the following packages:
@@ -194,6 +222,9 @@ Follow the README in `serl_robot_infra` for basic robot operation instructions.
 *NOTE: The following code will not run as it is, since it will require custom data, checkpoints, and robot env. We provide the code as a reference for how to use SERL with real robots. Learn this section in incremental order, starting from the first task (peg insertion) to the last task (bin relocation). Modify the code according to your needs. *
 
 ### 1. Peg Insertion 📍
+
+![](./docs/peg.png)
+
 > Example is located in `examples/async_peg_insert_drq/`
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/peg_env/`
@@ -226,6 +257,8 @@ The peg insertion task is best for getting started with running SERL on a real r
 
 ### 2. PCB Component Insertion 🖥️
 
+![](./docs/pcb.png)
+
 > Example is located in `examples/async_pcb_insert_drq`
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/pcb_env/`
@@ -252,6 +285,8 @@ bash run_bc.sh
 
 ### 3. Cable Routing 🔌
 
+![](./docs/cable.png)
+
 > Example is located in `examples/async_cable_routing_drq`
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/cable_env/`
@@ -269,6 +304,10 @@ The reward classifier is then used in the BC policy and DRQ policy for the actor
 
 
 ### 4. Object Relocation 🗑️
+
+![](./docs/forward.png)
+
+![](./docs/backward.png)
 
 > Example is located in `examples/async_bin_relocation_fwbw_drq`
 
