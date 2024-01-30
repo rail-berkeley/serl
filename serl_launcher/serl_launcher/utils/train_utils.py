@@ -97,11 +97,7 @@ def load_resnet10_params(agent, image_keys=("image",), public=False):
         f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
     )
 
-    # check if unfreeze is needed
-    if not isinstance(agent.state.params, dict):
-        new_params = agent.state.params.unfreeze()
-    else:
-        new_params = agent.state.params
+    new_params = agent.state.params
 
     for image_key in image_keys:
         new_encoder_params = new_params["modules_actor"]["encoder"][
@@ -114,8 +110,5 @@ def load_resnet10_params(agent, image_keys=("image",), public=False):
                 new_encoder_params[k] = encoder_params[k]
                 print(f"replaced {k} in pretrained_encoder")
 
-    from flax.core.frozen_dict import freeze
-
-    new_params = freeze(new_params)
     agent = agent.replace(state=agent.state.replace(params=new_params))
     return agent
