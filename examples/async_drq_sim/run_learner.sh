@@ -11,4 +11,4 @@ python async_drq_sim.py "$@" \
     --batch_size 256 \
     --eval_period 2000 \
     --encoder_type resnet-pretrained \
-    --debug
+    --debug # wandb is disabled when debug

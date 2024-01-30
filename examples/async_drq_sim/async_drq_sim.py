@@ -20,7 +20,7 @@ from serl_launcher.wrappers.chunking import ChunkingWrapper
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
 
-from serl_launcher.utils.jaxrl_m_common import (
+from serl_launcher.utils.launcher import (
     make_drq_agent,
     make_trainer_config,
     make_wandb_logger,
@@ -303,7 +303,7 @@ def main(_):
         wandb_logger = make_wandb_logger(
             project="serl_dev",
             description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
+            # debug=FLAGS.debug,
         )
         return replay_buffer, wandb_logger
 

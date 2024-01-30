@@ -24,6 +24,7 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
     - [2. PCB Component Insertion 🖥️](#2-pcb-component-insertion-️)
     - [3. Cable Routing 🔌](#3-cable-routing-)
     - [4. Object Relocation 🗑️](#4-object-relocation-️)
+  - [Contribution](#contribution)
   - [Citation](#citation)
 
 ---
@@ -66,7 +67,7 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
     pip install -r requirements.txt
     ```
 
-Try if franka_sim is running via `python franka_sim/franka_sim/test/test_gym_env_human.py`
+Try if `franka_sim` is running via `python franka_sim/franka_sim/test/test_gym_env_human.py`. Checkout [quick start with franka arm in sim](#quick-start-with-franka-arm-in-sim) for more details.
 
 ---
 
@@ -98,8 +99,11 @@ SERL provides a set of common libraries for users to train RL policies for robot
 
 Before beginning, please make sure that the simulation environment with `franka_sim` is working.
 
-Note to set `MUJOCO_GL` as egl if you are doing off-screen rendering.
+*Note: to set `MUJOCO_GL` as egl if you are doing off-screen rendering.
 You can do so by ```export MUJOCO_GL=egl``` and remember to set the rendering argument to False in the script.
+If receives `Cannot initialize a EGL device display due to GLIBCXX not found` error, try run `conda install -c conda-forge libstdcxx-ng` ([ref](https://stackoverflow.com/a/74132234))*
+
+![](./docs/franka_sim.png)
 
 ### 1. Training from state observation example
 
@@ -107,6 +111,8 @@ One-liner launcher (requires `tmux`, `sudo apt install tmux`):):
 ```bash
 bash examples/async_sac_state_sim/tmux_launch.sh
 ```
+
+To kill the tmux session, run `tmux kill-session -t serl_session`.
 
 <details>
   <summary>Click to show detailed commands</summary>
@@ -128,6 +134,8 @@ bash run_actor.sh
 
 You can optionally launch the learner and actor on separate machines. For example, if the learner node is running on a PC with `ip=x.x.x.x`, you can launch the actor node on a different machine with internet access to `ip=x.x.x.x` and add `--ip x.x.x.` to the commands in `run_actor.sh`.
 
+Remove `--debug` flag in `run_learner.sh` to upload training stats to `wandb`.
+
 </details>
 
 ### 2. Training from image observation example
@@ -144,7 +152,6 @@ bash examples/async_drq_sim/tmux_launch.sh
 cd examples/async_drq_sim
 
 # to use pre-trained ResNet weights, please download
-# note manual download is only for now, once repo is public, auto download will work
 wget https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl
 ```
 
@@ -165,7 +172,7 @@ bash run_actor.sh
 
 One-liner launcher (requires `tmux`):
 ```bash
-bash examples/async_sac_image_sim/tmux_launch.sh
+bash examples/async_rlpd_drq_sim/tmux_launch.sh
 ```
 
 <details>
@@ -200,7 +207,7 @@ bash run_actor.sh
 
 ## Run with Franka Arm on Real Robot
 
-We demonstrate how to use SERL with real robot manipulators with 4 different tasks. Namely: Peg Insertion, PCB Component Insertion, Cable Routing, and Object Relocation. We provide detailed instruction on how to reproduce the Peg Insertion task as a setup test for the entire SERL package. 
+We demonstrate how to use SERL with real robot manipulators with 4 different tasks. Namely: Peg Insertion, PCB Component Insertion, Cable Routing, and Object Relocation. We provide detailed instruction on how to reproduce the Peg Insertion task as a setup test for the entire SERL package.
 
 When running with a real robot, a separate gym env is needed. For our examples, we isolated the gym env as a client to a robot server. The robot server is a Flask server that sends commands to the robot via ROS. The gym env communicates with the robot server via post requests.
 
@@ -232,8 +239,8 @@ The peg insertion task is best for getting started with running SERL on a real r
 1. 3D-print (1) **Assembly Object** of choice and (1) corresponding **Assembly Board** from the **Single-Object Manipulation Objects** section of [FMB](https://functional-manipulation-benchmark.github.io/files/index.html). Fix the board to the workspace and grasp the peg with the gripper.
 2. 3D-print (2) wrist camera mounts for the RealSense D405 and install onto the threads on the Robotiq Gripper. Update the camera serial numbers in `REALSENSE_CAMERAS` located in [peg_env/config.py](./serl_robot_infra/franka_env/envs/peg_env/config.py).
 3. The reward is given by checking the end-effector pose matches a fixed target pose. Manually move the arm into a pose where the peg is inserted into the board and update the `TARGET_POSE` in [peg_env/config.py](./serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
-4. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works. 
-5. Record 20 demo trajectories with the spacemouse. 
+4. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works.
+5. Record 20 demo trajectories with the spacemouse.
     ```bash
     python record_demo.py
     ```
@@ -330,10 +337,21 @@ bash run_fw_learner.sh
 bash run_bw_learner.sh
 ```
 
+## Contribution
+
+We welcome contributions to this repository! Fork and submit a PR if you have any improvements to the codebase. Before submitting a PR, please run `pre-commit run --all-files` to ensure that the codebase is formatted correctly.
+
 ## Citation
 
 If you use this code for your research, please cite our paper:
 
-```
-TODO
+```bibtex
+@misc{luo2024serl,
+      title={SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning},
+      author={Jianlan Luo and Zheyuan Hu and Charles Xu and You Liang Tan and Jacob Berg and Archit Sharma and Stefan Schaal and Chelsea Finn and Abhishek Gupta and Sergey Levine},
+      year={2024},
+      eprint={2401.16013},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO}
+}
 ```

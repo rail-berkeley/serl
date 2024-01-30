@@ -15,7 +15,7 @@ from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.agents.continuous.bc import BCAgent
 
-from serl_launcher.utils.jaxrl_m_common import (
+from serl_launcher.utils.launcher import (
     make_bc_agent,
     make_wandb_logger,
 )

@@ -92,7 +92,6 @@ def populate_data_store(
         with open(demo_path, "rb") as f:
             demo = pkl.load(f)
             for transition in demo:
-                # import ipdb; ipdb.set_trace()
                 data_store.insert(transition)
         print(f"Loaded {len(data_store)} transitions.")
     return data_store

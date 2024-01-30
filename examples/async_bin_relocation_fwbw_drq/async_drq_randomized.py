@@ -23,7 +23,7 @@ from serl_launcher.utils.train_utils import concat_batches
 from agentlace.trainer import TrainerServer, TrainerClient, TrainerTunnel
 from agentlace.data.data_store import QueuedDataStore
 
-from serl_launcher.utils.jaxrl_m_common import (
+from serl_launcher.utils.launcher import (
     make_drq_agent,
     make_trainer_config,
     make_wandb_logger,

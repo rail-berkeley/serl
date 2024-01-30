@@ -1,16 +1,23 @@
 #!/bin/bash
 
-EXAMPLE_DIR="examples/async_drq_sim"
-CONDA_ENV="serl"
+# use the default values if the env variables are not set
+EXAMPLE_DIR=${EXAMPLE_DIR:-"examples/async_drq_sim"}
+CONDA_ENV=${CONDA_ENV:-"serl"}
 
 cd $EXAMPLE_DIR
 echo "Running from $(pwd)"
 
 # check if the pkl file exists, else download it
-# NOTE: this will not work when repo is private
 FILE="resnet10_params.pkl"
 if [ ! -f "$FILE" ]; then
+    echo "$FILE not found in $(pwd). Downloading..."
     wget https://github.com/rail-berkeley/serl/releases/download/resnet10/resnet10_params.pkl
+fi
+
+# if pretrained weights file not exists, throw error
+if [ ! -f "$FILE" ]; then
+    echo "Error: $FILE not found."
+    exit 1
 fi
 
 # Create a new tmux session
