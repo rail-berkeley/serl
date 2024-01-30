@@ -342,7 +342,7 @@ If you use this code for your research, please cite our paper:
 
 ```bibtex
 @misc{luo2024serl,
-      title={SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning}, 
+      title={SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning},
       author={Jianlan Luo and Zheyuan Hu and Charles Xu and You Liang Tan and Jacob Berg and Archit Sharma and Stefan Schaal and Chelsea Finn and Abhishek Gupta and Sergey Levine},
       year={2024},
       eprint={2401.16013},
