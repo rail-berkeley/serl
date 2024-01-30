@@ -24,6 +24,7 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
     - [2. PCB Component Insertion 🖥️](#2-pcb-component-insertion-️)
     - [3. Cable Routing 🔌](#3-cable-routing-)
     - [4. Object Relocation 🗑️](#4-object-relocation-️)
+  - [Contribution](#contribution)
   - [Citation](#citation)
 
 ---
@@ -335,6 +336,10 @@ bash run_actor.sh
 bash run_fw_learner.sh
 bash run_bw_learner.sh
 ```
+
+## Contribution
+
+We welcome contributions to this repository! Fork and submit a PR if you have any improvements to the codebase. Before submitting a PR, please run `pre-commit run --all-files` to ensure that the codebase is formatted correctly.
 
 ## Citation
 
