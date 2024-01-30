@@ -171,3 +171,4 @@ MUJOCO_LOG.TXT
 *.pkl
 _METADATA
 checkpoint
+wandb/

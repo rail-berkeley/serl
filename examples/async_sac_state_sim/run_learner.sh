@@ -10,4 +10,4 @@ python async_sac_state_sim.py "$@" \
     --utd_ratio 8 \
     --batch_size 256 \
     --eval_period 2000 \
-    --debug
+    --debug # wandb is disabled when debug

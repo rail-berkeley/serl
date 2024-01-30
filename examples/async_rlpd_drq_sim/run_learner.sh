@@ -12,4 +12,4 @@ python async_rlpd_drq_sim.py "$@" \
     --eval_period 2000 \
     --encoder_type resnet-pretrained \
     --demo_path franka_lift_cube_image_20_trajs.pkl \
-    --debug
+    --debug # wandb is disabled when debug

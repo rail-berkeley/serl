@@ -133,6 +133,8 @@ bash run_actor.sh
 
 You can optionally launch the learner and actor on separate machines. For example, if the learner node is running on a PC with `ip=x.x.x.x`, you can launch the actor node on a different machine with internet access to `ip=x.x.x.x` and add `--ip x.x.x.` to the commands in `run_actor.sh`.
 
+Remove `--debug` flag in `run_learner.sh` to upload training stats to `wandb`.
+
 </details>
 
 ### 2. Training from image observation example
@@ -338,6 +340,13 @@ bash run_bw_learner.sh
 
 If you use this code for your research, please cite our paper:
 
-```
-TODO
+```bibtex
+@misc{luo2024serl,
+      title={SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning}, 
+      author={Jianlan Luo and Zheyuan Hu and Charles Xu and You Liang Tan and Jacob Berg and Archit Sharma and Stefan Schaal and Chelsea Finn and Abhishek Gupta and Sergey Levine},
+      year={2024},
+      eprint={2401.16013},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO}
+}
 ```

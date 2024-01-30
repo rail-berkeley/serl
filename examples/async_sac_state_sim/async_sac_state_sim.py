@@ -13,7 +13,7 @@ from flax.training import checkpoints
 
 from agentlace.data.data_store import QueuedDataStore
 from agentlace.trainer import TrainerClient, TrainerServer
-from serl_launcher.utils.jaxrl_m_common import (
+from serl_launcher.utils.launcher import (
     make_sac_agent,
     make_trainer_config,
     make_wandb_logger,
