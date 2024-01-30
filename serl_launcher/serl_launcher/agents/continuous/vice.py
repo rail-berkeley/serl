@@ -308,11 +308,7 @@ class VICEAgent(DrQAgent):
         if encoder_type == "resnet-pretrained":  # load pretrained weights for ResNet-10
             from serl_launcher.utils.train_utils import load_resnet10_params
 
-            agent = load_resnet10_params(
-                agent,
-                image_keys,
-                public=False,
-            )
+            agent = load_resnet10_params(agent, image_keys)
 
         return agent
 

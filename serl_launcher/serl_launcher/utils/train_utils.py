@@ -1,7 +1,8 @@
 import os
 import pickle as pkl
-import urllib.request as request
+import requests
 from collections import defaultdict
+from tqdm import tqdm
 
 import imageio
 import jax
@@ -65,9 +66,9 @@ def _unpack(batch):
     return batch
 
 
-def load_resnet10_params(agent, image_keys=("image",), public=False):
+def load_resnet10_params(agent, image_keys=("image",), public=True):
     """
-    load pretrained resnet10 params from github release to an agent
+    Load pretrained resnet10 params from github release to an agent.
     :return: agent with pretrained resnet10 params
     """
     file_name = "resnet10_params.pkl"
@@ -76,15 +77,30 @@ def load_resnet10_params(agent, image_keys=("image",), public=False):
             encoder_params = pkl.load(f)
     else:  # when repo is released, download from url
         # Construct the full path to the file
-        file_path = os.path.expanduser(f"~/.serl/{file_name}")
+        file_path = os.path.expanduser("~/.serl/")
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        file_path = os.path.join(file_path, file_name)
         # Check if the file exists
         if os.path.exists(file_path):
-            print(f"The ResNet-10 weights already exists at '{file_path}'.")
+            print(f"The ResNet-10 weights already exist at '{file_path}'.")
         else:
             url = f"https://github.com/rail-berkeley/serl/releases/download/resnet10/{file_name}"
             print(f"Downloading file from {url}")
+
+            # Streaming download with progress bar
             try:
-                request.urlretrieve(url, file_path)
+                response = requests.get(url, stream=True)
+                total_size = int(response.headers.get("content-length", 0))
+                block_size = 1024  # 1 Kibibyte
+                t = tqdm(total=total_size, unit="iB", unit_scale=True)
+                with open(file_path, "wb") as f:
+                    for data in response.iter_content(block_size):
+                        t.update(len(data))
+                        f.write(data)
+                t.close()
+                if total_size != 0 and t.n != total_size:
+                    raise Exception("Error, something went wrong with the download")
             except Exception as e:
                 raise RuntimeError(e)
             print("Download complete!")
