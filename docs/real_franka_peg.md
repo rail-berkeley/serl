@@ -30,7 +30,7 @@ The peg insertion task is best for getting started with running SERL on a real r
 
 ### Procedure
 1. 3D-print (1) **Assembly Object** of choice and (1) corresponding **Assembly Board** from the **Single-Object Manipulation Objects** section of [FMB](https://functional-manipulation-benchmark.github.io/files/index.html). Fix the board to the workspace and grasp the peg with the gripper.
-2. 3D-print (2) wrist camera mounts for the RealSense D405 and install onto the threads on the Robotiq Gripper. Update the camera serial numbers in `REALSENSE_CAMERAS` located in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py).
+2. 3D-print and install (2) [wrist camera mounts for the RealSense D405](https://serl-robot.github.io/static/files/robotiq_d405_wrist_mount.step) if you are using the Robotiq Hand-E gripper, or (1) [wrist camera mount for the Franka gripper](https://serl-robot.github.io/static/files/franka_d405_wrist_mount.step). Update the camera serial numbers in `REALSENSE_CAMERAS` located in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py).
 3. The reward is given by checking the end-effector pose matches a fixed target pose. Manually move the arm into a pose where the peg is inserted into the board and update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
 4. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works.
 5. Record 20 demo trajectories with the spacemouse.
