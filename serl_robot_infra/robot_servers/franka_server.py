@@ -10,7 +10,8 @@ import subprocess
 from scipy.spatial.transform import Rotation as R
 from absl import app, flags
 
-from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState, ZeroJacobian
+from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState
+from serl_franka_controllers.msg import ZeroJacobian
 import geometry_msgs.msg as geom_msg
 from dynamic_reconfigure.client import Client as ReconfClient
 
