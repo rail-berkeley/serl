@@ -43,13 +43,13 @@ class FrankaServer:
         self.resetpub = rospy.Publisher(
             "/franka_control/error_recovery/goal", ErrorRecoveryActionGoal, queue_size=1
         )
-        self.state_sub = rospy.Subscriber(
-            "franka_state_controller/franka_states", FrankaState, self._set_currpos
-        )
         self.jacobian_sub = rospy.Subscriber(
             "/cartesian_impedance_controller/franka_jacobian",
             ZeroJacobian,
             self._set_jacobian,
+        )
+        self.state_sub = rospy.Subscriber(
+            "franka_state_controller/franka_states", FrankaState, self._set_currpos
         )
 
     def start_impedance(self):
