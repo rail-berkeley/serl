@@ -33,7 +33,6 @@ from franka_env.envs.wrappers import (
     Quat2EulerWrapper,
     ZOnlyWrapper,
     BinaryRewardClassifierWrapper,
-    FrontCameraBinaryRewardClassifierWrapper,
 )
 
 import franka_env

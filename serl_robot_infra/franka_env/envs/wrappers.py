@@ -78,6 +78,9 @@ class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 
 
 class BinaryRewardClassifierWrapper(gym.Wrapper):
+    """
+    Compute reward with custom binary reward classifier fn
+    """
     def __init__(self, env: Env, reward_classifier_func):
         super().__init__(env)
         self.reward_classifier_func = reward_classifier_func
@@ -96,6 +99,9 @@ class BinaryRewardClassifierWrapper(gym.Wrapper):
 
 
 class ZOnlyWrapper(gym.ObservationWrapper):
+    """
+    Removal of X and Y coordinates
+    """
     def __init__(self, env: Env):
         super().__init__(env)
         self.observation_space["state"] = spaces.Box(-np.inf, np.inf, shape=(14,))
@@ -113,6 +119,9 @@ class ZOnlyWrapper(gym.ObservationWrapper):
 
 
 class Quat2EulerWrapper(gym.ObservationWrapper):
+    """
+    Convert the quaternion representation of the tcp pose to euler angles
+    """
     def __init__(self, env: Env):
         super().__init__(env)
         # from xyz + quat to xyz + euler
@@ -130,6 +139,9 @@ class Quat2EulerWrapper(gym.ObservationWrapper):
 
 
 class GripperCloseEnv(gym.ActionWrapper):
+    """
+    Use this wrapper to task that requires the gripper to be closed
+    """
     def __init__(self, env):
         super().__init__(env)
         ub = self.env.action_space

@@ -33,7 +33,6 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
 from serl_launcher.wrappers.front_camera_wrapper import FrontCameraWrapper
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
-    GripperCloseEnv,
     SpacemouseIntervention,
     Quat2EulerWrapper,
     FWBWFrontCameraBinaryRewardClassifierWrapper,
