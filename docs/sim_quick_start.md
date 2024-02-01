@@ -1,5 +1,9 @@
 # Quick Start with SERL in Sim
 
+![](./images/franka_sim.png)
+
+## Installation
+
 **Install Franka Sim library**
 ```bash
     cd franka_sim
@@ -9,27 +13,27 @@
 
 Try if `franka_sim` is running via `python franka_sim/franka_sim/test/test_gym_env_human.py`.
 
-## Quick Start with Franka Arm in Sim
-
 Before beginning, please make sure that the simulation environment with `franka_sim` is working.
 
 *Note: to set `MUJOCO_GL` as egl if you are doing off-screen rendering.
 You can do so by ```export MUJOCO_GL=egl``` and remember to set the rendering argument to False in the script.
 If receives `Cannot initialize a EGL device display due to GLIBCXX not found` error, try run `conda install -c conda-forge libstdcxx-ng` ([ref](https://stackoverflow.com/a/74132234))*
 
-![](./images/franka_sim.png)
 
-### 1. Training from state observation example
+Optionally install `tmux`: `sudo apt install tmux`
 
-One-liner launcher (requires `tmux`, `sudo apt install tmux`):):
+## 1. Training from state observation example
+
+**✨ One-liner launcher (requires `tmux`) ✨**
 ```bash
 bash examples/async_sac_state_sim/tmux_launch.sh
 ```
 
 To kill the tmux session, run `tmux kill-session -t serl_session`.
 
-<details>
-  <summary>Click to show detailed commands</summary>
+### Without using one-liner tmux launcher
+
+You can opt for running the commands individually in 2 different terminals.
 
 ```bash
 cd examples/async_sac_state_sim
@@ -50,17 +54,17 @@ You can optionally launch the learner and actor on separate machines. For exampl
 
 Remove `--debug` flag in `run_learner.sh` to upload training stats to `wandb`.
 
-</details>
+## 2. Training from image observation example
 
-### 2. Training from image observation example
+**✨ One-liner launcher (requires `tmux`) ✨**
 
-One-liner launcher (requires `tmux`, `sudo apt install tmux`):
 ```bash
 bash examples/async_drq_sim/tmux_launch.sh
 ```
 
-<details>
-  <summary>Click to show detailed commands</summary>
+### Without using one-liner tmux launcher
+
+You can opt for running the commands individually in 2 different terminals.
 
 ```bash
 cd examples/async_drq_sim
@@ -80,17 +84,16 @@ Run actor node with rendering window:
 bash run_actor.sh
 ```
 
-</details>
+## 3. Training from image observation with 20 demo trajectories example
 
-### 3. Training from image observation with 20 demo trajectories example
-
-One-liner launcher (requires `tmux`):
+**✨ One-liner launcher (requires `tmux`) ✨**
 ```bash
 bash examples/async_rlpd_drq_sim/tmux_launch.sh
 ```
 
-<details>
-  <summary>Click to show detailed commands</summary>
+### Without using one-liner tmux launcher
+
+You can opt for running the commands individually in 2 different terminals.
 
 ```bash
 cd examples/async_rlpd_drq_sim
@@ -114,5 +117,3 @@ Run actor node with rendering window:
 # add --ip x.x.x.x if running on a different machine
 bash run_actor.sh
 ```
-
-</details>

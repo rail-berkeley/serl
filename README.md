@@ -10,20 +10,14 @@
 
 SERL provides a set of libraries, env wrappers, and examples to train RL policies for robotic manipulation tasks. The following sections describe how to use SERL. We will illustrate the usage with examples.
 
+🎬: [SERL video](https://www.youtube.com/watch?v=Um4CjBmHdcw), [additional video](https://www.youtube.com/watch?v=17NrtKHdPDw) on sample efficient RL.
+
 **Table of Contents**
 - [SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning](#serl-a-software-suite-for-sample-efficient-robotic-reinforcement-learning)
   - [Installation](#installation)
-  - [Overview and Code Structure](/docs/overview_structure.md)
-  - [Quick Start with Franka Arm in Sim](/docs/sim_quick_start.md)
-    - [1. Training from state observation example](/docs/sim_quick_start.md#1-training-from-state-observation-example)
-    - [2. Training from image observation example](/docs/sim_quick_start.md#2-training-from-image-observation-example)
-    - [3. Training from image observation with 20 demo trajectories example](/docs/sim_quick_start.md#3-training-from-image-observation-with-20-demo-trajectories-example)
-  - [Run with Franka Arm on Real Robot](/docs/real_franka_peg.md#run-with-franka-arm-on-real-robot)
-    - [1. Peg Insertion 📍](/docs/real_franka_peg.md#peg-insertion-📍)
-      - [Detailed Procedure](/docs/real_franka_peg.md#procedure)
-    - [2. PCB Component Insertion 🖥️](/docs/real_franka_pcb.md)
-    - [3. Cable Routing 🔌](/docs/real_franka_cable_route.md)
-    - [4. Object Relocation 🗑️](/docs/real_franka_bin_relocation.md)
+  - [Overview and Code Structure](#overview-and-code-structure)
+  - [Quick Start with SERL in Sim](#quick-start-with-serl-in-sim)
+  - [Run with Franka Arm on Real Robot](#run-with-franka-arm-on-real-robot)
   - [Contribution](#contribution)
   - [Citation](#citation)
 
@@ -57,6 +51,47 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
     pip install -e .
     pip install -r requirements.txt
     ```
+
+## Overview and Code Structure
+
+SERL provides a set of common libraries for users to train RL policies for robotic manipulation tasks. The main structure of running the RL experiments involves having an actor node and a learner node, both of which interact with the robot gym environment. Both nodes run asynchronously, with data being sent from the actor to the learner node via the network using [agentlace](https://github.com/youliangtan/agentlace). The learner will periodically synchronize the policy with the actor. This design provides flexibility for parallel training and inference.
+
+<p align="center">
+  <img src="./docs/images/software_design.png" width="80%"/>
+</p>
+
+**Table for code structure**
+
+| Code Directory | Description |
+| --- | --- |
+| [serl_launcher](./serl_launcher) | Main code for SERL |
+| [serl_launcher.agents](./serl_launcher/serl_launcher/agents/) | Agent Policies (e.g. DRQ, SAC, BC) |
+| [serl_launcher.wrappers](./serl_launcher/serl_launcher/wrappers) | Gym env wrappers |
+| [serl_launcher.data](./serl_launcher/serl_launcher/data) | Replay buffer and data store |
+| [serl_launcher.vision](./serl_launcher/serl_launcher/vision) | Vision related models and utils |
+| [franka_sim](./franka_sim) | Franka mujoco simulation gym environment |
+| [serl_robot_infra](./serl_robot_infra/) | Robot infra for running with real robots |
+| [serl_robot_infra.robot_servers](./serl_robot_infra/robot_servers/) | Flask server for sending commands to robot via ROS |
+| [serl_robot_infra.franka_env](./serl_robot_infra/franka_env/) | Gym env for real franka robot |
+
+## Quick Start with SERL in Sim
+
+We provide a simulated environment for trying out SERL with a franka robot.
+
+Check out the [Quick Start with SERL in Sim](/docs/sim_quick_start.md)
+ - [Training from state observation example](/docs/sim_quick_start.md#1-training-from-state-observation-example)
+ - [Training from image observation example](/docs/sim_quick_start.md#2-training-from-image-observation-example)
+ - [Training from image observation with 20 demo trajectories example](/docs/sim_quick_start.md#3-training-from-image-observation-with-20-demo-trajectories-example)
+
+## Run with Franka Arm on Real Robot
+
+We provide a step-by-step guide to run RL policies with SERL on the real Franka robot.
+
+Check out the [Run with Franka Arm on Real Robot](/docs/real_franka.md)
+ - [Peg Insertion 📍](/docs/real_franka.md#1-peg-insertion-📍)
+ - [PCB Component Insertion 🖥️](/docs/real_franka.md#2-pcb-component-insertion-🖥️)
+ - [Cable Routing 🔌](/docs/real_franka.md#3-cable-routing-🔌)
+ - [Object Relocation 🗑️](/docs/real_franka.md#4-object-relocation-🗑️)
 
 ## Contribution
 
