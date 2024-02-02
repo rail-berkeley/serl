@@ -10,7 +10,8 @@ import subprocess
 from scipy.spatial.transform import Rotation as R
 from absl import app, flags
 
-from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState, ZeroJacobian
+from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState
+from serl_franka_controllers.msg import ZeroJacobian
 import geometry_msgs.msg as geom_msg
 from dynamic_reconfigure.client import Client as ReconfClient
 
@@ -42,13 +43,13 @@ class FrankaServer:
         self.resetpub = rospy.Publisher(
             "/franka_control/error_recovery/goal", ErrorRecoveryActionGoal, queue_size=1
         )
-        self.state_sub = rospy.Subscriber(
-            "franka_state_controller/franka_states", FrankaState, self._set_currpos
-        )
         self.jacobian_sub = rospy.Subscriber(
             "/cartesian_impedance_controller/franka_jacobian",
             ZeroJacobian,
             self._set_jacobian,
+        )
+        self.state_sub = rospy.Subscriber(
+            "franka_state_controller/franka_states", FrankaState, self._set_currpos
         )
 
     def start_impedance(self):
