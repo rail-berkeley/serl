@@ -6,12 +6,7 @@ When running with a real robot, a separate gym env is needed. For our examples, 
 
 ![](./images/robot_infra_interfaces.png)
 
-This requires the installation of the following packages:
-
-- [serl_franka_controller](https://github.com/rail-berkeley/serl_franka_controller)
-- `serl_robot_infra`: [readme](serl_robot_infra/README.md)
-
-Follow the README in `serl_robot_infra` for basic robot operation instructions.
+Follow the [README](serl_robot_infra/README.md) in `serl_robot_infra` for installation and basic robot operation instructions.
 
 
 *NOTE: The following code will not run as it is, since it will require custom data, checkpoints, and robot env. We provide the code as a reference for how to use SERL with real robots. Learn this section in incremental order, starting from the first task (peg insertion) to the last task (bin relocation). Modify the code according to your needs. *
@@ -31,20 +26,32 @@ The peg insertion task is best for getting started with running SERL on a real r
 ### Procedure
 1. 3D-print (1) **Assembly Object** of choice and (1) corresponding **Assembly Board** from the **Single-Object Manipulation Objects** section of [FMB](https://functional-manipulation-benchmark.github.io/files/index.html). Fix the board to the workspace and grasp the peg with the gripper.
 2. 3D-print (2) wrist camera mounts for the RealSense D405 and install onto the threads on the Robotiq Gripper. Create your own config from [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py), and update the camera serial numbers in `REALSENSE_CAMERAS`.
-3. The reward is given by checking the end-effector pose matches a fixed target pose. Manually move the arm into a pose where the peg is inserted into the board and update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
-4. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works.
-5. Record 20 demo trajectories with the spacemouse.
+3. Adjust for the weight of the wrist camera by editing `Desk > Settings > End-effector > Mechnical Data > Mass`.
+4. Unlock the robot and activate FCI in Desk. Then, start the franka_server by running:
     ```bash
+    python serl_robo_infra/robot_servers/franka_server.py --gripper_type=<Robotiq|Franka|None> --robot_ip=<robot_IP> --gripper_ip=<[Optional] Robotiq_gripper_IP>
+    ```
+    This should start the impedance controller and a Flask server ready to recieve requests.
+5. The reward in this task is given by checking whether the end-effector pose matches a fixed target pose. Grasp the desired peg with  `curl -X POST http://127.0.0.1:5000/close_gripper` and manually move the arm into a pose where the peg is inserted into the board. Print the current pose with `curl -X POST http://127.0.0.1:5000/getpos` and update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
+
+    **Note: the `getpos` command prints the pose in xyz+quaternion format, but `TARGET_POSE` expects xyz+euler(rpy) format. Please use your favourite quat to euler calculator to do the conversion.
+
+    **Note: make sure the wrist joint is centered (away from joint limits) and z-axis euler angle is positive at the target pose to avoid discontinuities.
+
+6. Set `RANDOM_RESET` to `False` inside the config file to speedup training. Note the policy would only generalize to any board pose when this is set to `True`, but only try this after the basic task works.
+7. Record 20 demo trajectories with the spacemouse.
+    ```bash
+    cd examples/async_peg_insert_drq
     python record_demo.py
     ```
     The trajectories are saved in `examples/async_peg_insert_drq/peg_insertion_20_trajs_{UUID}.pkl`.
-6. Train the RL agent with the collected demos by running both learner and actor nodes.
+8. Edit `demo_path` and `checkpoint_path` in `run_learner.sh` and `run_actor.sh`. Train the RL agent with the collected demos by running both learner and actor nodes.
     ```bash
     bash run_learner.sh
     bash run_actor.sh
     ```
-7. If nothing went wrong, the policy should converge with 100% success rate within 30 minutes without `RANDOM_RESET` and 60 minutes with `RANDOM_RESET`.
-8. The checkpoints are automatically saved and can be evaluated with:
+9. If nothing went wrong, the policy should converge with 100% success rate within 30 minutes without `RANDOM_RESET` and 60 minutes with `RANDOM_RESET`.
+10. The checkpoints are automatically saved and can be evaluated by setting the `--eval_checkpoint_step=CHECKPOINT_NUMBER_TO_EVAL` and `--eval_n_trajs=N_TIMES_TO_EVAL` flags in `run_actor.sh`. Then run:
     ```bash
     bash run_actor.sh
     ```
