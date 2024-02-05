@@ -28,3 +28,12 @@ class SpaceMouseExpert:
         """Returns the latest action and button state of the SpaceMouse."""
         with self.state_lock:
             return self.latest_data["action"], self.latest_data["buttons"]
+
+
+if __name__ == "__main__":
+    import time
+    spacemouse = SpaceMouseExpert()
+    while True:
+        action, buttons = spacemouse.get_action()
+        print(action, buttons)
+        time.sleep(0.1)
