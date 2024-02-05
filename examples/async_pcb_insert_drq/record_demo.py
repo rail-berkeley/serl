@@ -32,6 +32,7 @@ if __name__ == "__main__":
     transitions = []
     success_count = 0
     success_needed = 40
+    total_count = 0
     pbar = tqdm(total=success_needed)
 
     while success_count < success_needed:
@@ -53,13 +54,25 @@ if __name__ == "__main__":
         obs = next_obs
 
         if done:
-            print(rew)
             success_count += rew
+            total_count += 1
+            print(f'{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed.')
             pbar.update(rew)
             obs, _ = env.reset()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"./bc_demos/pcb_insert_{success_needed}_demos_{uuid}.pkl"
-    with open(file_name, "wb") as f:
-        pkl.dump(transitions, f)
-        print(f"saved {success_needed} demos to {file_name}")
+    file_name = f"./pcb_insert_{success_needed}_demos_{uuid}.pkl"
+    try:
+        with open(file_name, "wb") as f:
+            pkl.dump(transitions, f)
+            print(f"saved {success_needed} demos to {file_name}")
+    except Exception as e:
+        print(f"failed to save demos to {file_name}")
+        print(e)
+        f_temp = f"/tmp/recovered_serl_demos_{uuid}.pkl"
+        print(f"attempting to save to {f_temp} instead...")
+        pkl.dump(transitions, f_temp)
+        print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
+
+    env.close()
+    pbar.close()
