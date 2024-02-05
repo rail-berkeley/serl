@@ -35,5 +35,5 @@ if __name__ == "__main__":
     spacemouse = SpaceMouseExpert()
     while True:
         action, buttons = spacemouse.get_action()
-        print(action, buttons)
+        print(f'Spacemouse action: {action}, buttons: {buttons}')
         time.sleep(0.1)
