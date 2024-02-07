@@ -1,4 +1,7 @@
 """ Test the spacemouse output. """
+import time
+import numpy as np
+from serl_robot_infra.franka_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 
 
 def test_spacemouse():
@@ -9,19 +12,12 @@ def test_spacemouse():
     It keeps running until the user stops it.
 
     """
-    import time
-    import numpy as np
-    from serl_robot_infra.franka_env.spacemouse.spacemouse_expert import (
-        SpaceMouseExpert,
-    )
-
-    np.set_printoptions(precision=3, suppress=True)
-
     spacemouse = SpaceMouseExpert()
-    while True:
-        action, buttons = spacemouse.get_action()
-        print(f"Spacemouse action: {action}, buttons: {buttons}")
-        time.sleep(0.1)
+    with np.printoptions(precision=3, suppress=True):
+        while True:
+            action, buttons = spacemouse.get_action()
+            print(f"Spacemouse action: {action}, buttons: {buttons}")
+            time.sleep(0.1)
 
 
 def main():
