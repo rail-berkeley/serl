@@ -34,5 +34,12 @@ class FrankaGripperServer(GripperServer):
         msg.goal.force = 130
         self.grippergrasppub.publish(msg)
 
+    def move(self, position: int):
+        """Move the gripper to a specific position in range [0, 255]"""
+        msg = MoveActionGoal()
+        msg.goal.width = float(position / (255 * 10))  # width in [0, 0.1]m
+        msg.goal.speed = 0.3
+        self.grippermovepub.publish(msg)
+
     def update_gripper(self, msg):
         self.gripper_pos = np.sum(msg.position)
