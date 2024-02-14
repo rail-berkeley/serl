@@ -55,7 +55,7 @@ The HTTP server is used to communicate between the ROS controller and gym enviro
 | get_gripper | Return current gripper position |
 | close_gripper | Close the gripper completely |
 | open_gripper | Open the gripper completely |
-| move_gripper | Move the gripper to a given position (Robotiq only) |
+| move_gripper | Move the gripper to a given position |
 | clearerr | Clear errors |
 | update_param | Update the impedance controller parameters |
 
