@@ -6,10 +6,14 @@ When running with a real robot, a separate gym env is needed. For our examples, 
 
 ![](./images/robot_infra_interfaces.png)
 
-Follow the [README](serl_robot_infra/README.md) in `serl_robot_infra` for installation and basic robot operation instructions.
 
+### Installation for `serl_robot_infra`
 
-*NOTE: The following code will not run as it is, since it will require custom data, checkpoints, and robot env. We provide the code as a reference for how to use SERL with real robots. Learn this section in incremental order, starting from the first task (peg insertion) to the last task (bin relocation). Modify the code according to your needs. *
+Follow the [README](../serl_robot_infra/README.md) in `serl_robot_infra` for installation and basic robot operation instructions. This contains the instruction for installing the impendence-based [serl_franka_controllers](https://github.com/rail-berkeley/serl_franka_controllers).
+
+After the installation, you should be able to run the robot server, interact with the gym `franka_env` (hardware).
+
+> NOTE: The following example code will not run as it is, since it will require custom data, checkpoints, and robot env. We provide the code as a reference for how to use SERL with real robots. Learn this section in incremental order, starting from the first task (peg insertion) to the last task (bin relocation). Modify the code according to your needs.
 
 ## 1. Peg Insertion 📍
 
@@ -80,7 +84,9 @@ env = RecordEpisodeStatistics(env) # record episode statistics
 
 > Env and default config are located in `serl_robot_infra/franka_env/envs/pcb_env/`
 
-Similar to peg insertion, here we record demo trajectories with the robot, then run the learner and actor nodes.
+Similar to peg insertion task, we define the reward in this task is given by checking whether the end-effector pose matches a fixed target pose. Update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
+
+Here we record demo trajectories with the robot, then run the learner and actor nodes.
 ```bash
 # record demo trajectories
 python record_demo.py

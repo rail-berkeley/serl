@@ -20,7 +20,7 @@ from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.utils.train_utils import concat_batches
 
-from agentlace.trainer import TrainerServer, TrainerClient, TrainerTunnel
+from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
 
 from serl_launcher.utils.launcher import (
@@ -121,11 +121,9 @@ def actor(
     data_stores: OrderedDict[str, MemoryEfficientReplayBufferDataStore],
     env,
     sampling_rng,
-    tunnel=None,
 ):
     """
     This is the actor loop, which runs when "--actor" is set to True.
-    NOTE: tunnel is used the transport layer for multi-threading
     """
     if FLAGS.eval_checkpoint_step:
         for task in agents.keys():
@@ -295,12 +293,9 @@ def actor(
 ##############################################################################
 
 
-def learner(
-    rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None, tunnel=None
-):
+def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None):
     """
     The learner loop, which runs when "--learner" is set to True.
-    NOTE: tunnel is used the transport layer for multi-threading
     """
     # To track the step in the training loop
     update_steps = 0
@@ -542,7 +537,6 @@ def main(_):
             replay_buffer,
             demo_buffer=demo_buffer,
             wandb_logger=wandb_logger,
-            tunnel=None,
         )
 
     elif FLAGS.actor:
@@ -552,7 +546,7 @@ def main(_):
         )
         # actor loop
         print_green("starting actor loop")
-        actor(agents, data_stores, env, sampling_rng, tunnel=None)
+        actor(agents, data_stores, env, sampling_rng)
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")

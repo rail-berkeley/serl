@@ -5,6 +5,12 @@ from typing import Tuple
 
 
 class SpaceMouseExpert:
+    """
+    This class provides an interface to the SpaceMouse.
+    It continuously reads the SpaceMouse state and provide
+    a "get_action" method to get the latest action and button state.
+    """
+
     def __init__(self):
         pyspacemouse.open()
 

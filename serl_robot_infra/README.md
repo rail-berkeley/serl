@@ -19,6 +19,7 @@ There is a Flask server which sends commands to the robot via ROS. There is a gy
     conda activate serl
     pip install -e .
     ```
+
 ### Usage
 
 **Robot Server**
@@ -29,7 +30,13 @@ From there you should be able to navigate to `serl_robot_infra` and then simply 
 
 ```bash
 conda activate serl
-python serl_robo_infra/robot_servers/franka_server.py --gripper_type=<Robotiq|Franka|None> --robot_ip=<robot_IP> --gripper_ip=<[Optional] Robotiq_gripper_IP>
+
+# script to start http server and ros controller
+python serl_robo_infra/robot_servers/franka_server.py \
+    --gripper_type=<Robotiq|Franka|None>
+    --robot_ip=<robot_IP>
+    --gripper_ip=<[Optional] Robotiq_gripper_IP>
+    --reset_joint_target=<[Optional] robot_joints_when_robot_resets>
 ```
 
 This should start ROS node impedence controller and the HTTP server. You can test that things are running by trying to move the end effector around, if the impedence controller is running it should be compliant.

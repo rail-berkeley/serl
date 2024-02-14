@@ -25,6 +25,11 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "gripper_type", "Robotiq", "Type of gripper to use: Robotiq, Franka, or None"
 )
+flags.DEFINE_list(
+    "reset_joint_target",
+    [0, 0, 0, -1.9, -0, 2, 0],
+    "Target joint angles for the robot to reset to",
+)
 
 
 class FrankaServer:
@@ -134,7 +139,7 @@ class FrankaServer:
         self.start_impedance()
         print("impedance STARTED")
 
-    def move(self, pose):
+    def move(self, pose: list):
         """Moves to a pose: [x, y, z, qx, qy, qz, qw]"""
         assert len(pose) == 7
         msg = geom_msg.PoseStamped()
@@ -164,12 +169,12 @@ class FrankaServer:
 
 
 def main(_):
-    RESET_JOINT_TARGET = [0, 0, 0, -1.9, -0, 2, 0]
     ROS_PKG_NAME = "serl_franka_controllers"
 
     ROBOT_IP = FLAGS.robot_ip
     GRIPPER_IP = FLAGS.gripper_ip
     GRIPPER_TYPE = FLAGS.gripper_type
+    RESET_JOINT_TARGET = FLAGS.reset_joint_target
 
     webapp = Flask(__name__)
 

@@ -21,7 +21,7 @@ class RobotiqGripperServer(GripperServer):
         self.gripper_state_sub = rospy.Subscriber(
             "Robotiq2FGripperRobotInput",
             inputMsg.Robotiq2FGripper_robot_input,
-            self.update_gripper,
+            self._update_gripper,
             queue_size=1,
         )
         self.gripperpub = rospy.Publisher(
@@ -52,7 +52,8 @@ class RobotiqGripperServer(GripperServer):
         gripper_command = self._generate_gripper_command(position, self.gripper_command)
         self.gripperpub.publish(self.gripper_command)
 
-    def update_gripper(self, msg):
+    def _update_gripper(self, msg):
+        """internal callback to get the latest gripper position."""
         self.gripper_pos = msg.gPO
 
     def _generate_gripper_command(self, char, command):

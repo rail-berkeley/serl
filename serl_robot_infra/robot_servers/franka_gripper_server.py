@@ -16,7 +16,7 @@ class FrankaGripperServer(GripperServer):
             "/franka_gripper/grasp/goal", GraspActionGoal, queue_size=1
         )
         self.gripper_sub = rospy.Subscriber(
-            "/franka_gripper/joint_states", JointState, self.update_gripper
+            "/franka_gripper/joint_states", JointState, self._update_gripper
         )
 
     def open(self):
@@ -41,5 +41,6 @@ class FrankaGripperServer(GripperServer):
         msg.goal.speed = 0.3
         self.grippermovepub.publish(msg)
 
-    def update_gripper(self, msg):
+    def _update_gripper(self, msg):
+        """internal callback to get the latest gripper position."""
         self.gripper_pos = np.sum(msg.position)
