@@ -80,10 +80,9 @@ def print_green(x):
 ##############################################################################
 
 
-def actor(agent: DrQAgent, data_store, env, sampling_rng, tunnel=None):
+def actor(agent: DrQAgent, data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
-    NOTE: tunnel is used the transport layer for multi-threading
     """
     client = TrainerClient(
         "actor_env",
@@ -179,11 +178,9 @@ def learner(
     replay_buffer,
     demo_buffer,
     wandb_logger=None,
-    tunnel=None,
 ):
     """
     The learner loop, which runs when "--learner" is set to True.
-    NOTE: tunnel is used the transport layer for multi-threading
     """
     # To track the step in the training loop
     update_steps = 0
@@ -355,7 +352,6 @@ def main(_):
             replay_buffer,
             demo_buffer=demo_buffer,
             wandb_logger=wandb_logger,
-            tunnel=None,
         )
 
     elif FLAGS.actor:
@@ -364,7 +360,7 @@ def main(_):
 
         # actor loop
         print_green("starting actor loop")
-        actor(agent, data_store, env, sampling_rng, tunnel=None)
+        actor(agent, data_store, env, sampling_rng)
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")

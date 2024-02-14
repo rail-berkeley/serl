@@ -35,7 +35,7 @@ class RelativeFrame(gym.Wrapper):
             # Homogeneous transformation matrix from reset pose's relative frame to base frame
             self.T_r_o_inv = np.zeros((4, 4))
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         # action is assumed to be (x, y, z, rx, ry, rz, gripper)
         # Transform action from end-effector frame to base frame
         transformed_action = self.transform_action(action)
@@ -86,7 +86,7 @@ class RelativeFrame(gym.Wrapper):
 
         return obs
 
-    def transform_action(self, action):
+    def transform_action(self, action: np.ndarray):
         """
         Transform action from body(end-effector) frame into into spatial(base) frame
         using the adjoint matrix
