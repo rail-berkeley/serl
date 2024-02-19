@@ -1,5 +1,7 @@
 # Quick Start with SERL in Sim
 
+This is a minimal mujoco simulation environment for training with SERL. The environment consists of a panda robot arm and a cube. The goal is to lift the cube to a target position. The environment is implemented using `franka_sim` and `gym` interface.
+
 ![](./images/franka_sim.png)
 
 ## Installation
@@ -160,4 +162,4 @@ With the example above, we can load the data from the replay buffer by providing
 ./run_learner.sh --preload_rlds_path /path/to/load
 ```
 
-This is equivalent to the `--demo_path` argument in `examples/async_rlpd_drq_sim/run_learner.sh` script.
+This is similar to the `examples/async_rlpd_drq_sim/run_learner.sh` script, which uses `--demo_path` argument which load .pkl offline demo trajectories.
