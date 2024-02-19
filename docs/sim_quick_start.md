@@ -117,3 +117,47 @@ Run actor node with rendering window:
 # add --ip x.x.x.x if running on a different machine
 bash run_actor.sh
 ```
+
+## Use RLDS logger to save and load trajectories
+
+This provides a way to save and load trajectories for SERL training. [Tensorflow RLDS dataset](https://github.com/google-research/rlds) format is used to save and load trajectories. This standard is compliant with the [RTX datasets](https://robotics-transformer-x.github.io/), which can potentially can be used for other robot learning tasks.
+
+### Installation
+
+This requires additional installation of `oxe_envlogger`:
+```bash
+git clone git@github.com:rail-berkeley/oxe_envlogger.git
+cd oxe_envlogger
+pip install -e .
+```
+
+### Usage
+
+**Save the trajectories**
+
+With the example above, we can save the data from the replay buffer by providing the `rlds_logger_path` argument. This will save the data to the specified path.
+
+```bash
+./run_learner.sh --log_rlds_path /path/to/save
+```
+
+This will save the data to the specified path in the following format:
+
+```bash
+ - /path/to/save
+    - dataset_info.json
+    - features.json
+    - serl_rlds_dataset-train.tfrecord-00000
+    - serl_rlds_dataset-train.tfrecord-00001
+    ....
+```
+
+**Load the trajectories**
+
+With the example above, we can load the data from the replay buffer by providing the `preload_rlds_path` argument. This will load the data from the specified path.
+
+```bash
+./run_learner.sh --preload_rlds_path /path/to/load
+```
+
+This is equivalent to the `--demo_path` argument in `examples/async_rlpd_drq_sim/run_learner.sh` script.
