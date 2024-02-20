@@ -56,7 +56,9 @@ if __name__ == "__main__":
         if done:
             success_count += rew
             total_count += 1
-            print(f'{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed.')
+            print(
+                f"{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed."
+            )
             pbar.update(rew)
             obs, _ = env.reset()
 
@@ -71,8 +73,9 @@ if __name__ == "__main__":
         print(e)
         f_temp = f"/tmp/recovered_serl_demos_{uuid}.pkl"
         print(f"attempting to save to {f_temp} instead...")
-        pkl.dump(transitions, f_temp)
-        print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
+        with open(f_temp, "wb") as f:
+            pkl.dump(transitions, f)
+            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
 
     env.close()
     pbar.close()

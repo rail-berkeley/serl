@@ -96,9 +96,18 @@ if __name__ == "__main__":
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"bc_bin_relocate_{demos_needed}_demos_{uuid}.pkl"
-    with open(file_name, "wb") as f:
-        pkl.dump(trajectories, f)
-        print(f"saved {len(trajectories)} transitions to {file_name}")
+    try:
+        with open(file_name, "wb") as f:
+            pkl.dump(trajectories, f)
+            print(f"saved {len(trajectories)} transitions to {file_name}")
+    except Exception as e:
+        print(f"failed to save demos to {file_name}")
+        print(e)
+        f_temp = f"/tmp/recovered_serl_demos_{uuid}.pkl"
+        print(f"attempting to save to {f_temp} instead...")
+        with open(f_temp, "wb") as f:
+            pkl.dump(trajectories, f)
+            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
 
     listener_1.stop()
     listener_2.stop()

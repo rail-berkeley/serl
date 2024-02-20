@@ -100,11 +100,33 @@ if __name__ == "__main__":
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"fw_bin_{len(fw_transitions)}_demo_{uuid}.pkl"
-    with open(file_name, "wb") as f:
-        pkl.dump(fw_transitions, f)
-        print(f"saved {len(fw_transitions)} transitions to {file_name}")
+    try:
+        with open(file_name, "wb") as f:
+            pkl.dump(fw_transitions, f)
+            print(f"saved {len(fw_transitions)} transitions to {file_name}")
+    except Exception as e:
+        print(f"failed to save demos to {file_name}")
+        print(e)
+        f_temp = f"/tmp/recovered_serl_demos_{uuid}_fw.pkl"
+        print(f"attempting to save to {f_temp} instead...")
+        with open(f_temp, "wb") as f:
+            pkl.dump(fw_transitions, f)
+            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
 
     file_name = f"bw_bin_{len(bw_transitions)}_demo_{uuid}.pkl"
-    with open(file_name, "wb") as f:
-        pkl.dump(bw_transitions, f)
-        print(f"saved {len(bw_transitions)} transitions to {file_name}")
+    try:
+        with open(file_name, "wb") as f:
+            pkl.dump(bw_transitions, f)
+            print(f"saved {len(bw_transitions)} transitions to {file_name}")
+    except Exception as e:
+        print(f"failed to save demos to {file_name}")
+        print(e)
+        f_temp = f"/tmp/recovered_serl_demos_{uuid}_bw.pkl"
+        print(f"attempting to save to {f_temp} instead...")
+        with open(f_temp, "wb") as f:
+            pkl.dump(bw_transitions, f)
+            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
+
+    env.close()
+    fw_pbar.close()
+    bw_pbar.close()

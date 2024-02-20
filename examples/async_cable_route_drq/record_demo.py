@@ -47,6 +47,7 @@ if __name__ == "__main__":
     transitions = []
     success_count = 0
     success_needed = 70
+    total_count = 0
 
     pbar = tqdm(total=success_needed)
 
@@ -69,13 +70,29 @@ if __name__ == "__main__":
         obs = next_obs
 
         if done:
-            print(rew)
-            success_count += 1
-            pbar.update(1)
+            success_count += rew
+            total_count += 1
+            print(
+                f"{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed."
+            )
+            pbar.update(rew)
             obs, _ = env.reset()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"./bc_demos/cable_route_{success_needed}_demos_{uuid}.pkl"
-    with open(file_name, "wb") as f:
-        pkl.dump(transitions, f)
-        print(f"saved {len(transitions)} transitions to {file_name}")
+    try:
+        with open(file_name, "wb") as f:
+            pkl.dump(transitions, f)
+            print(f"saved {success_needed} demos to {file_name}")
+            print(f"saved {len(transitions)} transitions to {file_name}")
+    except Exception as e:
+        print(f"failed to save demos to {file_name}")
+        print(e)
+        f_temp = f"/tmp/recovered_serl_demos_{uuid}.pkl"
+        print(f"attempting to save to {f_temp} instead...")
+        with open(f_temp, "wb") as f:
+            pkl.dump(transitions, f)
+            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
+
+    env.close()
+    pbar.close()
