@@ -4,6 +4,7 @@ import numpy as np
 import copy
 import pickle as pkl
 import datetime
+import os
 
 import franka_env
 
@@ -59,6 +60,17 @@ if __name__ == "__main__":
     listener_2.start()
 
     pbar = tqdm(total=demos_needed, desc="bc_demos")
+    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = f"bc_bin_relocate_{demos_needed}_demos_{uuid}.pkl"
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
+    file_path = os.path.join(file_dir, file_name)
+
+    if not os.path.exists(file_dir):
+        os.mkdir(file_dir)
+    if os.path.exists(file_path):
+        raise FileExistsError(f"{file_name} already exists in {file_dir}")
+    if not os.access(file_dir, os.W_OK):
+        raise PermissionError(f"No permission to write to {file_dir}")
 
     transitions = []
     while demos_count < demos_needed:
@@ -94,11 +106,11 @@ if __name__ == "__main__":
             trajectories += transitions
             transitions = []
 
-    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"bc_bin_relocate_{demos_needed}_demos_{uuid}.pkl"
-    with open(file_name, "wb") as f:
+    with open(file_path, "wb") as f:
         pkl.dump(trajectories, f)
-        print(f"saved {len(trajectories)} transitions to {file_name}")
+        print(f"saved {len(trajectories)} transitions to {file_path}")
 
     listener_1.stop()
     listener_2.stop()
+    env.close()
+    pbar.close()

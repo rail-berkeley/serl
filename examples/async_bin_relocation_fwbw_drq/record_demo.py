@@ -4,6 +4,7 @@ import numpy as np
 import copy
 import pickle as pkl
 import datetime
+import os
 
 import franka_env
 
@@ -64,6 +65,22 @@ if __name__ == "__main__":
     fw_pbar = tqdm(total=transitions_needed, desc="fw")
     bw_pbar = tqdm(total=transitions_needed, desc="bw")
 
+    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    fw_file_name = f"fw_bin_demo_{uuid}.pkl"
+    bw_file_name = f"bw_bin_demo_{uuid}.pkl"
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
+    fw_file_path = os.path.join(file_dir, fw_file_name)
+    bw_file_path = os.path.join(file_dir, bw_file_name)
+
+    if not os.path.exists(file_dir):
+        os.mkdir(file_dir)
+    if os.path.exists(fw_file_path) or os.path.exists(bw_file_path):
+        raise FileExistsError(
+            f"Either {fw_file_name} or {bw_file_name} already exists in {file_dir}"
+        )
+    if not os.access(file_dir, os.W_OK):
+        raise PermissionError(f"No permission to write to {file_dir}")
+
     while (
         len(fw_transitions) < transitions_needed
         or len(bw_transitions) < transitions_needed
@@ -98,13 +115,14 @@ if __name__ == "__main__":
             env.set_task_id(next_task_id)
             obs, _ = env.reset()
 
-    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"fw_bin_{len(fw_transitions)}_demo_{uuid}.pkl"
-    with open(file_name, "wb") as f:
+    with open(fw_file_path, "wb") as f:
         pkl.dump(fw_transitions, f)
-        print(f"saved {len(fw_transitions)} transitions to {file_name}")
+        print(f"saved {len(fw_transitions)} transitions to {fw_file_path}")
 
-    file_name = f"bw_bin_{len(bw_transitions)}_demo_{uuid}.pkl"
-    with open(file_name, "wb") as f:
+    with open(bw_file_path, "wb") as f:
         pkl.dump(bw_transitions, f)
-        print(f"saved {len(bw_transitions)} transitions to {file_name}")
+        print(f"saved {len(bw_transitions)} transitions to {bw_file_path}")
+
+    env.close()
+    fw_pbar.close()
+    bw_pbar.close()

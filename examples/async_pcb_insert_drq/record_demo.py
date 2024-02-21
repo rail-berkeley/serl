@@ -4,6 +4,7 @@ import numpy as np
 import copy
 import pickle as pkl
 import datetime
+import os
 
 import franka_env
 
@@ -31,8 +32,21 @@ if __name__ == "__main__":
 
     transitions = []
     success_count = 0
-    success_needed = 40
+    success_needed = 3
+    total_count = 0
     pbar = tqdm(total=success_needed)
+
+    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = f"pcb_insert_{success_needed}_demos_{uuid}.pkl"
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
+    file_path = os.path.join(file_dir, file_name)
+
+    if not os.path.exists(file_dir):
+        os.mkdir(file_dir)
+    if os.path.exists(file_path):
+        raise FileExistsError(f"{file_name} already exists in {file_dir}")
+    if not os.access(file_dir, os.W_OK):
+        raise PermissionError(f"No permission to write to {file_dir}")
 
     while success_count < success_needed:
         next_obs, rew, done, truncated, info = env.step(action=np.zeros((6,)))
@@ -53,13 +67,17 @@ if __name__ == "__main__":
         obs = next_obs
 
         if done:
-            print(rew)
             success_count += rew
+            total_count += 1
+            print(
+                f"{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed."
+            )
             pbar.update(rew)
             obs, _ = env.reset()
 
-    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"./bc_demos/pcb_insert_{success_needed}_demos_{uuid}.pkl"
-    with open(file_name, "wb") as f:
+    with open(file_path, "wb") as f:
         pkl.dump(transitions, f)
-        print(f"saved {success_needed} demos to {file_name}")
+        print(f"saved {success_needed} demos to {file_path}")
+
+    env.close()
+    pbar.close()
