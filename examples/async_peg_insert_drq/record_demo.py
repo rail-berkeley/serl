@@ -4,6 +4,7 @@ import numpy as np
 import copy
 import pickle as pkl
 import datetime
+import os
 
 import franka_env
 
@@ -35,6 +36,18 @@ if __name__ == "__main__":
     total_count = 0
     pbar = tqdm(total=success_needed)
 
+    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = f"peg_insert_{success_needed}_demos_{uuid}.pkl"
+    file_dir = os.path.dirname(os.path.realpath(__file__)) # same dir as this script
+    file_path = os.path.join(file_dir, file_name)
+
+    if not os.path.exists(file_dir):
+        os.mkdir(file_dir)
+    if os.path.exists(file_path):
+        raise FileExistsError(f"{file_name} already exists in {file_dir}")
+    if not os.access(file_dir, os.W_OK):
+        raise PermissionError(f"No permission to write to {file_dir}")
+
     while success_count < success_needed:
         next_obs, rew, done, truncated, info = env.step(action=np.zeros((6,)))
         actions = info["intervene_action"]
@@ -62,20 +75,9 @@ if __name__ == "__main__":
             pbar.update(rew)
             obs, _ = env.reset()
 
-    uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"peg_insert_{success_needed}_demos_{uuid}.pkl"
-    try:
-        with open(file_name, "wb") as f:
-            pkl.dump(transitions, f)
-            print(f"saved {success_needed} demos to {file_name}")
-    except Exception as e:
-        print(f"failed to save demos to {file_name}")
-        print(e)
-        f_temp = f"/tmp/recovered_serl_demos_{uuid}.pkl"
-        print(f"attempting to save to {f_temp} instead...")
-        with open(f_temp, "wb") as f:
-            pkl.dump(transitions, f)
-            print(f"successfully saved to {f_temp}. PLEASE MOVE TO A SAFE LOCATION!")
+    with open(file_path, "wb") as f:
+        pkl.dump(transitions, f)
+        print(f"saved {success_needed} demos to {file_path}")
 
     env.close()
     pbar.close()
