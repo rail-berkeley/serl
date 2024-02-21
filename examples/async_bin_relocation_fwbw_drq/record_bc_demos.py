@@ -62,7 +62,7 @@ if __name__ == "__main__":
     pbar = tqdm(total=demos_needed, desc="bc_demos")
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"bc_bin_relocate_{demos_needed}_demos_{uuid}.pkl"
-    file_dir = os.path.dirname(os.path.realpath(__file__)) # same dir as this script
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
     file_path = os.path.join(file_dir, file_name)
 
     if not os.path.exists(file_dir):

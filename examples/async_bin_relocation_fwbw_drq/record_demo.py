@@ -68,14 +68,16 @@ if __name__ == "__main__":
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     fw_file_name = f"fw_bin_demo_{uuid}.pkl"
     bw_file_name = f"bw_bin_demo_{uuid}.pkl"
-    file_dir = os.path.dirname(os.path.realpath(__file__)) # same dir as this script
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
     fw_file_path = os.path.join(file_dir, fw_file_name)
     bw_file_path = os.path.join(file_dir, bw_file_name)
 
     if not os.path.exists(file_dir):
         os.mkdir(file_dir)
     if os.path.exists(fw_file_path) or os.path.exists(bw_file_path):
-        raise FileExistsError(f"Either {fw_file_name} or {bw_file_name} already exists in {file_dir}")
+        raise FileExistsError(
+            f"Either {fw_file_name} or {bw_file_name} already exists in {file_dir}"
+        )
     if not os.access(file_dir, os.W_OK):
         raise PermissionError(f"No permission to write to {file_dir}")
 

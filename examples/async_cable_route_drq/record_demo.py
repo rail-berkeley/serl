@@ -53,7 +53,7 @@ if __name__ == "__main__":
     pbar = tqdm(total=success_needed)
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"./bc_demos/cable_route_{success_needed}_demos_{uuid}.pkl"
-    file_dir = os.path.dirname(os.path.realpath(__file__)) # same dir as this script
+    file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
     file_path = os.path.join(file_dir, file_name)
 
     if not os.path.exists(file_dir):
@@ -62,7 +62,6 @@ if __name__ == "__main__":
         raise FileExistsError(f"{file_name} already exists in {file_dir}")
     if not os.access(file_dir, os.W_OK):
         raise PermissionError(f"No permission to write to {file_dir}")
-
 
     while success_count < success_needed:
         next_obs, rew, done, truncated, info = env.step(action=np.zeros((6,)))
@@ -93,7 +92,9 @@ if __name__ == "__main__":
 
     with open(file_path, "wb") as f:
         pkl.dump(transitions, f)
-        print(f"saved {success_needed} demos and {len(transitions)} transitions to {file_path}")
+        print(
+            f"saved {success_needed} demos and {len(transitions)} transitions to {file_path}"
+        )
 
     env.close()
     pbar.close()
