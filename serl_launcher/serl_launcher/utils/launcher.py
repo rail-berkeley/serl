@@ -196,14 +196,20 @@ def make_replay_buffer(
     capacity: int = 1000000,
     rlds_logger_path: Optional[str] = None,
     type: str = "replay_buffer",
-    image_keys: list = [],  # used when type is "memory_efficient_replay_buffer"
+    image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
     preload_rlds_path: Optional[str] = None,
 ):
     """
     This is the high-level helper function to
-    create a replay buffer and wandb logger
+    create a replay buffer for the given environment.
 
-    support only for "replay_buffer" and "memory_efficient_replay_buffer"
+    Args:
+    - env: gym or gymasium environment
+    - capacity: capacity of the replay buffer
+    - rlds_logger_path: path to save RLDS logs
+    - type: support only for "replay_buffer" and "memory_efficient_replay_buffer"
+    - image_keys: list of image keys, used only "memory_efficient_replay_buffer"
+    - preload_rlds_path: path to preloaded RLDS trajectories
     """
     print("shape of observation space and action space")
     print(env.observation_space)
@@ -211,7 +217,7 @@ def make_replay_buffer(
 
     # init logger for RLDS
     if rlds_logger_path:
-        # clean this to make this common
+        # from: https://github.com/rail-berkeley/oxe_envlogger
         from oxe_envlogger.rlds_logger import RLDSLogger
 
         rlds_logger = RLDSLogger(
