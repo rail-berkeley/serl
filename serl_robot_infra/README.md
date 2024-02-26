@@ -32,10 +32,10 @@ From there you should be able to navigate to `serl_robot_infra` and then simply 
 conda activate serl
 
 # script to start http server and ros controller
-python serl_robo_infra/robot_servers/franka_server.py \
-    --gripper_type=<Robotiq|Franka|None>
-    --robot_ip=<robot_IP>
-    --gripper_ip=<[Optional] Robotiq_gripper_IP>
+python serl_robot_infra/robot_servers/franka_server.py \
+    --gripper_type=<Robotiq|Franka|None> \
+    --robot_ip=<robot_IP> \
+    --gripper_ip=<[Optional] Robotiq_gripper_IP> \
     --reset_joint_target=<[Optional] robot_joints_when_robot_resets>
 ```
 
