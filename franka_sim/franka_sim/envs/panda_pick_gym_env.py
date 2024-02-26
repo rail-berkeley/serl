@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Tuple, Dict
 
 import gymnasium as gym
 import mujoco
@@ -140,7 +140,8 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
 
     def reset(
         self, seed=None, **kwargs
-    ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
+        """Reset the environment."""
         mujoco.mj_resetData(self._model, self._data)
 
         # Reset arm to home position.
@@ -163,22 +164,21 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         obs = self._compute_observation()
         return obs, {}
 
-    """
-    take a step in the environment.
-    Params:
-        action: np.ndarray
-
-    Returns:
-        observation: dict[str, np.ndarray],
-        reward: float,
-        done: bool,
-        truncated: bool,
-        info: dict[str, Any]
-    """
-
     def step(
         self, action: np.ndarray
-    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+    ) -> Tuple[Dict[str, np.ndarray], float, bool, bool, Dict[str, Any]]:
+        """
+        take a step in the environment.
+        Params:
+            action: np.ndarray
+
+        Returns:
+            observation: dict[str, np.ndarray],
+            reward: float,
+            done: bool,
+            truncated: bool,
+            info: dict[str, Any]
+        """
         x, y, z, grasp = action
 
         # Set the mocap position.
@@ -227,6 +227,17 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         obs = {}
         obs["state"] = {}
 
+        tcp_pos = self._data.sensor("2f85/pinch_pos").data
+        obs["state"]["panda/tcp_pos"] = tcp_pos.astype(np.float32)
+
+        tcp_vel = self._data.sensor("2f85/pinch_vel").data
+        obs["state"]["panda/tcp_vel"] = tcp_vel.astype(np.float32)
+
+        gripper_pos = np.array(
+            self._data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32
+        )
+        obs["state"]["panda/gripper_pos"] = gripper_pos
+
         # joint_pos = np.stack(
         #     [self._data.sensor(f"panda/joint{i}_pos").data for i in range(1, 8)],
         # ).ravel()
@@ -237,14 +248,6 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         # ).ravel()
         # obs["panda/joint_vel"] = joint_vel.astype(np.float32)
 
-        tcp_pos = self._data.sensor("2f85/pinch_pos").data
-        obs["state"]["panda/tcp_pos"] = tcp_pos.astype(np.float32)
-        tcp_vel = self._data.sensor("2f85/pinch_vel").data
-        obs["state"]["panda/tcp_vel"] = tcp_vel.astype(np.float32)
-        gripper_pos = np.array(
-            self._data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32
-        )
-        obs["state"]["panda/gripper_pos"] = gripper_pos
         # joint_torque = np.stack(
         # [self._data.sensor(f"panda/joint{i}_torque").data for i in range(1, 8)],
         # ).ravel()

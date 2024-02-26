@@ -17,8 +17,8 @@ from serl_launcher.utils.launcher import (
     make_sac_agent,
     make_trainer_config,
     make_wandb_logger,
+    make_replay_buffer,
 )
-from serl_launcher.data.data_store import ReplayBufferDataStore
 
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from serl_launcher.agents.continuous.sac import SACAgent
@@ -60,6 +60,9 @@ flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
+
+flags.DEFINE_string("log_rlds_path", None, "Path to save RLDS logs.")
+flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 
 
 def print_green(x):
@@ -130,7 +133,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
                     next_observations=next_obs,
                     rewards=reward,
                     masks=1.0 - done,
-                    dones=done,
+                    dones=done or truncated,
                 )
             )
 
@@ -264,10 +267,12 @@ def main(_):
     )
 
     def create_replay_buffer_and_wandb_logger():
-        replay_buffer = ReplayBufferDataStore(
-            env.observation_space,
-            env.action_space,
+        replay_buffer = make_replay_buffer(
+            env,
             capacity=FLAGS.replay_buffer_capacity,
+            rlds_logger_path=FLAGS.log_rlds_path,
+            type="replay_buffer",
+            preload_rlds_path=FLAGS.preload_rlds_path,
         )
 
         # set up wandb and logging

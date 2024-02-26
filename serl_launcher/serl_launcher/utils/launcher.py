@@ -3,13 +3,22 @@
 import jax
 from jax import nn
 
+from typing import Optional
+import tensorflow_datasets as tfds
+
 from agentlace.trainer import TrainerConfig
+from agentlace.data.tfds import populate_datastore
 
 from serl_launcher.common.wandb import WandBLogger
 from serl_launcher.agents.continuous.bc import BCAgent
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.agents.continuous.vice import VICEAgent
+
+from serl_launcher.data.data_store import (
+    MemoryEfficientReplayBufferDataStore,
+    ReplayBufferDataStore,
+)
 
 ##############################################################################
 
@@ -180,3 +189,69 @@ def make_wandb_logger(
         debug=debug,
     )
     return wandb_logger
+
+
+def make_replay_buffer(
+    env,
+    capacity: int = 1000000,
+    rlds_logger_path: Optional[str] = None,
+    type: str = "replay_buffer",
+    image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
+    preload_rlds_path: Optional[str] = None,
+):
+    """
+    This is the high-level helper function to
+    create a replay buffer for the given environment.
+
+    Args:
+    - env: gym or gymasium environment
+    - capacity: capacity of the replay buffer
+    - rlds_logger_path: path to save RLDS logs
+    - type: support only for "replay_buffer" and "memory_efficient_replay_buffer"
+    - image_keys: list of image keys, used only "memory_efficient_replay_buffer"
+    - preload_rlds_path: path to preloaded RLDS trajectories
+    """
+    print("shape of observation space and action space")
+    print(env.observation_space)
+    print(env.action_space)
+
+    # init logger for RLDS
+    if rlds_logger_path:
+        # from: https://github.com/rail-berkeley/oxe_envlogger
+        from oxe_envlogger.rlds_logger import RLDSLogger
+
+        rlds_logger = RLDSLogger(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            dataset_name="serl_rlds_dataset",
+            directory=rlds_logger_path,
+            max_episodes_per_file=5,  # TODO: arbitrary number
+        )
+    else:
+        rlds_logger = None
+
+    if type == "replay_buffer":
+        replay_buffer = ReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            capacity=capacity,
+            rlds_logger=rlds_logger,
+        )
+    elif type == "memory_efficient_replay_buffer":
+        replay_buffer = MemoryEfficientReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            capacity=capacity,
+            rlds_logger=rlds_logger,
+            image_keys=image_keys,
+        )
+    else:
+        raise ValueError(f"Unsupported replay_buffer_type: {type}")
+
+    if preload_rlds_path:
+        print(f" - Preloaded {preload_rlds_path} to replay buffer")
+        dataset = tfds.builder_from_directory(preload_rlds_path).as_dataset(split="all")
+        populate_datastore(replay_buffer, dataset, type="with_dones")
+        print(f" - done populated {len(replay_buffer)} samples to replay buffer")
+
+    return replay_buffer
