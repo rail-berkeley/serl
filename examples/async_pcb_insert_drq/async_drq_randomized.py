@@ -5,6 +5,9 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pynput
+import os
+import signal
 import tqdm
 from absl import app, flags
 from flax.training import checkpoints
@@ -87,6 +90,29 @@ sharding = jax.sharding.PositionalSharding(devices)
 def print_green(x):
     return print("\033[92m {}\033[00m".format(x))
 
+SHOULD_PAUSE = False  # flag to pause actor/learner agents
+def pause_client(a,b):
+    """ Set flag to pause actor/learner agents at next iteration """
+    global SHOULD_PAUSE
+    SHOULD_PAUSE = True
+    print('Requested pause training')
+
+def on_press(key):
+    """ Callback for when a key is pressed """
+    try:
+        # print(f'{key.char} pressed')
+
+        # chosen a rarely used key to avoid conflicts. this listener is always on, even when the program is not in focus
+        if key == pynput.keyboard.Key.pause:
+            print('Pause pressed')
+            pause_client(None, None)
+    except AttributeError:
+        # print(f'{key} pressed')
+        pass
+
+signal.signal(signal.SIGUSR1, pause_client)  # enable interrupt signal to pause training
+listener = pynput.keyboard.Listener(on_press=on_press)  # to enable keyboard based pause
+listener.start()
 
 ##############################################################################
 
@@ -95,6 +121,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     """
+    global SHOULD_PAUSE
+
     if FLAGS.eval_checkpoint_step:
         success_counter = 0
         time_list = []
@@ -129,6 +157,16 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     success_counter += reward
                     print(reward)
                     print(f"{success_counter}/{episode + 1}")
+
+            if SHOULD_PAUSE is True:
+                SHOULD_PAUSE = False # reset flag
+                print("Actor eval loop interrupted")
+                response = input("Do you want to continue (c), or exit (e)? ")
+                if response == "c":
+                    print("Continuing")
+                else:
+                    print("Stopping actor eval")
+                    break
 
         print(f"success rate: {success_counter / FLAGS.eval_n_trajs}")
         print(f"average time: {np.mean(time_list)}")
@@ -209,6 +247,23 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             stats = {"timer": timer.get_average_times()}
             client.request("send-stats", stats)
 
+        if SHOULD_PAUSE is True:
+            SHOULD_PAUSE = False # reset flag
+            print("Actor loop interrupted")
+            response = input("Do you want to continue (c), save replay buffer and exit (s) or simply exit (e)? ")
+            if response == "c":
+                print("Continuing")
+            else:
+                if response == "s":
+                    print("Saving replay buffer")
+                    data_store.save("replay_buffer_actor.npz")  # not yet supported for QueuedDataStore
+                else:
+                    print("Replay buffer not saved")
+                print("Stopping actor client")
+                client.stop()
+                break
+
+    print("Actor loop finished")
 
 ##############################################################################
 
@@ -219,6 +274,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     """
     # To track the step in the training loop
     update_steps = 0
+    global SHOULD_PAUSE
 
     def stats_callback(type: str, payload: dict) -> dict:
         """Callback for when server receives stats request."""
@@ -304,6 +360,28 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
             )
 
         update_steps += 1
+
+        if SHOULD_PAUSE is True:
+            SHOULD_PAUSE = False # reset flag
+            print("Learner loop interrupted")
+            response = input("Do you want to continue (c), save training state and exit (s) or simply exit (e)? ")
+            if response == "c":
+                print("Continuing")
+            else:
+                if response == "s":
+                    print("Saving learner state")
+                    agent_ckpt = checkpoints.save_checkpoint(
+                        FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
+                    )
+                    replay_buffer.save("replay_buffer_learner.npz")  # not yet supported for QueuedDataStore
+                    # TODO: save other parts of training state
+                else:
+                    print("Training state not saved")
+                print("Stopping learner client")
+                server.stop()
+                break
+
+    print("Learner loop finished")
 
 
 ##############################################################################
