@@ -90,25 +90,30 @@ sharding = jax.sharding.PositionalSharding(devices)
 def print_green(x):
     return print("\033[92m {}\033[00m".format(x))
 
+
 SHOULD_PAUSE = False  # flag to pause actor/learner agents
-def pause_client(a,b):
-    """ Set flag to pause actor/learner agents at next iteration """
+
+
+def pause_client(a, b):
+    """Set flag to pause actor/learner agents at next iteration"""
     global SHOULD_PAUSE
     SHOULD_PAUSE = True
-    print('Requested pause training')
+    print("Requested pause training")
+
 
 def on_press(key):
-    """ Callback for when a key is pressed """
+    """Callback for when a key is pressed"""
     try:
         # print(f'{key.char} pressed')
 
         # chosen a rarely used key to avoid conflicts. this listener is always on, even when the program is not in focus
         if key == pynput.keyboard.Key.pause:
-            print('Pause pressed')
+            print("Pause pressed")
             pause_client(None, None)
     except AttributeError:
         # print(f'{key} pressed')
         pass
+
 
 signal.signal(signal.SIGUSR1, pause_client)  # enable interrupt signal to pause training
 listener = pynput.keyboard.Listener(on_press=on_press)  # to enable keyboard based pause
@@ -159,7 +164,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print(f"{success_counter}/{episode + 1}")
 
             if SHOULD_PAUSE is True:
-                SHOULD_PAUSE = False # reset flag
+                SHOULD_PAUSE = False  # reset flag
                 print("Actor eval loop interrupted")
                 response = input("Do you want to continue (c), or exit (e)? ")
                 if response == "c":
@@ -248,15 +253,19 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             client.request("send-stats", stats)
 
         if SHOULD_PAUSE is True:
-            SHOULD_PAUSE = False # reset flag
+            SHOULD_PAUSE = False  # reset flag
             print("Actor loop interrupted")
-            response = input("Do you want to continue (c), save replay buffer and exit (s) or simply exit (e)? ")
+            response = input(
+                "Do you want to continue (c), save replay buffer and exit (s) or simply exit (e)? "
+            )
             if response == "c":
                 print("Continuing")
             else:
                 if response == "s":
                     print("Saving replay buffer")
-                    data_store.save("replay_buffer_actor.npz")  # not yet supported for QueuedDataStore
+                    data_store.save(
+                        "replay_buffer_actor.npz"
+                    )  # not yet supported for QueuedDataStore
                 else:
                     print("Replay buffer not saved")
                 print("Stopping actor client")
@@ -264,6 +273,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 break
 
     print("Actor loop finished")
+
 
 ##############################################################################
 
@@ -362,9 +372,11 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         update_steps += 1
 
         if SHOULD_PAUSE is True:
-            SHOULD_PAUSE = False # reset flag
+            SHOULD_PAUSE = False  # reset flag
             print("Learner loop interrupted")
-            response = input("Do you want to continue (c), save training state and exit (s) or simply exit (e)? ")
+            response = input(
+                "Do you want to continue (c), save training state and exit (s) or simply exit (e)? "
+            )
             if response == "c":
                 print("Continuing")
             else:
@@ -373,7 +385,9 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
                     agent_ckpt = checkpoints.save_checkpoint(
                         FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
                     )
-                    replay_buffer.save("replay_buffer_learner.npz")  # not yet supported for QueuedDataStore
+                    replay_buffer.save(
+                        "replay_buffer_learner.npz"
+                    )  # not yet supported for QueuedDataStore
                     # TODO: save other parts of training state
                 else:
                     print("Training state not saved")
