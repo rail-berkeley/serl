@@ -8,7 +8,7 @@ from typing import Dict
 from rtde_control import RTDEControlInterface as RTDEControl
 from rtde_receive import RTDEReceiveInterface as RTDEReceive
 
-from robotiq_env.utils.rotations import rotvev_2_quat, quat_2_rotvec
+from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
 
 ##############################################################################
 
@@ -69,7 +69,7 @@ class RobotiqEnv(gym.Env):
 
         # convert last 3 elements from axis angle to quat, from size (6,) to (7,)
         self.resetpos = np.concatenate(
-            [config.RESET_POSE[:3], rotvev_2_quat(config.RESET_POSE[3:])]
+            [config.RESET_POSE[:3], rotvec_2_quat(config.RESET_POSE[3:])]
         ).astype(np.float32)
 
         self.currpos = self.resetpos.copy().astype(np.float32)
@@ -147,7 +147,7 @@ class RobotiqEnv(gym.Env):
 
 
     def pose_r2q(self, pose: np.ndarray) -> np.ndarray:
-        return np.concatenate([pose[:3], rotvev_2_quat(pose[3:])])
+        return np.concatenate([pose[:3], rotvec_2_quat(pose[3:])])
 
     def pose_q2r(self, pose: np.ndarray) -> np.ndarray:
         return np.concatenate([pose[:3], quat_2_rotvec(pose[3:])])
