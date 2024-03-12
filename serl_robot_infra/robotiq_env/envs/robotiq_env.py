@@ -24,14 +24,14 @@ class DefaultEnvConfig:
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
+    ACTION_SCALE = np.zeros((3, ), dtype=np.float32)
 
     ROBOT_IP: str = "localhost"
+    ERROR_DELTA: float = 0.
     FORCEMODE_DAMPING: float = 0.1
     FORCEMODE_TASK_FRAME = np.zeros(6, )
     FORCEMODE_SELECTION_VECTOR = np.ones(6, )
-    FORCEMODE_FORCE_TYPE: int = 2
     FORCEMODE_LIMITS = np.zeros(6, )
-    FORCEMODE_SCALING = np.ones(6, )
 
     # not used for now
     REALSENSE_CAMERAS: Dict = {
@@ -54,14 +54,13 @@ class RobotiqEnv(gym.Env):
         self._TARGET_POSE = config.TARGET_POSE
         self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
         self.max_episode_length = max_episode_length
+        self.action_scale = config.ACTION_SCALE
 
         self.robot_ip = config.ROBOT_IP
         self.FM_DAMPING = config.FORCEMODE_DAMPING
         self.FM_TASK_FRAME = config.FORCEMODE_TASK_FRAME
         self.FM_SELECTION_VECTOR = config.FORCEMODE_SELECTION_VECTOR
-        self.FM_FORCE_TYPE = config.FORCEMODE_FORCE_TYPE
         self.FM_LIMITS = config.FORCEMODE_LIMITS
-        self.FM_SCALING = config.FORCEMODE_SCALING
 
         self.robotiq_control = None
         self.robotiq_receive = None
@@ -265,15 +264,8 @@ class RobotiqEnv(gym.Env):
 
     def _send_force_command(self, action: np.ndarray):
         """Internal function to send force command to the robot."""
-        force = action * self.FM_SCALING
-        self.robotiq_control.forceModeSetDamping(self.FM_DAMPING)
-        self.robotiq_control.forceMode(
-            self.FM_TASK_FRAME,
-            self.FM_SELECTION_VECTOR,
-            force,
-            self.FM_FORCE_TYPE,
-            self.FM_LIMITS
-        )
+
+        # TODO send to controller
 
     def _send_gripper_command(self, pos: float):
         """Internal function to send gripper command to the robot."""

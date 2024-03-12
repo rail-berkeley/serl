@@ -2,11 +2,14 @@ import time
 import threading
 import asyncio
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
+
+from robotiq_env.envs.robotiq_env import DefaultEnvConfig
 from robotiq_env.utils.vacuum_gripper import VacuumGripper
-from robotiq_env.utils.rotations import rotvec_diff, rotvec_2_quat, quat_2_rotvec
-from scipy.spatial.transform import Rotation as R
+from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
 
 np.set_printoptions(precision=4, suppress=True)
 
@@ -23,12 +26,10 @@ class RobotiqImpedanceController(threading.Thread):
     def __init__(
             self,
             robot_ip,
-            frequency=500,
-            lookahead_time=0.1,
-            max_pos_speed=0.25,  # 5% of max speed   TODO not needed for now
-            max_rot_speed=0.16,  # 5% of max speed
-            kp=5e4,
-            kd=1000,
+            frequency=100,
+            kp=4e4,
+            kd=8e3,
+            config: DefaultEnvConfig=None,
             verbose=True,
             *args,
             **kwargs
@@ -43,9 +44,6 @@ class RobotiqImpedanceController(threading.Thread):
 
         self.robot_ip = robot_ip
         self.frequency = frequency
-        self.lookahead_time = lookahead_time
-        self.max_pos_speed = max_pos_speed
-        self.max_rot_speed = max_rot_speed
         self.kp = kp
         self.kd = kd
         self.lock = threading.Lock()
@@ -60,17 +58,24 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_Qd = np.zeros((6,))
         self.curr_force = np.zeros((6,))  # force of tool tip
 
-        self.fm_damping = 0.1  # TODO make customizable
-        self.fm_task_frame = np.zeros((6,), dtype=np.float32)
-        self.fm_selection_vector = np.ones((6,), dtype=np.int8)
-        self.fm_force_type = 2
-        self.fm_limits = np.array([2, 2, 2, 1, 1, 1], dtype=np.float32)
+        self.fm_damping = config.FORCEMODE_DAMPING
+        self.fm_task_frame = config.FORCEMODE_TASK_FRAME
+        self.fm_selection_vector = config.FORCEMODE_SELECTION_VECTOR
+        self.fm_limits = config.FORCEMODE_LIMITS
+
+        self.action_scale = config.ACTION_SCALE
 
         self.robotiq_control: RTDEControlInterface = None
         self.robotiq_receive: RTDEReceiveInterface = None
         self.robotiq_gripper: VacuumGripper = None
 
         self._is_ready = False
+
+        # only temporary to test
+        self.hist_data = [[], []]
+        self.horizon = [0, 500]
+        self.err = 0
+        self.noerr = 0
 
     def start(self):
         super().start()
@@ -98,8 +103,11 @@ class RobotiqImpedanceController(threading.Thread):
     def stopped(self):
         return self._stop.is_set()
 
-    def set_target_pos(self, action, gripper_action):       # TODO make action scale
-        action = np.array(action[:6]) * np.array([1.5, 1.5, 1.5, 3, 3, 3]) * 0.01
+    def set_target_pos(self, action, gripper_action):  # TODO make action scale
+        # action = np.array(action[:6]) * np.array([1.5, 1.5, 1.5, 3, 3, 3]) * 0.01
+        action = np.array(action[:6], dtype=np.float32)
+        action[:3] *= self.action_scale[0]
+        action[3:] *= self.action_scale[1]
         with self.lock:
             self.target_pos[:3] += action[:3]
             self.target_pos[3:] = (R.from_quat(self.target_pos[3:]) * R.from_rotvec(action[3:])).as_quat()
@@ -154,14 +162,45 @@ class RobotiqImpedanceController(threading.Thread):
         rot_diff = R.from_quat(self.target_pos[3:]) * R.from_quat(self.curr_pos[3:]).inv()
         torque = 200 * rot_diff.as_rotvec()
 
+        # np.clip(force_pos, a_min=-124., a_max=124.)
+        # np.clip(torque, a_min=-50., a_max=50.)
         return np.concatenate((force_pos, torque))
 
     def run(self):
         asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
 
+    def plot(self):
+        if self.horizon[0] == 0:
+            self.start_t = time.monotonic()
+        if self.horizon[0] < self.horizon[1]:
+            self.horizon[0] += 1
+            # print(self.horizon[0], self.horizon[1], end="  ")
+            return
+
+        print(time.monotonic() - self.start_t)
+        self.robotiq_control.forceModeStop()
+
+        self.horizon[0] = -1e5
+        print("plotting")
+        real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
+        target_pos = np.array([pose2rotvec(q) for q in self.hist_data[1]])
+
+        plt.figure()
+        fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 8), dpi=300)
+        for i in range(6):
+            ax = axes[i % 3, i // 3]
+            ax.plot(real_pos[:, i], 'b')
+            ax.plot(target_pos[:, i], 'g')
+
+        fig.suptitle(f"params_ kp:{self.kp}  kd:{self.kd}")
+        plt.show(block=True)
+        self.stop()
+
     async def run_async(self):
         await self.start_robotiq_interfaces(gripper=True)
         self.init_pose()
+
+        self.robotiq_control.forceModeSetDamping(self.fm_damping)     # less damping = Faster
 
         try:
             dt = 1. / self.frequency
@@ -176,25 +215,27 @@ class RobotiqImpedanceController(threading.Thread):
                 t_now = time.monotonic()
 
                 # update robot state
-                last_p = self.curr_pos
                 await self._update_robot_state()
+
+                # log data
+                # self.hist_data[0].append(self.curr_pos.copy())
+                # self.hist_data[1].append(self.target_pos.copy())
+
+                # self.plot()
 
                 t_start = self.robotiq_control.initPeriod()
 
                 # send command to robot
-                # proportional to pos diff for now (test)
                 force = self._calculate_force()
-                # print(force)
-                # force[3:] = np.clip(force[3:], -3, 3)
 
-                self.robotiq_control.forceModeSetDamping(self.fm_damping)
-                self.robotiq_control.forceMode(
-                    list(self.fm_task_frame),
-                    list(self.fm_selection_vector),
-                    list(force),
-                    self.fm_force_type,
-                    list(self.fm_limits)
+                assert self.robotiq_control.forceMode(
+                    self.fm_task_frame,
+                    self.fm_selection_vector,
+                    force,
+                    2,
+                    self.fm_limits
                 )
+
                 if self.robotiq_gripper:
                     if self.target_grip > 0.9:
                         await self.robotiq_gripper.automatic_grip()
@@ -202,9 +243,15 @@ class RobotiqImpedanceController(threading.Thread):
                         await self.robotiq_gripper.automatic_release()
 
                 self.robotiq_control.waitPeriod(t_start)
-                time.sleep(max(0, (1.0 / self.frequency) - (time.monotonic() - t_now)))
+                a = (1.0 / self.frequency) - (time.monotonic() - t_now)
+                time.sleep(max(0., a))
+                if a < 0:
+                    self.err += 1
+                else:
+                    self.noerr += 1
 
         finally:
+            print(f"num errs: {self.err}     no_err: {self.noerr}")
             # mandatory cleanup
             self.robotiq_control.forceModeStop()
 
