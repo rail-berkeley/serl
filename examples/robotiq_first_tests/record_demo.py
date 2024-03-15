@@ -7,11 +7,15 @@ from tqdm import tqdm
 import gymnasium as gym
 from pprint import pprint
 
-from robotiq_env.envs.wrappers import SpacemouseIntervention
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper     # TODO has no images
+
 
 if __name__ == "__main__":
     env = gym.make("robotiq_test")
     env = SpacemouseIntervention(env)
+    env = Quat2EulerWrapper(env)
+    # env = SERLObsWrapper(env)
 
     obs, _ = env.reset()
 

@@ -1,8 +1,10 @@
 import gymnasium as gym
 import numpy as np
-from franka_env.spacemouse.spacemouse_expert import SpaceMouseExpert
+from robotiq_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 import time
 from scipy.spatial.transform import Rotation as R
+
+from robotiq_env.utils.rotations import quat_2_euler
 
 
 class SpacemouseIntervention(gym.ActionWrapper):
@@ -43,7 +45,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
     def get_deadspace_action(self) -> np.ndarray:
         expert_a, buttons = self.expert.get_action()
 
-        expert_a = np.clip((expert_a - np.sign(expert_a) * self.deadspace) / (1.-self.deadspace), a_min=-1.0, a_max=1.)
+        expert_a = np.clip((expert_a - np.sign(expert_a) * self.deadspace) / (1. - self.deadspace),
+                           a_min=-1.0, a_max=1.)
 
         self.left, self.right = tuple(buttons)
 
@@ -67,7 +70,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
         return action
 
-    def step(self, action):  # TODO change here!
+    def step(self, action):
         new_action = self.action(action)
         # print(f"new action: {new_action}")
         obs, rew, done, truncated, info = self.env.step(new_action)
@@ -75,3 +78,24 @@ class SpacemouseIntervention(gym.ActionWrapper):
         info["left"] = self.left
         info["right"] = self.right
         return obs, rew, done, truncated, info
+
+
+class Quat2EulerWrapper(gym.ObservationWrapper):
+    """
+    Convert the quaternion representation of the tcp pose to euler angles
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        # from xyz + quat to xyz + euler
+        self.observation_space["state"]["tcp_pose"] = gym.spaces.Box(
+            -np.inf, np.inf, shape=(6,)
+        )
+
+    def observation(self, observation):
+        # convert tcp pose from quat to euler
+        tcp_pose = observation["state"]["tcp_pose"]
+        observation["state"]["tcp_pose"] = np.concatenate(
+            (tcp_pose[:3], quat_2_euler(tcp_pose[3:]))
+        )
+        return observation

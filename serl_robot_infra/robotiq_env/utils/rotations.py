@@ -12,3 +12,11 @@ def rotvec_2_quat(rotvec):
 
 def quat_2_rotvec(quat):
     return R.from_quat(quat).as_rotvec()
+
+
+def quat_2_euler(quat):
+    return R.from_quat(quat).as_euler()
+
+
+def euler_2_quat(euler):
+    return R.from_euler(euler).as_quat()
