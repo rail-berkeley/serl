@@ -5,10 +5,12 @@ import gymnasium as gym
 import copy
 import time
 from typing import Dict
-from rtde_control import RTDEControlInterface as RTDEControl
-from rtde_receive import RTDEReceiveInterface as RTDEReceive
+from scipy.spatial.transform import Rotation as R
+
 
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
+from robot_controllers.robotiq_controller import RobotiqImpedanceController
+
 
 ##############################################################################
 
@@ -16,17 +18,18 @@ from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
 class DefaultEnvConfig:
     """Default configuration for RobotiqEnv. Fill in the values below."""
 
-    TARGET_POSE: np.ndarray = np.zeros((6,))           # might change as well
+    TARGET_POSE: np.ndarray = np.zeros((6,))  # might change as well
     REWARD_THRESHOLD: np.ndarray = np.zeros((6,))
-    RESET_POSE = np.zeros((6,))
+    RESET_Q = np.zeros((6,))
     RANDOM_RESET = (False,)
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
-    ACTION_SCALE = np.zeros((3, ), dtype=np.float32)
+    ACTION_SCALE = np.zeros((3,), dtype=np.float32)
 
     ROBOT_IP: str = "localhost"
+    CONTROLLER_HZ: int = 0
     ERROR_DELTA: float = 0.
     FORCEMODE_DAMPING: float = 0.1
     FORCEMODE_TASK_FRAME = np.zeros(6, )
@@ -56,36 +59,24 @@ class RobotiqEnv(gym.Env):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
 
-        self.robot_ip = config.ROBOT_IP
-        self.FM_DAMPING = config.FORCEMODE_DAMPING
-        self.FM_TASK_FRAME = config.FORCEMODE_TASK_FRAME
-        self.FM_SELECTION_VECTOR = config.FORCEMODE_SELECTION_VECTOR
-        self.FM_LIMITS = config.FORCEMODE_LIMITS
+        self.config = config
 
-        self.robotiq_control = None
-        self.robotiq_receive = None
-        self.robotiq_gripper = None
+        self.resetQ = config.RESET_Q
 
-        # convert last 3 elements from axis angle to quat, from size (6,) to (7,)
-        self.resetpos = np.concatenate(
-            [config.RESET_POSE[:3], rotvec_2_quat(config.RESET_POSE[3:])]
-        ).astype(np.float32)
-
-        self.currpos = self.resetpos.copy().astype(np.float32)
-        self.currvel = np.zeros((6,), dtype=np.float32)
-        self.q = np.zeros((6,), dtype=np.float32)         # TODO is (7,) for some reason in franka?? same in dq
-        self.dq = np.zeros((6,), dtype=np.float32)
+        self.currpos = np.zeros((7, ), dtype=np.float32)
+        self.currvel = np.zeros((7,), dtype=np.float32)
+        self.Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
+        self.Qd = np.zeros((6,), dtype=np.float32)
         self.currforce = np.zeros((3,), dtype=np.float32)
         self.currtorque = np.zeros((3,), dtype=np.float32)
-        self.currjacobian = np.zeros((6, 7), dtype=np.float32)
 
-        self.curr_gripper_pos = 0
+        self.currpressure = np.zeros((1, ), dtype=np.float32)
         self.lastsent = time.time()
         self.randomreset = config.RANDOM_RESET
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
-        self.joint_reset_cycle = 200  # reset the robot joint every 200 cycles
+        self.joint_reset_cycle = 200  # reset the robot joint every 200 cycles  # TODO needed?
 
         if save_video:
             print("Saving videos!")
@@ -135,15 +126,20 @@ class RobotiqEnv(gym.Env):
         )
         self.cycle_count = 0
 
-        self.start_robotiq_interfaces()
+        self.controller = RobotiqImpedanceController(
+            robot_ip=config.ROBOT_IP,
+            frequency=config.CONTROLLER_HZ,
+            kp=10000,
+            kd=2200,
+            config=config,
+            verbose=True,
+            plot=False
+        )
 
-    def start_robotiq_interfaces(self):
-        self.robotiq_control = RTDEControl(self.robot_ip)
-        self.robotiq_receive = RTDEReceive(self.robot_ip)
-        # self.robotiq_gripper = VacuumGripper(self.robot_ip)
-        # TODO gripper
-        print("UR-RTDE interfaces ready")
+        self.controller.start()  # start Thread
 
+        while not self.controller.is_ready():       # wait for contoller
+            time.sleep(0.1)
 
     def pose_r2q(self, pose: np.ndarray) -> np.ndarray:
         return np.concatenate([pose[:3], rotvec_2_quat(pose[3:])])
@@ -151,35 +147,52 @@ class RobotiqEnv(gym.Env):
     def pose_q2r(self, pose: np.ndarray) -> np.ndarray:
         return np.concatenate([pose[:3], quat_2_rotvec(pose[3:])])
 
-    def clip_safety_box(self, action: np.ndarray) -> np.ndarray:
-        """Clip the action to not move outside the safety box."""
+    def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:
+        """Clip the pose to be within the safety box."""
+        next_pos[:3] = np.clip(
+            next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
+        )
+        euler = R.from_quat(next_pos[3:]).as_euler("xyz")
 
-        # check for position limits (prevent, but do not stop)
-        adverse_move = 0.1
-        for i, (low, high) in enumerate(zip(self.xyz_bounding_box.low, self.xyz_bounding_box.high)):
-            if low and self.currpos[i] < low and action[i] < adverse_move:
-                action[i] = adverse_move
-                print(f"lower {i} set new")
-            elif high and self.currpos[i] > high and action[i] > -adverse_move:
-                action[i] = -adverse_move
-                print("upper set new")
+        # Clip first euler angle separately due to discontinuity from pi to -pi
+        sign = np.sign(euler[0])
+        euler[0] = sign * (
+            np.clip(
+                np.abs(euler[0]),
+                self.rpy_bounding_box.low[0],
+                self.rpy_bounding_box.high[0],
+            )
+        )
 
-        # TODO apply quaternion limits
-        # TODO test
-        return action
+        euler[1:] = np.clip(
+            euler[1:], self.rpy_bounding_box.low[1:], self.rpy_bounding_box.high[1:]
+        )
+        next_pos[3:] = R.from_euler("xyz", euler).as_quat()
+
+        return next_pos
 
     def step(self, action: np.ndarray) -> tuple:
         """standard gym step function."""
-        t_start_robotiq = self.robotiq_control.initPeriod()
         start_time = time.time()
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
-        safe_action = self.clip_safety_box(action)
-        self._send_force_command(safe_action[:6])
-        self._send_gripper_command(safe_action[6])
+        # position
+        # next_pos = self.currpos.copy()
+        next_pos = self.controller.get_target_pos()
+        next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
+
+        # orientation (leave for now)
+        next_pos[3:] = (
+                R.from_quat(next_pos[3:]) * R.from_euler("xyz", action[3:6] * self.action_scale[1])
+        ).as_quat()
+
+        gripper_action = action[6] * self.action_scale[2]
+
+        safe_pos = self.clip_safety_box(next_pos)
+        self._send_pos_command(safe_pos)
+        self._send_gripper_command(gripper_action)
 
         self.curr_path_length += 1
-        self.robotiq_control.waitPeriod(t_start_robotiq)
 
         dt = time.time() - start_time
         time.sleep(max(0, (1.0 / self.hz) - dt))
@@ -200,14 +213,6 @@ class RobotiqEnv(gym.Env):
         else:
             # print(f'Goal not reached, the difference is {delta}, the desired threshold is {_REWARD_THRESHOLD}')
             return False
-
-    # TODO adapt get_im(), crop_image(), init_cameras(), close_cameras(),
-
-    def move_to(self, goal: np.ndarray):
-        """Move the robot to the goal position with moveL (linear in tool-space)"""
-        goal_ur = self.pose_q2r(goal)
-        self.robotiq_control.moveL(list(goal_ur), speed=0.05, acceleration=0.3)   # command will block until finished
-        self._update_currpos()
 
     def go_to_rest(self, joint_reset=False):
         """
@@ -235,8 +240,13 @@ class RobotiqEnv(gym.Env):
             # self.move_to(reset_pose)
             pass
         else:
-            reset_pose = self.resetpos.copy()
-            self.move_to(reset_pose)
+            reset_Q = self.resetQ.copy()
+            self._send_gripper_command(np.ones((1,))*-1)            # disable vacuum gripper
+            self._send_reset_command(reset_Q)
+            time.sleep(0.1)
+            while not self.controller.is_ready():
+                time.sleep(0.1)
+            self._update_currpos()
 
     def reset(self, joint_reset=False, **kwargs):
         if self.save_video:
@@ -262,56 +272,40 @@ class RobotiqEnv(gym.Env):
         # TODO make recover function
         pass
 
-    def _send_force_command(self, action: np.ndarray):
+    def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""
+        self.controller.set_target_pos(target_pos=target_pos)
 
-        # TODO send to controller
+    def _send_gripper_command(self, gripper_pos: np.ndarray):
+        self.controller.set_gripper_pos(gripper_pos)
 
-    def _send_gripper_command(self, pos: float):
-        """Internal function to send gripper command to the robot."""
-        if (pos >= -1) and (pos <= -0.9):  # close gripper
-            pass  # TODO gripper command
-        elif (pos >= 0.9) and (pos <= 1):  # open gripper
-            pass
-        else:  # do nothing to the gripper
-            return
+    def _send_reset_command(self, reset_Q: np.ndarray):
+        self.controller.move_to_reset_Q(reset_Q)
 
     def _update_currpos(self):
         """
         Internal function to get the latest state of the robot and its gripper.
         """
-        pose = self.robotiq_receive.getActualTCPPose()
-        vel = self.robotiq_receive.getActualTCPSpeed()
-        pose_quat = self.pose_r2q(pose)
+        state = self.controller.get_state()
 
-        force = self.robotiq_receive.getActualTCPForce()
-        q = self.robotiq_receive.getActualQ()
-        qd = self.robotiq_receive.getActualQd()
-
-        self.currpos[:] = np.array(pose_quat)
-        self.currvel[:] = np.array(vel)
-
-        self.currforce[:] = np.array(force[:3])
-        self.currtorque[:] = np.array(force[3:])
-        # self.currjacobian[:] = np.reshape(np.array(ps["jacobian"]), (6, 7)) # TODO jacobian?
-
-        self.q[:] = np.array(q)
-        self.dq[:] = np.array(qd)
-
-        # TODO get gripper pos
-        self.curr_gripper_pos = np.zeros(1, dtype=np.float32)
+        self.currpos[:] = state['pos']
+        self.currvel[:] = state['vel']
+        self.currforce[:] = state['force']
+        self.currtorque[:] = state['torque']
+        self.Q[:] = state['Q']
+        self.Qd[:] = state['Qd']
+        self.currpressure[:] = state['pressure']
 
     def _get_obs(self) -> dict:
         state_observation = {
             "tcp_pose": self.currpos,
             "tcp_vel": self.currvel,
-            "gripper_pose": self.curr_gripper_pos,
+            "gripper_pose": self.currpressure,
             "tcp_force": self.currforce,
             "tcp_torque": self.currtorque,
         }
         return copy.deepcopy(dict(state=state_observation))
 
     def close(self):
-        self.robotiq_control.forceModeStop()
-        print("force mode stopped")
+        self.controller.stop()
         super().close()
