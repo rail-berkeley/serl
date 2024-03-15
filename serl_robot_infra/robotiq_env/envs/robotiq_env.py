@@ -62,16 +62,16 @@ class RobotiqEnv(gym.Env):
 
         self.resetQ = config.RESET_Q
 
-        self.currpos = np.zeros((7, ), dtype=np.float32)
-        self.currvel = np.zeros((7,), dtype=np.float32)
+        self.curr_pos = np.zeros((7,), dtype=np.float32)
+        self.curr_vel = np.zeros((7,), dtype=np.float32)
         self.Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
         self.Qd = np.zeros((6,), dtype=np.float32)
-        self.currforce = np.zeros((3,), dtype=np.float32)
-        self.currtorque = np.zeros((3,), dtype=np.float32)
+        self.curr_force = np.zeros((3,), dtype=np.float32)
+        self.curr_torque = np.zeros((3,), dtype=np.float32)
 
-        self.currpressure = np.zeros((1, ), dtype=np.float32)
-        self.lastsent = time.time()
-        self.randomreset = config.RANDOM_RESET
+        self.gripper_state = np.zeros((2,), dtype=np.float32)
+        self.last_sent = time.time()
+        self.random_reset = config.RANDOM_RESET
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
@@ -101,7 +101,7 @@ class RobotiqEnv(gym.Env):
                             -np.inf, np.inf, shape=(7,)
                         ),  # xyz + quat
                         "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                        "gripper_pressure": gym.spaces.Box(-1, 1, shape=(1,)),
+                        "gripper_state": gym.spaces.Box(-1, 1, shape=(2,)),
                         "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
@@ -221,7 +221,7 @@ class RobotiqEnv(gym.Env):
             # TODO joint reset
 
         # Perform Carteasian reset
-        if self.randomreset[0]:  # randomize reset position in xy plane TODO is most likely bug in codebase, no ...[0]
+        if self.random_reset:  # randomize reset position in xy plane
             # reset_pose = self.resetpos.copy()ss
             # reset_pose[:2] += np.random.uniform(
             #     np.negative(self.random_xy_range), self.random_xy_range, (2,)
@@ -281,21 +281,21 @@ class RobotiqEnv(gym.Env):
         """
         state = self.controller.get_state()
 
-        self.currpos[:] = state['pos']
-        self.currvel[:] = state['vel']
-        self.currforce[:] = state['force']
-        self.currtorque[:] = state['torque']
+        self.curr_pos[:] = state['pos']
+        self.curr_vel[:] = state['vel']
+        self.curr_force[:] = state['force']
+        self.curr_torque[:] = state['torque']
         self.Q[:] = state['Q']
         self.Qd[:] = state['Qd']
-        self.currpressure[:] = state['pressure']
+        self.gripper_state[:] = state['gripper']
 
     def _get_obs(self) -> dict:
         state_observation = {
-            "tcp_pose": self.currpos,
-            "tcp_vel": self.currvel,
-            "gripper_pressure": self.currpressure,
-            "tcp_force": self.currforce,
-            "tcp_torque": self.currtorque,
+            "tcp_pose": self.curr_pos,
+            "tcp_vel": self.curr_vel,
+            "gripper_state": self.gripper_state,
+            "tcp_force": self.curr_force,
+            "tcp_torque": self.curr_torque,
         }
         return copy.deepcopy(dict(state=state_observation))
 

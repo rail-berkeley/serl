@@ -56,16 +56,16 @@ class RobotiqImpedanceController(threading.Thread):
         self.verbose = verbose
         self.do_plot = plot
 
-        self.target_pos = np.zeros((7,))  # new as quat to avoid +- problems with axis angle repr.
-        self.target_grip = np.zeros((1,))
-        self.curr_pos = np.zeros((7,))
-        self.curr_vel = np.zeros((7,))
-        self.curr_pressure = np.zeros((1,))  # TODO gripper state (sucking or not)
-        self.curr_Q = np.zeros((6,))
-        self.curr_Qd = np.zeros((6,))
-        self.curr_force = np.zeros((6,))  # force of tool tip
+        self.target_pos = np.zeros((7,), dtype=np.float32)  # new as quat to avoid +- problems with axis angle repr.
+        self.target_grip = np.zeros((1,), dtype=np.float32)
+        self.curr_pos = np.zeros((7,), dtype=np.float32)
+        self.curr_vel = np.zeros((7,), dtype=np.float32)
+        self.gripper_state = np.zeros((2,), dtype=np.float32)  # TODO gripper state (sucking or not)
+        self.curr_Q = np.zeros((6,), dtype=np.float32)
+        self.curr_Qd = np.zeros((6,), dtype=np.float32)
+        self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
 
-        self.reset_Q = np.zeros((6,))  # reset state in Joint Space
+        self.reset_Q = np.zeros((6,), dtype=np.float32)  # reset state in Joint Space
 
         self.delta = config.ERROR_DELTA
         self.fm_damping = config.FORCEMODE_DAMPING
@@ -129,11 +129,11 @@ class RobotiqImpedanceController(threading.Thread):
     def set_reset_Q(self, reset_Q: np.ndarray):
         self._reset.set()
         with self.lock:
-            self.reset_Q = reset_Q
+            self.reset_Q[:] = reset_Q
 
     def set_gripper_pos(self, target_grip: np.ndarray):
         with self.lock:
-            self.target_grip = target_grip
+            self.target_grip[:] = target_grip
 
     def get_target_pos(self):
         with self.lock:
@@ -146,14 +146,14 @@ class RobotiqImpedanceController(threading.Thread):
         Qd = self.robotiq_receive.getActualQd()
         force = self.robotiq_receive.getActualTCPForce()
         pressure = await self.robotiq_gripper.get_current_pressure()
-        a = self.robotiq_gripper.get_object_status()
+        obj_status = self.robotiq_gripper.get_object_status()
         with self.lock:
-            self.curr_pos = pose2quat(pos)
-            self.curr_vel = pose2quat(vel)
-            self.curr_Q = np.array(Q)
-            self.curr_Qd = np.array(Qd)
-            self.curr_force = np.array(force)
-            self.curr_pressure = np.array(pressure)
+            self.curr_pos[:] = pose2quat(pos)
+            self.curr_vel[:] = pose2quat(vel)
+            self.curr_Q[:] = Q
+            self.curr_Qd[:] = Qd
+            self.curr_force[:] = force
+            self.gripper_state[:] = [pressure, obj_status]
 
     def get_state(self):
         with self.lock:
@@ -164,7 +164,7 @@ class RobotiqImpedanceController(threading.Thread):
                 "Qd": self.curr_Qd,
                 "force": self.curr_force[:3],
                 "torque": self.curr_force[3:],
-                "pressure": self.curr_pressure
+                "gripper": self.gripper_state
             }
             return state
 
