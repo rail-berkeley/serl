@@ -50,7 +50,6 @@ class RobotiqEnv(gym.Env):
     def __init__(
             self,
             hz: int = 10,
-            save_video: bool = False,
             config=DefaultEnvConfig,
             max_episode_length: int = 100
     ):
@@ -78,11 +77,6 @@ class RobotiqEnv(gym.Env):
         self.hz = hz
         self.joint_reset_cycle = 200  # reset the robot joint every 200 cycles  # TODO needed?
 
-        if save_video:
-            print("Saving videos!")
-        self.save_video = save_video
-        self.recording_frames = []
-
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
             config.ABS_POSE_LIMIT_HIGH[:3],
@@ -107,7 +101,7 @@ class RobotiqEnv(gym.Env):
                             -np.inf, np.inf, shape=(7,)
                         ),  # xyz + quat
                         "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                        "gripper_pose": gym.spaces.Box(-1, 1, shape=(1,)),
+                        "gripper_pressure": gym.spaces.Box(-1, 1, shape=(1,)),
                         "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
@@ -243,23 +237,22 @@ class RobotiqEnv(gym.Env):
             reset_Q = self.resetQ.copy()
             self._send_gripper_command(np.ones((1,))*-1)            # disable vacuum gripper
             self._send_reset_command(reset_Q)
-            time.sleep(0.1)
-            while not self.controller.is_ready():
+
+            while True:
                 time.sleep(0.1)
+                if self.controller.is_reset():
+                    break       # wait for reset
+
             self._update_currpos()
 
     def reset(self, joint_reset=False, **kwargs):
-        if self.save_video:
-            # TODO adapt save_video_recording()
-            pass
-
         self.cycle_count += 1
         if self.cycle_count % self.joint_reset_cycle == 0:
             self.cycle_count = 0
             joint_reset = True
 
         self.go_to_rest(joint_reset=joint_reset)
-        self._recover()
+        # self._recover()
         self.curr_path_length = 0
 
         self._update_currpos()
@@ -280,7 +273,7 @@ class RobotiqEnv(gym.Env):
         self.controller.set_gripper_pos(gripper_pos)
 
     def _send_reset_command(self, reset_Q: np.ndarray):
-        self.controller.move_to_reset_Q(reset_Q)
+        self.controller.set_reset_Q(reset_Q)
 
     def _update_currpos(self):
         """
@@ -300,7 +293,7 @@ class RobotiqEnv(gym.Env):
         state_observation = {
             "tcp_pose": self.currpos,
             "tcp_vel": self.currvel,
-            "gripper_pose": self.currpressure,
+            "gripper_pressure": self.currpressure,
             "tcp_force": self.currforce,
             "tcp_torque": self.currtorque,
         }

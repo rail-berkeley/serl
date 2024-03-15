@@ -35,10 +35,10 @@ class RobotiqImpedanceController(threading.Thread):
             self,
             robot_ip,
             frequency=100,
-            kp=4e4,
-            kd=8e3,
+            kp=10000,
+            kd=2200,
             config=None,
-            verbose=True,
+            verbose=False,
             plot=False,
             *args,
             **kwargs
@@ -47,17 +47,12 @@ class RobotiqImpedanceController(threading.Thread):
         self._stop = threading.Event()
         self._reset = threading.Event()
         self._is_ready = threading.Event()
-        """
-        frequency: CB2=125, UR3e=500
-        max_pos_speed: m/s
-        max_rot_speed: rad/s
-        """
+        self.lock = threading.Lock()
 
         self.robot_ip = robot_ip
         self.frequency = frequency
         self.kp = kp
         self.kd = kd
-        self.lock = threading.Lock()
         self.verbose = verbose
         self.do_plot = plot
 
@@ -70,7 +65,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_Qd = np.zeros((6,))
         self.curr_force = np.zeros((6,))  # force of tool tip
 
-        self.reset_Q = np.zeros((6,))
+        self.reset_Q = np.zeros((6,))  # reset state in Joint Space
 
         self.delta = config.ERROR_DELTA
         self.fm_damping = config.FORCEMODE_DAMPING
@@ -91,23 +86,25 @@ class RobotiqImpedanceController(threading.Thread):
     def start(self):
         super().start()
         if self.verbose:
-            print(f"[RTDEPositionalController] Controller process spawned at {self.native_id}")
+            print(f"[RobotiqImpedanceController] Controller process spawned at {self.native_id}")
 
     async def start_robotiq_interfaces(self, gripper=True):
-        try:
-            self.robotiq_control = RTDEControlInterface(self.robot_ip)
-            self.robotiq_receive = RTDEReceiveInterface(self.robot_ip)
-            if gripper:
-                self.robotiq_gripper = VacuumGripper(self.robot_ip)
-                await self.robotiq_gripper.connect()
-                await self.robotiq_gripper.activate()
-            if self.verbose:
-                gr_string = "(with gripper) " if gripper else ""
-                print(f"[RTDEPositionalController] Controller connected to robot {gr_string}at: {self.robot_ip}")
-        except RuntimeError:
-            print("Failed to start control script, before timeout of 5 seconds, trying again...")
-            time.sleep(1)
-            return await self.start_robotiq_interfaces(gripper=gripper)
+        for _ in range(5):  # try it 5 times
+            try:
+                self.robotiq_control = RTDEControlInterface(self.robot_ip)
+                self.robotiq_receive = RTDEReceiveInterface(self.robot_ip)
+                if gripper:
+                    self.robotiq_gripper = VacuumGripper(self.robot_ip)
+                    await self.robotiq_gripper.connect()
+                    await self.robotiq_gripper.activate()
+                if self.verbose:
+                    gr_string = "(with gripper) " if gripper else ""
+                    print(f"[RobotiqImpedanceController] Controller connected to robot {gr_string}at: {self.robot_ip}")
+            except RuntimeError:
+                print(
+                    "[RobotiqImpedanceController] Failed to start control script, before timeout of 5 seconds, trying again...")
+                continue
+        raise RuntimeError(f"[RobotiqImpedanceController] Could not connect to robot [{self.robot_ip}]")
 
     def stop(self):
         self._stop.set()
@@ -121,7 +118,7 @@ class RobotiqImpedanceController(threading.Thread):
         elif target_pos.shape == (6,):
             target_orientation = R.from_rotvec(target_pos[3:]).as_quat()
         else:
-            raise ValueError(f"target pos has shape {target_pos.shape}")
+            raise ValueError(f"[RobotiqImpedanceController] target pos has shape {target_pos.shape}")
 
         with self.lock:
             self.target_pos[:3] = target_pos[:3]
@@ -129,7 +126,7 @@ class RobotiqImpedanceController(threading.Thread):
 
         # print("target: ", self.target_pos)
 
-    def move_to_reset_Q(self, reset_Q: np.ndarray):
+    def set_reset_Q(self, reset_Q: np.ndarray):
         self._reset.set()
         with self.lock:
             self.reset_Q = reset_Q
@@ -174,6 +171,9 @@ class RobotiqImpedanceController(threading.Thread):
     def is_ready(self):
         return self._is_ready.is_set()
 
+    def is_reset(self):
+        return not self._reset.is_set()
+
     def _calculate_force(self):
         target_pos = self.get_target_pos()
         with self.lock:
@@ -190,12 +190,15 @@ class RobotiqImpedanceController(threading.Thread):
         # calc torque
         rot_diff = R.from_quat(target_pos[3:]) * R.from_quat(curr_pos[3:]).inv()
         vel_rot_diff = R.from_quat(curr_vel[3:]).inv()
-        torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22      # TODO make customizable
+        torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
 
         return np.concatenate((force_pos, torque))
 
     def run(self):
-        asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
+        try:
+            asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
+        finally:
+            self.stop()
 
     def plot(self):
         if self.horizon[0] < self.horizon[1]:
@@ -204,19 +207,23 @@ class RobotiqImpedanceController(threading.Thread):
             self.hist_data[1].append(self.target_pos.copy())
             return
 
-        print(time.monotonic() - self.start_t)
         self.robotiq_control.forceModeStop()
 
-        print("plotting")
+        print("[RobotiqImpedanceController] plotting")
         real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
         target_pos = np.array([pose2rotvec(q) for q in self.hist_data[1]])
 
         plt.figure()
         fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 8), dpi=200)
+        ax_label = [{'x': f'time {self.frequency} [Hz]', 'y': ylabel} for ylabel in ["[mm]", "[rad]"]]
+        plot_label = "X Y Z RX RY RZ".split(' ')
+
         for i in range(6):
             ax = axes[i % 3, i // 3]
-            ax.plot(real_pos[:, i], 'b')
+            ax.plot(real_pos[:, i], 'b', label=plot_label[i])
             ax.plot(target_pos[:, i], 'g')
+            ax.set(xlabel=ax_label[i // 3]['x'], ylabel=ax_label[i // 3]['y'])
+            ax.legend()
 
         fig.suptitle(f"params-->  kp:{self.kp}  kd:{self.kd}")
         plt.show(block=True)
@@ -237,9 +244,8 @@ class RobotiqImpedanceController(threading.Thread):
             self._is_ready.set()
 
             while not self.stopped():
-                if self._reset.is_set():  # move to reset pose with moveL
-                    self._is_ready.clear()
-                    print(f"moving to {self.reset_Q} with moveJ (joint space)")
+                if self._reset.is_set():  # move to reset joint space pose with moveJ
+                    print(f"[RobotiqImpedanceController] moving to {self.reset_Q} with moveJ (joint space)")
                     self.robotiq_control.forceModeStop()
                     self.robotiq_control.moveJ(self.reset_Q, speed=1.05, acceleration=1.4)
 
@@ -251,7 +257,6 @@ class RobotiqImpedanceController(threading.Thread):
                     self.robotiq_control.zeroFtSensor()
 
                     self._reset.clear()
-                    self._is_ready.set()  # moving complete
 
                 t_now = time.monotonic()
 
