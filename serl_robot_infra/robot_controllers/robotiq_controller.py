@@ -146,7 +146,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = force
-            self.gripper_state[:] = [pressure, obj_status.value]
+            self.gripper_state[:] = [pressure, float(obj_status.value)]
 
     def get_state(self):
         with self.lock:
@@ -277,13 +277,13 @@ class RobotiqImpedanceController(threading.Thread):
                 if self.robotiq_gripper:
                     if self.target_grip[0] > 0.9 and self.gripper_state[0] == 100:
                         await self.robotiq_gripper.automatic_grip()
-                        self.target_grip[0] = 0.0       # reset
-                        print("grip")
+                        self.target_grip[0] = 0.0
+                        # print("grip")
 
                     elif self.target_grip[0] < -0.9 and self.gripper_state[1] != 3:     # only release if obj detected
                         await self.robotiq_gripper.automatic_release()
                         self.target_grip[0] = 0.0
-                        print("release")
+                        # print("release")
 
                 self.robotiq_control.waitPeriod(t_start)
 
