@@ -8,7 +8,7 @@ from typing import Dict
 from scipy.spatial.transform import Rotation as R
 
 
-from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
+from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
 
@@ -51,7 +51,7 @@ class RobotiqEnv(gym.Env):
             self,
             hz: int = 10,
             config=DefaultEnvConfig,
-            max_episode_length: int = 100
+            max_episode_length: int = 500
     ):
         self._TARGET_POSE = config.TARGET_POSE
         self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
@@ -135,13 +135,7 @@ class RobotiqEnv(gym.Env):
         while not self.controller.is_ready():       # wait for contoller
             time.sleep(0.1)
 
-    def pose_r2q(self, pose: np.ndarray) -> np.ndarray:
-        return np.concatenate([pose[:3], rotvec_2_quat(pose[3:])])
-
-    def pose_q2r(self, pose: np.ndarray) -> np.ndarray:
-        return np.concatenate([pose[:3], quat_2_rotvec(pose[3:])])
-
-    def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:
+    def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:      # TODO make better, no euler -> quat -> euler -> quat
         """Clip the pose to be within the safety box."""
         next_pos[:3] = np.clip(
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
@@ -200,7 +194,7 @@ class RobotiqEnv(gym.Env):
     def compute_reward(self, obs) -> bool:
         current_pose = obs["state"]["tcp_pose"]
         # convert from quat to axis angle representation first
-        current_pose = self.pose_q2r(current_pose)
+        current_pose = pose2rotvec(current_pose)
         delta = np.abs(current_pose - self._TARGET_POSE)
         if np.all(delta < self._REWARD_THRESHOLD):
             return True

@@ -60,7 +60,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         - expert_a: spacemouse output adapted to force space (action)
         """
 
-        position = super().get_wrapper_attr("currpos")  # get position from robotiq_env
+        position = super().get_wrapper_attr("curr_pos")  # get position from robotiq_env
         z_angle = np.arctan2(position[1], position[0])  # get first joint angle
 
         z_rot = R.from_rotvec(np.array([0, 0, z_angle]))

@@ -8,17 +8,10 @@ from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
 from robotiq_env.utils.vacuum_gripper import VacuumGripper
-from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec
+from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
 
 np.set_printoptions(precision=4, suppress=True)
 
-
-def pose2quat(rotvec_pose) -> np.ndarray:
-    return np.concatenate((rotvec_pose[:3], rotvec_2_quat(rotvec_pose[3:])))
-
-
-def pose2rotvec(quat_pose) -> np.ndarray:
-    return np.concatenate((quat_pose[:3], quat_2_rotvec(quat_pose[3:])))
 
 
 def pos_difference(quat_pose_1: np.ndarray, quat_pose_2: np.ndarray):
@@ -100,11 +93,11 @@ class RobotiqImpedanceController(threading.Thread):
                 if self.verbose:
                     gr_string = "(with gripper) " if gripper else ""
                     print(f"[RobotiqImpedanceController] Controller connected to robot {gr_string}at: {self.robot_ip}")
-            except RuntimeError:
-                print(
-                    "[RobotiqImpedanceController] Failed to start control script, before timeout of 5 seconds, trying again...")
+                    break
+            except RuntimeError as e:
+                print("[RobotiqImpedanceController] ", e.__str__())
                 continue
-        raise RuntimeError(f"[RobotiqImpedanceController] Could not connect to robot [{self.robot_ip}]")
+        # raise RuntimeError(f"[RobotiqImpedanceController] Could not connect to robot [{self.robot_ip}]")
 
     def stop(self):
         self._stop.set()
@@ -116,7 +109,7 @@ class RobotiqImpedanceController(threading.Thread):
         if target_pos.shape == (7,):
             target_orientation = target_pos[3:]
         elif target_pos.shape == (6,):
-            target_orientation = R.from_rotvec(target_pos[3:]).as_quat()
+            target_orientation = rotvec_2_quat(target_pos[3:])
         else:
             raise ValueError(f"[RobotiqImpedanceController] target pos has shape {target_pos.shape}")
 
@@ -146,14 +139,14 @@ class RobotiqImpedanceController(threading.Thread):
         Qd = self.robotiq_receive.getActualQd()
         force = self.robotiq_receive.getActualTCPForce()
         pressure = await self.robotiq_gripper.get_current_pressure()
-        obj_status = self.robotiq_gripper.get_object_status()
+        obj_status = await self.robotiq_gripper.get_object_status()
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = pose2quat(vel)
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = force
-            self.gripper_state[:] = [pressure, obj_status]
+            self.gripper_state[:] = [pressure, obj_status.value]
 
     def get_state(self):
         with self.lock:
@@ -251,7 +244,7 @@ class RobotiqImpedanceController(threading.Thread):
 
                     await self._update_robot_state()
                     with self.lock:
-                        self.target_pos = self.curr_pos
+                        self.target_pos = self.curr_pos.copy()
 
                     self.robotiq_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
                     self.robotiq_control.zeroFtSensor()
@@ -282,9 +275,9 @@ class RobotiqImpedanceController(threading.Thread):
                 )
 
                 if self.robotiq_gripper:
-                    if self.target_grip > 0.9:
+                    if self.target_grip[0] > 0.9:
                         await self.robotiq_gripper.automatic_grip()
-                    elif self.target_grip < -0.9:
+                    elif self.target_grip[0] < -0.9:
                         await self.robotiq_gripper.automatic_release()
 
                 self.robotiq_control.waitPeriod(t_start)
