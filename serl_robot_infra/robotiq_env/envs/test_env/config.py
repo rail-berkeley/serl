@@ -9,8 +9,8 @@ class TestConfig(DefaultEnvConfig):
     RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
-    ABS_POSE_LIMIT_HIGH = np.array([1., 1., 1., np.inf, np.inf, np.inf])            # TODO define better (box & rot)
-    ABS_POSE_LIMIT_LOW = np.array([-1., -1., 0.05, -np.inf, -np.inf, -np.inf])
+    ABS_POSE_LIMIT_HIGH = np.array([1., -0.41, 1., 3.3, 3.3, 3.3])            # TODO euler rotations suck :/
+    ABS_POSE_LIMIT_LOW = np.array([-0.55, -1., 0.05, -3.3, -3.3, -3.3])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.3"
