@@ -29,7 +29,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         """
         expert_a = self.get_deadspace_action()
 
-        if np.linalg.norm(expert_a) > 0.001:
+        if np.linalg.norm(expert_a) > 0.001 or self.left or self.right:     # also read buttons with no movement
             self.last_intervene = time.time()
 
         if self.gripper_enabled:
@@ -45,8 +45,9 @@ class SpacemouseIntervention(gym.ActionWrapper):
     def get_deadspace_action(self) -> np.ndarray:
         expert_a, buttons = self.expert.get_action()
 
-        expert_a = np.clip((expert_a - np.sign(expert_a) * self.deadspace) / (1. - self.deadspace),
-                           a_min=-1.0, a_max=1.)
+        positive = np.clip((expert_a - self.deadspace) / (1. - self.deadspace), a_min=0.0, a_max=1.0)
+        negative = np.clip((expert_a + self.deadspace) / (1. - self.deadspace), a_min=-1.0, a_max=0.0)
+        expert_a = positive + negative
 
         self.left, self.right = tuple(buttons)
 
@@ -72,7 +73,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
     def step(self, action):
         new_action = self.action(action)
-        # print(f"new action: {new_action}")
+        print(f"new action: {new_action}")
         obs, rew, done, truncated, info = self.env.step(new_action)
         info["intervene_action"] = new_action
         info["left"] = self.left
