@@ -295,7 +295,7 @@ class RobotiqImpedanceController(threading.Thread):
                     self.noerr += 1
 
         finally:
-            print(f"time errs: {self.err}     no_err: {self.noerr}")
+            print(f"[RTDEPositionalController] >dt: {self.err}     <dt (good): {self.noerr}")
             # mandatory cleanup
             self.robotiq_control.forceModeStop()
 
