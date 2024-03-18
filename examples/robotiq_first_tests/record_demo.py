@@ -10,11 +10,13 @@ from pynput import keyboard
 
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper  # TODO has no images
+from scipy.spatial.transform import Rotation as R
 
 
 def on_space(key, state, gr_state):
     if key == keyboard.Key.space:
-        print(f'state: {state}   gripper: {gr_state}')
+        rotvec = R.from_quat(state[3:]).as_rotvec()
+        print(f'state: {state}   gripper: {gr_state}   rotvec: {rotvec}')
 
 
 def on_esc(key):
@@ -25,7 +27,7 @@ def on_esc(key):
 if __name__ == "__main__":
     env = gym.make("robotiq_test")
     env = SpacemouseIntervention(env)
-    env = Quat2EulerWrapper(env)
+    # env = Quat2EulerWrapper(env)      # TODO change pos & vel dimens to 6 if the euler wrapper is used!
     # env = SERLObsWrapper(env)
 
     obs, _ = env.reset()
@@ -37,7 +39,8 @@ if __name__ == "__main__":
     pbar = tqdm(total=success_needed)
 
     listener_1 = keyboard.Listener(daemon=True,
-        on_press=lambda event: on_space(event, state=env.unwrapped.curr_pos, gr_state=env.unwrapped.gripper_state))
+                                   on_press=lambda event: on_space(event, state=env.unwrapped.curr_pos,
+                                                                   gr_state=env.unwrapped.gripper_state))
     listener_1.start()
 
     listener_2 = keyboard.Listener(on_press=on_esc, daemon=True)
