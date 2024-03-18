@@ -100,8 +100,8 @@ class RobotiqEnv(gym.Env):
                         "tcp_pose": gym.spaces.Box(
                             -np.inf, np.inf, shape=(7,)
                         ),  # xyz + quat
-                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                        "gripper_state": gym.spaces.Box(-1, 1, shape=(2,)),
+                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(7,)),
+                        "gripper_state": gym.spaces.Box(-np.inf, np.inf, shape=(2,)),
                         "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
@@ -132,7 +132,7 @@ class RobotiqEnv(gym.Env):
 
         self.controller.start()  # start Thread
 
-        while not self.controller.is_ready():       # wait for contoller
+        while not self.controller.is_ready():       # wait for controller
             time.sleep(0.1)
 
     def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:      # TODO make better, no euler -> quat -> euler -> quat
