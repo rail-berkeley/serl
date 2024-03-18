@@ -6,9 +6,20 @@ import pickle as pkl
 from tqdm import tqdm
 import gymnasium as gym
 from pprint import pprint
+from pynput import keyboard
 
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper     # TODO has no images
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper  # TODO has no images
+
+
+def on_space(key, state, gr_state):
+    if key == keyboard.Key.space:
+        print(f'state: {state}   gripper: {gr_state}')
+
+
+def on_esc(key):
+    if key == keyboard.Key.esc:
+        print("ESC pressed (can be used later)")
 
 
 if __name__ == "__main__":
@@ -24,6 +35,13 @@ if __name__ == "__main__":
     success_needed = 20
     total_count = 0
     pbar = tqdm(total=success_needed)
+
+    listener_1 = keyboard.Listener(daemon=True,
+        on_press=lambda event: on_space(event, state=env.unwrapped.curr_pos, gr_state=env.unwrapped.gripper_state))
+    listener_1.start()
+
+    listener_2 = keyboard.Listener(on_press=on_esc, daemon=True)
+    listener_2.start()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"robotiq_test_{success_needed}_demos_{uuid}.pkl"
@@ -66,5 +84,10 @@ if __name__ == "__main__":
             pkl.dump(transitions, f)
             print(f"saved {success_needed} demos to {file_path}")
 
+    except KeyboardInterrupt:
+        print(f'\nProgram was interrupted, cleaning up...')
+
     finally:
         env.close()
+        listener_1.stop()
+        listener_2.stop()
