@@ -1,5 +1,6 @@
 import os
 import datetime
+import threading
 import numpy as np
 import copy
 import pickle as pkl
@@ -12,6 +13,8 @@ from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper  # TODO has no images
 from scipy.spatial.transform import Rotation as R
 
+exit_program = threading.Event()
+
 
 def on_space(key, state, gr_state):
     if key == keyboard.Key.space:
@@ -21,11 +24,11 @@ def on_space(key, state, gr_state):
 
 def on_esc(key):
     if key == keyboard.Key.esc:
-        print("ESC pressed (can be used later)")
+        exit_program.set()
 
 
 if __name__ == "__main__":
-    env = gym.make("robotiq_test")
+    env = gym.make("robotiq_grip-v1")
     env = SpacemouseIntervention(env)
     # env = Quat2EulerWrapper(env)      # TODO change pos & vel dimens to 6 if the euler wrapper is used!
     # env = SERLObsWrapper(env)
@@ -56,6 +59,9 @@ if __name__ == "__main__":
 
     try:
         while success_count < success_needed:
+            if exit_program.is_set():
+                raise KeyboardInterrupt  # stop program, but clean up before
+
             next_obs, rew, done, truncated, info = env.step(action=np.zeros((7,)))
             actions = info["intervene_action"]
 
