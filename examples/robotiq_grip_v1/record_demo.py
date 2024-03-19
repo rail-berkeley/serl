@@ -13,6 +13,9 @@ from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from scipy.spatial.transform import Rotation as R
 
+from franka_env.envs.relative_env import RelativeFrame      # TODO make robotiq_env
+
+
 exit_program = threading.Event()
 
 
@@ -31,7 +34,8 @@ def on_esc(key):
 if __name__ == "__main__":
     env = gym.make("robotiq_grip-v1")
     env = SpacemouseIntervention(env)
-    env = Quat2EulerWrapper(env)      # TODO change pos & vel dimens to 6 if the euler wrapper is used!
+    env = RelativeFrame(env)
+    env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
 
     obs, _ = env.reset()
