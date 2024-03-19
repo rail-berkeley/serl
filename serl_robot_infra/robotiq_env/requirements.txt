@@ -1,0 +1,8 @@
+matplotlib
+scipy
+pyspacemouse
+ur-rtde
+pynput
+pprint
+
+# TODO may not be the right place to put the file
