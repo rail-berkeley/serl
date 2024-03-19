@@ -63,7 +63,7 @@ class RobotiqEnv(gym.Env):
         self.resetQ = config.RESET_Q
 
         self.curr_pos = np.zeros((7,), dtype=np.float32)
-        self.curr_vel = np.zeros((7,), dtype=np.float32)
+        self.curr_vel = np.zeros((6,), dtype=np.float32)
         self.Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
         self.Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((3,), dtype=np.float32)

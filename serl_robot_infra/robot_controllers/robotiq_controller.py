@@ -52,7 +52,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.target_pos = np.zeros((7,), dtype=np.float32)  # new as quat to avoid +- problems with axis angle repr.
         self.target_grip = np.zeros((1,), dtype=np.float32)
         self.curr_pos = np.zeros((7,), dtype=np.float32)
-        self.curr_vel = np.zeros((7,), dtype=np.float32)
+        self.curr_vel = np.zeros((6,), dtype=np.float32)
         self.gripper_state = np.zeros((2,), dtype=np.float32)  # TODO gripper state (sucking or not)
         self.curr_Q = np.zeros((6,), dtype=np.float32)
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
@@ -142,7 +142,7 @@ class RobotiqImpedanceController(threading.Thread):
         obj_status = await self.robotiq_gripper.get_object_status()
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
-            self.curr_vel[:] = pose2quat(vel)
+            self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = force
@@ -182,7 +182,7 @@ class RobotiqImpedanceController(threading.Thread):
 
         # calc torque
         rot_diff = R.from_quat(target_pos[3:]) * R.from_quat(curr_pos[3:]).inv()
-        vel_rot_diff = R.from_quat(curr_vel[3:]).inv()
+        vel_rot_diff = R.from_rotvec(curr_vel[3:]).inv()
         torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
 
         return np.concatenate((force_pos, torque))
