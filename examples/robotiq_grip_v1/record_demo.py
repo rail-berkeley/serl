@@ -11,10 +11,9 @@ from pynput import keyboard
 
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
-from scipy.spatial.transform import Rotation as R
+from serl_launcher.wrappers.chunking import ChunkingWrapper
 
-from franka_env.envs.relative_env import RelativeFrame      # TODO make robotiq_env
-
+from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
 
 exit_program = threading.Event()
 
@@ -37,6 +36,7 @@ if __name__ == "__main__":
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
+    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
     obs, _ = env.reset()
 
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     total_count = 0
     pbar = tqdm(total=success_needed)
 
-    info_dict = {'state': env.unwrapped.curr_pos, 'gripper_state': env.unwrapped.gripper_state, 'force': env.unwrapped.curr_force}
+    info_dict = {'state': env.unwrapped.curr_pos, 'gripper_state': env.unwrapped.gripper_state,
+                 'force': env.unwrapped.curr_force}
     listener_1 = keyboard.Listener(daemon=True, on_press=lambda event: on_space(event, info_dict=info_dict))
     listener_1.start()
 
