@@ -51,9 +51,9 @@ class RobotiqEnv(gym.Env):
             self,
             hz: int = 10,
             config=DefaultEnvConfig,
-            max_episode_length: int = 500
+            max_episode_length: int = 100
     ):
-        self._TARGET_POSE = config.TARGET_POSE
+        self._TARGET_POSE = config.TARGET_POSE      # TODO not used for now, same for threshold
         self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -165,7 +165,7 @@ class RobotiqEnv(gym.Env):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
-        # next_pos = self.currpos.copy()
+        # next_pos = self.curr_pos.copy()
         next_pos = self.controller.get_target_pos()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
@@ -192,15 +192,7 @@ class RobotiqEnv(gym.Env):
         return ob, int(reward), done, False, {}
 
     def compute_reward(self, obs) -> bool:
-        current_pose = obs["state"]["tcp_pose"]
-        # convert from quat to axis angle representation first
-        current_pose = pose2rotvec(current_pose)
-        delta = np.abs(current_pose - self._TARGET_POSE)
-        if np.all(delta < self._REWARD_THRESHOLD):
-            return True
-        else:
-            # print(f'Goal not reached, the difference is {delta}, the desired threshold is {_REWARD_THRESHOLD}')
-            return False
+        return False        # overwrite for each task
 
     def go_to_rest(self, joint_reset=False):
         """
