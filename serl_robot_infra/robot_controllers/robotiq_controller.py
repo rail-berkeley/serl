@@ -187,12 +187,6 @@ class RobotiqImpedanceController(threading.Thread):
 
         return np.concatenate((force_pos, torque))
 
-    def run(self):
-        try:
-            asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
-        finally:
-            self.stop()
-
     def plot(self):
         if self.horizon[0] < self.horizon[1]:
             self.horizon[0] += 1
@@ -222,6 +216,23 @@ class RobotiqImpedanceController(threading.Thread):
         plt.show(block=True)
         self.stop()
 
+    async def send_gripper_command(self):
+        if self.target_grip[0] > 0.9 and self.gripper_state[0] == 100:
+            await self.robotiq_gripper.automatic_grip()
+            self.target_grip[0] = 0.0
+            # print("grip")
+
+        elif self.target_grip[0] < -0.9 and self.gripper_state[1] != 3:  # only release if obj detected
+            await self.robotiq_gripper.automatic_release()
+            self.target_grip[0] = 0.0
+            # print("release")
+
+    def run(self):
+        try:
+            asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
+        finally:
+            self.stop()
+
     async def run_async(self):
         await self.start_robotiq_interfaces(gripper=True)
 
@@ -238,9 +249,16 @@ class RobotiqImpedanceController(threading.Thread):
 
             while not self.stopped():
                 if self._reset.is_set():  # move to reset joint space pose with moveJ
+                    # first disable vaccum gripper
+                    if self.robotiq_gripper:
+                        self.target_grip[0] = -1.
+                        await self.send_gripper_command()
+                        time.sleep(0.1)    # TODO not sure if necessary
+
+                    # then move to Jointspace position
                     print(f"[RobotiqImpedanceController] moving to {self.reset_Q} with moveJ (joint space)")
                     self.robotiq_control.forceModeStop()
-                    self.robotiq_control.moveJ(self.reset_Q, speed=1.05, acceleration=1.4)
+                    self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.5)
 
                     await self._update_robot_state()
                     with self.lock:
@@ -273,17 +291,10 @@ class RobotiqImpedanceController(threading.Thread):
                     2,
                     self.fm_limits
                 )
+                # TODO try to reset with moveJ if forcemode returns False
 
                 if self.robotiq_gripper:
-                    if self.target_grip[0] > 0.9 and self.gripper_state[0] == 100:
-                        await self.robotiq_gripper.automatic_grip()
-                        self.target_grip[0] = 0.0
-                        # print("grip")
-
-                    elif self.target_grip[0] < -0.9 and self.gripper_state[1] != 3:     # only release if obj detected
-                        await self.robotiq_gripper.automatic_release()
-                        self.target_grip[0] = 0.0
-                        # print("release")
+                    await self.send_gripper_command()
 
                 self.robotiq_control.waitPeriod(t_start)
 

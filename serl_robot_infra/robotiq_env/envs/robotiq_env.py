@@ -221,7 +221,6 @@ class RobotiqEnv(gym.Env):
             pass
         else:
             reset_Q = self.resetQ.copy()
-            self._send_gripper_command(np.ones((1,))*-1)            # disable vacuum gripper
             self._send_reset_command(reset_Q)
 
             while True:
