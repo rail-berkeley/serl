@@ -17,7 +17,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         self.last_intervene = 0
         self.left, self.right = False, False
 
-        self.invert_axes = [-1, -1, 1, 1, -1, 1]
+        self.invert_axes = [-1, -1, 1, 1, -1, -1]
         self.deadspace = 0.15
 
     def action(self, action: np.ndarray) -> np.ndarray:
@@ -61,7 +61,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
         - expert_a: spacemouse output adapted to force space (action)
         """
 
-        position = super().get_wrapper_attr("curr_pos")  # get position from robotiq_env
+        # position = super().get_wrapper_attr("curr_pos")  # get position from robotiq_env
+        position = self.unwrapped.curr_pos
         z_angle = np.arctan2(position[1], position[0])  # get first joint angle
 
         z_rot = R.from_rotvec(np.array([0, 0, z_angle]))
