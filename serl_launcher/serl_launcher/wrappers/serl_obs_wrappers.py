@@ -23,3 +23,24 @@ class SERLObsWrapper(gym.ObservationWrapper):
             **(obs["images"]),
         }
         return obs
+
+
+class SerlObsWrapperNoImages(gym.ObservationWrapper):
+    """
+    This observation wrapper treat the observation space as a dictionary
+    of a flattened state space, if no images are present.
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = gym.spaces.Dict(
+            {
+                "state": flatten_space(self.env.observation_space["state"])
+            }
+        )
+
+    def observation(self, obs):
+        obs = {
+            "state": flatten(self.env.observation_space["state"], obs["state"])
+        }
+        return obs
