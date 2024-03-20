@@ -14,7 +14,7 @@ class RobotiqCornerConfig(DefaultEnvConfig):
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.2"
-    CONTROLLER_HZ = 200
+    CONTROLLER_HZ = 100
     ERROR_DELTA: float = 0.05
     FORCEMODE_DAMPING: float = 0.0      # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
