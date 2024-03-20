@@ -6,6 +6,8 @@ from scipy.spatial.transform import Rotation as R
 
 from robotiq_env.utils.rotations import quat_2_euler
 
+sigmoid = lambda x: 1 / (1 + np.exp(-x))
+
 
 class SpacemouseIntervention(gym.ActionWrapper):
     def __init__(self, env):
@@ -29,7 +31,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         """
         expert_a = self.get_deadspace_action()
 
-        if np.linalg.norm(expert_a) > 0.001 or self.left or self.right:     # also read buttons with no movement
+        if np.linalg.norm(expert_a) > 0.001 or self.left or self.right:  # also read buttons with no movement
             self.last_intervene = time.time()
 
         if self.gripper_enabled:
@@ -101,3 +103,25 @@ class Quat2EulerWrapper(gym.ObservationWrapper):
             (tcp_pose[:3], quat_2_euler(tcp_pose[3:]))
         )
         return observation
+
+
+class BinaryRewardClassifierWrapper(gym.Wrapper):
+    """
+    Compute reward with custom binary reward classifier fn
+    """
+
+    def __init__(self, env: gym.Env, reward_classifier_func):
+        super().__init__(env)
+        self.reward_classifier_func = reward_classifier_func
+
+    def compute_reward(self, obs):
+        if self.reward_classifier_func is not None:
+            logit = self.reward_classifier_func(obs).item()
+            return (sigmoid(logit) >= 0.5) * 1
+        return 0
+
+    def step(self, action):
+        obs, rew, done, truncated, info = self.env.step(action)
+        rew = self.compute_reward(obs)
+        done = done or rew
+        return obs, rew, done, truncated, info
