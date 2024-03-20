@@ -100,7 +100,7 @@ class RobotiqEnv(gym.Env):
                         "tcp_pose": gym.spaces.Box(
                             -np.inf, np.inf, shape=(7,)
                         ),  # xyz + quat
-                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(7,)),
+                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                         "gripper_state": gym.spaces.Box(-np.inf, np.inf, shape=(2,)),
                         "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
