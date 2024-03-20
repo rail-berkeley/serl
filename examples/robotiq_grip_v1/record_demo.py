@@ -31,7 +31,7 @@ def on_esc(key):
 
 
 if __name__ == "__main__":
-    env = gym.make("robotiq_grip-v1")
+    env = gym.make("robotiq-grip-v1")
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
