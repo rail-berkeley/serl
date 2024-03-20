@@ -93,7 +93,7 @@ class RobotiqImpedanceController(threading.Thread):
                 if self.verbose:
                     gr_string = "(with gripper) " if gripper else ""
                     print(f"[RobotiqImpedanceController] Controller connected to robot {gr_string}at: {self.robot_ip}")
-                    break
+                break
             except RuntimeError as e:
                 print("[RobotiqImpedanceController] ", e.__str__())
                 continue
