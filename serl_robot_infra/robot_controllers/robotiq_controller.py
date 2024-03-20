@@ -1,3 +1,4 @@
+import datetime
 import time
 import threading
 import asyncio
@@ -11,7 +12,6 @@ from robotiq_env.utils.vacuum_gripper import VacuumGripper
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
 
 np.set_printoptions(precision=4, suppress=True)
-
 
 
 def pos_difference(quat_pose_1: np.ndarray, quat_pose_2: np.ndarray):
@@ -76,10 +76,17 @@ class RobotiqImpedanceController(threading.Thread):
         self.err = 0
         self.noerr = 0
 
+        with open("/tmp/console2.txt", 'w') as f:
+            f.write("reset\n")
+        self.second_console = open("/tmp/console2.txt", 'a')
+
     def start(self):
         super().start()
         if self.verbose:
-            print(f"[RobotiqImpedanceController] Controller process spawned at {self.native_id}")
+            print(f"[RIC] Controller process spawned at {self.native_id}")
+
+    def print(self, msg):
+        self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
 
     async def start_robotiq_interfaces(self, gripper=True):
         for _ in range(5):  # try it 5 times
@@ -92,12 +99,12 @@ class RobotiqImpedanceController(threading.Thread):
                     await self.robotiq_gripper.activate()
                 if self.verbose:
                     gr_string = "(with gripper) " if gripper else ""
-                    print(f"[RobotiqImpedanceController] Controller connected to robot {gr_string}at: {self.robot_ip}")
+                    print(f"[RIC] Controller connected to robot {gr_string}at: {self.robot_ip}")
                 break
             except RuntimeError as e:
-                print("[RobotiqImpedanceController] ", e.__str__())
+                print("[RIC] ", e.__str__())
                 continue
-        # raise RuntimeError(f"[RobotiqImpedanceController] Could not connect to robot [{self.robot_ip}]")
+        # raise RuntimeError(f"[RIC] Could not connect to robot [{self.robot_ip}]")
 
     def stop(self):
         self._stop.set()
@@ -111,7 +118,7 @@ class RobotiqImpedanceController(threading.Thread):
         elif target_pos.shape == (6,):
             target_orientation = rotvec_2_quat(target_pos[3:])
         else:
-            raise ValueError(f"[RobotiqImpedanceController] target pos has shape {target_pos.shape}")
+            raise ValueError(f"[RIC] target pos has shape {target_pos.shape}")
 
         with self.lock:
             self.target_pos[:3] = target_pos[:3]
@@ -196,7 +203,7 @@ class RobotiqImpedanceController(threading.Thread):
 
         self.robotiq_control.forceModeStop()
 
-        print("[RobotiqImpedanceController] plotting")
+        print("[RIC] plotting")
         real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
         target_pos = np.array([pose2rotvec(q) for q in self.hist_data[1]])
 
@@ -244,6 +251,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.robotiq_control.zeroFtSensor()
             await self._update_robot_state()
             self.target_pos = self.curr_pos.copy()
+            print(f"[RIC] target position set to curr pos: {self.target_pos}")
 
             self._is_ready.set()
 
@@ -256,7 +264,7 @@ class RobotiqImpedanceController(threading.Thread):
                         time.sleep(0.1)
 
                     # then move to Jointspace position
-                    print(f"[RobotiqImpedanceController] moving to {self.reset_Q} with moveJ (joint space)")
+                    print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)")
                     self.robotiq_control.forceModeStop()
                     self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.5)
 
@@ -281,6 +289,7 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
+                self.print(f"{self.target_pos}, {self.curr_pos}, {force}")      # output to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()
@@ -291,6 +300,8 @@ class RobotiqImpedanceController(threading.Thread):
                     2,
                     self.fm_limits
                 )
+                # if np.sum(np.abs(force)) > 50:
+                #     print("high force: ", force)
                 # TODO try to reset with moveJ if forcemode returns False
 
                 if self.robotiq_gripper:
