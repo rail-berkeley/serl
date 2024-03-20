@@ -14,6 +14,7 @@ from serl_launcher.agents.continuous.bc import BCAgent
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.agents.continuous.vice import VICEAgent
+from serl_launcher.agents.continuous.bc_noimg import BCAgentNoImg
 
 from serl_launcher.data.data_store import (
     MemoryEfficientReplayBufferDataStore,
@@ -44,6 +45,27 @@ def make_bc_agent(
         use_proprio=True,
         encoder_type=encoder_type,
         image_keys=image_keys,
+    )
+
+
+def make_bc_agent_no_img(
+        seed, sample_obs, sample_action
+):
+    return BCAgentNoImg.create(
+        jax.random.PRNGKey(seed),
+        sample_obs,
+        sample_action,
+        network_kwargs={
+            "activations": nn.tanh,
+            "use_layer_norm": False,
+            "hidden_dims": [256, 256],
+        },
+        policy_kwargs={
+            "tanh_squash_distribution": False,
+            "std_parameterization": "exp",
+            "std_min": 1e-5,
+            "std_max": 5,
+        },
     )
 
 
