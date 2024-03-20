@@ -50,6 +50,7 @@ class RobotiqEnv(gym.Env):
     def __init__(
             self,
             hz: int = 10,
+            fake_env = False,
             config=DefaultEnvConfig,
             max_episode_length: int = 100
     ):
@@ -119,6 +120,9 @@ class RobotiqEnv(gym.Env):
             }
         )
         self.cycle_count = 0
+
+        if fake_env:
+            return
 
         self.controller = RobotiqImpedanceController(
             robot_ip=config.ROBOT_IP,
