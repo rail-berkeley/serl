@@ -53,7 +53,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.target_grip = np.zeros((1,), dtype=np.float32)
         self.curr_pos = np.zeros((7,), dtype=np.float32)
         self.curr_vel = np.zeros((6,), dtype=np.float32)
-        self.gripper_state = np.zeros((2,), dtype=np.float32)  # TODO gripper state (sucking or not)
+        self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.curr_Q = np.zeros((6,), dtype=np.float32)
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
@@ -253,7 +253,7 @@ class RobotiqImpedanceController(threading.Thread):
                     if self.robotiq_gripper:
                         self.target_grip[0] = -1.
                         await self.send_gripper_command()
-                        time.sleep(0.1)    # TODO not sure if necessary
+                        time.sleep(0.1)
 
                     # then move to Jointspace position
                     print(f"[RobotiqImpedanceController] moving to {self.reset_Q} with moveJ (joint space)")

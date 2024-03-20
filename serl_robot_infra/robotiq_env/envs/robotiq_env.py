@@ -201,11 +201,6 @@ class RobotiqEnv(gym.Env):
         Should override this method if custom reset procedure is needed.
         """
 
-        # Perform joint reset if needed
-        if joint_reset:
-            pass
-            # TODO joint reset
-
         # Perform Carteasian reset
         if self.random_reset:  # randomize reset position in xy plane
             # reset_pose = self.resetpos.copy()ss
