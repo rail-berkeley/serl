@@ -7,10 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pynput
 import os
-import signal
 import tqdm
 from absl import app, flags
 from flax.training import checkpoints
+import threading
 
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
@@ -92,31 +92,26 @@ def print_green(x):
 
 
 SHOULD_PAUSE = False  # flag to pause actor/learner agents
+PAUSE_LOCK = threading.Lock()
 
 
-def pause_client(a, b):
-    """Set flag to pause actor/learner agents at next iteration"""
-    global SHOULD_PAUSE
-    SHOULD_PAUSE = True
-    print("Requested pause training")
-
-
-def on_press(key):
+def pause_callback(key):
     """Callback for when a key is pressed"""
+    global SHOULD_PAUSE, PAUSE_LOCK
     try:
-        # print(f'{key.char} pressed')
-
         # chosen a rarely used key to avoid conflicts. this listener is always on, even when the program is not in focus
         if key == pynput.keyboard.Key.pause:
-            print("Pause pressed")
-            pause_client(None, None)
+            with PAUSE_LOCK:
+                SHOULD_PAUSE = True
+                print("Requested pause training")
     except AttributeError:
         # print(f'{key} pressed')
         pass
 
 
-signal.signal(signal.SIGUSR1, pause_client)  # enable interrupt signal to pause training
-listener = pynput.keyboard.Listener(on_press=on_press)  # to enable keyboard based pause
+listener = pynput.keyboard.Listener(
+    on_press=pause_callback
+)  # to enable keyboard based pause
 listener.start()
 
 ##############################################################################
@@ -126,7 +121,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     """
-    global SHOULD_PAUSE
+    global SHOULD_PAUSE, PAUSE_LOCK
 
     if FLAGS.eval_checkpoint_step:
         success_counter = 0
@@ -163,9 +158,10 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print(reward)
                     print(f"{success_counter}/{episode + 1}")
 
-            if SHOULD_PAUSE is True:
-                SHOULD_PAUSE = False  # reset flag
-                print("Actor eval loop interrupted")
+            if SHOULD_PAUSE:
+                with PAUSE_LOCK:
+                    SHOULD_PAUSE = False  # reset flag
+                    print("Actor eval loop interrupted")
                 response = input("Do you want to continue (c), or exit (e)? ")
                 if response == "c":
                     print("Continuing")
@@ -253,8 +249,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             client.request("send-stats", stats)
 
         if SHOULD_PAUSE is True:
-            SHOULD_PAUSE = False  # reset flag
-            print("Actor loop interrupted")
+            with PAUSE_LOCK:
+                SHOULD_PAUSE = False  # reset flag
+                print("Actor loop interrupted")
             response = input(
                 "Do you want to continue (c), save replay buffer and exit (s) or simply exit (e)? "
             )
@@ -284,7 +281,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     """
     # To track the step in the training loop
     update_steps = 0
-    global SHOULD_PAUSE
+    global SHOULD_PAUSE, PAUSE_LOCK
 
     def stats_callback(type: str, payload: dict) -> dict:
         """Callback for when server receives stats request."""
@@ -372,8 +369,9 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         update_steps += 1
 
         if SHOULD_PAUSE is True:
-            SHOULD_PAUSE = False  # reset flag
-            print("Learner loop interrupted")
+            with PAUSE_LOCK:
+                SHOULD_PAUSE = False  # reset flag
+                print("Learner loop interrupted")
             response = input(
                 "Do you want to continue (c), save training state and exit (s) or simply exit (e)? "
             )
