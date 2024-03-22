@@ -91,19 +91,19 @@ def print_green(x):
     return print("\033[92m {}\033[00m".format(x))
 
 
-SHOULD_PAUSE = False  # flag to pause actor/learner agents
-PAUSE_LOCK = threading.Lock()
+PAUSE_EVENT_FLAG = threading.Event()
+PAUSE_EVENT_FLAG.clear()  # clear() to continue the actor/learner loop, set() to pause
 
 
 def pause_callback(key):
     """Callback for when a key is pressed"""
-    global SHOULD_PAUSE, PAUSE_LOCK
+    global PAUSE_EVENT_FLAG
     try:
         # chosen a rarely used key to avoid conflicts. this listener is always on, even when the program is not in focus
         if key == pynput.keyboard.Key.pause:
-            with PAUSE_LOCK:
-                SHOULD_PAUSE = True
-                print("Requested pause training")
+            print("Requested pause training")
+            # set the PAUSE FLAG to pause the actor/learner loop
+            PAUSE_EVENT_FLAG.set()
     except AttributeError:
         # print(f'{key} pressed')
         pass
@@ -121,7 +121,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     """
-    global SHOULD_PAUSE, PAUSE_LOCK
+    global PAUSE_EVENT_FLAG
 
     if FLAGS.eval_checkpoint_step:
         success_counter = 0
@@ -158,12 +158,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print(reward)
                     print(f"{success_counter}/{episode + 1}")
 
-            if SHOULD_PAUSE:
-                with PAUSE_LOCK:
-                    SHOULD_PAUSE = False  # reset flag
-                    print("Actor eval loop interrupted")
+            # if pause event is requested, pause the actor
+            if PAUSE_EVENT_FLAG.is_set():
+                print("Actor eval loop interrupted")
                 response = input("Do you want to continue (c), or exit (e)? ")
                 if response == "c":
+                    # update PAUSE FLAG to continue training
+                    PAUSE_EVENT_FLAG.clear()
                     print("Continuing")
                 else:
                     print("Stopping actor eval")
@@ -248,15 +249,14 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             stats = {"timer": timer.get_average_times()}
             client.request("send-stats", stats)
 
-        if SHOULD_PAUSE is True:
-            with PAUSE_LOCK:
-                SHOULD_PAUSE = False  # reset flag
-                print("Actor loop interrupted")
+        if PAUSE_EVENT_FLAG.is_set():
+            print_green("Actor loop interrupted")
             response = input(
                 "Do you want to continue (c), save replay buffer and exit (s) or simply exit (e)? "
             )
             if response == "c":
                 print("Continuing")
+                PAUSE_EVENT_FLAG.clear()
             else:
                 if response == "s":
                     print("Saving replay buffer")
@@ -281,7 +281,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     """
     # To track the step in the training loop
     update_steps = 0
-    global SHOULD_PAUSE, PAUSE_LOCK
+    global PAUSE_EVENT_FLAG
 
     def stats_callback(type: str, payload: dict) -> dict:
         """Callback for when server receives stats request."""
@@ -368,15 +368,14 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
 
         update_steps += 1
 
-        if SHOULD_PAUSE is True:
-            with PAUSE_LOCK:
-                SHOULD_PAUSE = False  # reset flag
-                print("Learner loop interrupted")
+        if PAUSE_EVENT_FLAG.is_set():
+            print("Learner loop interrupted")
             response = input(
                 "Do you want to continue (c), save training state and exit (s) or simply exit (e)? "
             )
             if response == "c":
                 print("Continuing")
+                PAUSE_EVENT_FLAG.clear()
             else:
                 if response == "s":
                     print("Saving learner state")
@@ -390,9 +389,10 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
                 else:
                     print("Training state not saved")
                 print("Stopping learner client")
-                server.stop()
                 break
 
+    # Wrap up the learner loop
+    server.stop()
     print("Learner loop finished")
 
 
