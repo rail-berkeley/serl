@@ -18,8 +18,6 @@ from robot_controllers.robotiq_controller import RobotiqImpedanceController
 class DefaultEnvConfig:
     """Default configuration for RobotiqEnv. Fill in the values below."""
 
-    TARGET_POSE: np.ndarray = np.zeros((6,))  # might change as well
-    REWARD_THRESHOLD: np.ndarray = np.zeros((6,))
     RESET_Q = np.zeros((6,))
     RANDOM_RESET = (False,)
     RANDOM_XY_RANGE = (0.0,)
@@ -54,8 +52,6 @@ class RobotiqEnv(gym.Env):
             config=DefaultEnvConfig,
             max_episode_length: int = 100
     ):
-        self._TARGET_POSE = config.TARGET_POSE      # TODO not used for now, same for threshold
-        self._REWARD_THRESHOLD = config.REWARD_THRESHOLD
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
 
@@ -120,6 +116,7 @@ class RobotiqEnv(gym.Env):
             }
         )
         self.cycle_count = 0
+        self.controller = None
 
         if fake_env:
             return
@@ -284,5 +281,6 @@ class RobotiqEnv(gym.Env):
         return copy.deepcopy(dict(state=state_observation))
 
     def close(self):
-        self.controller.stop()
+        if self.controller:
+            self.controller.stop()
         super().close()
