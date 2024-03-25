@@ -6,5 +6,5 @@ python bc_policy_robotiq.py "$@" \
     --exp_name=bc_robotiq_policy \
     --seed 42 \
     --batch_size 256 \
-    --eval_checkpoint_step 100000 \
-    --debug # wandb is disabled when debug
+    --eval_checkpoint_step 40000 \
+#    --debug # wandb is disabled when debug
