@@ -6,8 +6,10 @@ class RobotiqGripV1(RobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=RobotiqCornerConfig)
 
-    def compute_reward(self, obs) -> bool:
+    def compute_reward(self, obs) -> float:
         if int(self.gripper_state[1]) == 1 and 10 < self.gripper_state[0] < 30 and self.curr_force[2] < -1.:
-            return True
+            return 1.
+        elif self.curr_force[2] > 3.:       # neg reward if the downward force is too big
+            return -0.5
         else:
-            return False
+            return 0.0
