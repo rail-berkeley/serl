@@ -27,7 +27,7 @@ from serl_launcher.data.data_store import (
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from serl_launcher.networks.reward_classifier import load_classifier_func
-from franka_env.envs.relative_env import RelativeFrame
+# from franka_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
 import robotiq_env
@@ -40,14 +40,15 @@ flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", True, "Whether to save model.")
-flags.DEFINE_integer("batch_size", 256, "Batch size.")
+flags.DEFINE_integer("batch_size", 512, "Batch size.")
 
-flags.DEFINE_integer("max_steps", 10000, "Maximum number of training steps.")
+flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity.")
 
-flags.DEFINE_multi_string("demo_paths", "robotiq_grip_v1/robotiq_test_20_demos_2024-03-20_15-09-46.pkl",
+flags.DEFINE_multi_string("demo_paths", "robotiq_grip_v1/robotiq_test_20_demos_2024-03-25_16-39-22.pkl",
                           "paths to demos")
-flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/checkpoints", "Path to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/checkpoints",
+                    "Path to save checkpoints.")
 
 flags.DEFINE_integer(
     "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
@@ -55,7 +56,7 @@ flags.DEFINE_integer(
 flags.DEFINE_integer("eval_n_trajs", 100, "Number of trajectories for evaluation.")
 
 flags.DEFINE_boolean(
-    "debug", True, "Debug mode."
+    "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
 flags.DEFINE_string(
     "reward_classifier_ckpt_path",
@@ -82,27 +83,21 @@ def main(_):
     # env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
-    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
 
-    print(1)
-
     rng, sampling_rng = jax.random.split(rng)
-    agent: BCAgentNoImg = make_bc_agent_no_img(     # replace with no img one
+    agent: BCAgentNoImg = make_bc_agent_no_img(  # replace with no img one
         FLAGS.seed,
         env.observation_space.sample(),
         env.action_space.sample(),
     )
 
-    print(2)
-
     wandb_logger = make_wandb_logger(
-        project="serl_dev",
+        project="real-world-rl",
         description=FLAGS.exp_name or FLAGS.env,
         debug=FLAGS.debug,
     )
-    print(3)
-
 
     if not FLAGS.eval_checkpoint_step:
         """
@@ -118,8 +113,6 @@ def main(_):
             # preload_rlds_path=FLAGS.preload_rlds_path,
         )
 
-        print(4)
-
         replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
@@ -134,7 +127,7 @@ def main(_):
             agent, info = agent.update(batch)
             wandb_logger.log(info, step=step)
 
-            if (step + 1) % 1000 == 0 and FLAGS.save_model:     # TODO was 10'000
+            if (step + 1) % 10000 == 0 and FLAGS.save_model:
                 checkpoints.save_checkpoint(
                     FLAGS.checkpoint_path,
                     agent.state,
@@ -142,6 +135,8 @@ def main(_):
                     keep=100,
                     overwrite=True,
                 )
+
+        wandb_logger.join()
 
     else:
         """
@@ -189,6 +184,7 @@ def main(_):
                     argmax=True,
                 )
                 actions = np.asarray(jax.device_get(actions))
+                print(f"sampled actions: {actions}")
 
                 next_obs, reward, done, truncated, info = env.step(actions)
                 obs = next_obs
