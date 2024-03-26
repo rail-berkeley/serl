@@ -113,6 +113,7 @@ def main(_):
             # preload_rlds_path=FLAGS.preload_rlds_path,
         )
 
+        print(f"loaded demos from {FLAGS.demo_paths}")
         replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
@@ -179,7 +180,8 @@ def main(_):
             while not done:
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    argmax=True,
+                    argmax=False,
+                    seed=rng,
                 )
                 actions = np.asarray(jax.device_get(actions))
                 print(f"sampled actions: {actions}")
@@ -195,6 +197,11 @@ def main(_):
                     reward = 1
                     done = True
                     print("success, reset now")
+
+                if truncated:
+                    reward = 0
+                    done = True
+                    print("truncated, reset now")
 
                 if done:
                     if not is_failure:

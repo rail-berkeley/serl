@@ -7,7 +7,6 @@ import time
 from typing import Dict
 from scipy.spatial.transform import Rotation as R
 
-
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
@@ -48,7 +47,7 @@ class RobotiqEnv(gym.Env):
     def __init__(
             self,
             hz: int = 10,
-            fake_env = False,
+            fake_env=False,
             config=DefaultEnvConfig,
             max_episode_length: int = 100
     ):
@@ -133,7 +132,7 @@ class RobotiqEnv(gym.Env):
 
         self.controller.start()  # start Thread
 
-        while not self.controller.is_ready():       # wait for controller
+        while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
 
     def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:      # TODO make better, no euler -> quat -> euler -> quat
@@ -170,7 +169,7 @@ class RobotiqEnv(gym.Env):
         next_pos = self.controller.get_target_pos()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
-        # orientation (leave for now)
+        # orientation
         next_pos[3:] = (
                 R.from_quat(next_pos[3:]) * R.from_euler("xyz", action[3:6] * self.action_scale[1])
         ).as_quat()
@@ -189,11 +188,12 @@ class RobotiqEnv(gym.Env):
         self._update_currpos()
         ob = self._get_obs()
         reward = self.compute_reward(ob)
-        done = self.curr_path_length >= self.max_episode_length or reward
-        return ob, int(reward), done, False, {}
+        truncated = self._is_truncated()
+        done = self.curr_path_length >= self.max_episode_length or (reward > 0.99)
+        return ob, int(reward), done, truncated, {}
 
     def compute_reward(self, obs) -> bool:
-        return False        # overwrite for each task
+        return False  # overwrite for each task
 
     def go_to_rest(self, joint_reset=False):
         """
@@ -222,7 +222,7 @@ class RobotiqEnv(gym.Env):
             while True:
                 time.sleep(0.1)
                 if self.controller.is_reset():
-                    break       # wait for reset
+                    break  # wait for reset
 
             self._update_currpos()
 
@@ -269,6 +269,9 @@ class RobotiqEnv(gym.Env):
         self.Q[:] = state['Q']
         self.Qd[:] = state['Qd']
         self.gripper_state[:] = state['gripper']
+
+    def _is_truncated(self):
+        return self.controller.is_truncated()
 
     def _get_obs(self) -> dict:
         state_observation = {

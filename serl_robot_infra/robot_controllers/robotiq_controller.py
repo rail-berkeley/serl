@@ -59,6 +59,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
 
         self.reset_Q = np.zeros((6,), dtype=np.float32)  # reset state in Joint Space
+        self._is_truncated = False
 
         self.delta = config.ERROR_DELTA
         self.fm_damping = config.FORCEMODE_DAMPING
@@ -224,15 +225,24 @@ class RobotiqImpedanceController(threading.Thread):
         self.stop()
 
     async def send_gripper_command(self):
-        if self.target_grip[0] > 0.9 and self.gripper_state[0] == 100:
+        if self.target_grip[0] > 0.5 and self.gripper_state[0] == 100:
             await self.robotiq_gripper.automatic_grip()
             self.target_grip[0] = 0.0
             # print("grip")
 
-        elif self.target_grip[0] < -0.9 and self.gripper_state[1] != 3:  # only release if obj detected
+        elif self.target_grip[0] < -0.5 and self.gripper_state[1] != 3:  # only release if obj detected
             await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             # print("release")
+
+    def _truncate_check(self):
+        if self.curr_force[2] > 8.:     # TODO add better criteria
+            self._is_truncated = True
+        else:
+            self._is_truncated = False
+
+    def is_truncated(self):
+        return self._is_truncated
 
     def run(self):
         try:
@@ -281,6 +291,7 @@ class RobotiqImpedanceController(threading.Thread):
 
                 # update robot state
                 await self._update_robot_state()
+                self._truncate_check()
 
                 # only used for plotting
                 if self.do_plot:
@@ -300,8 +311,6 @@ class RobotiqImpedanceController(threading.Thread):
                     2,
                     self.fm_limits
                 )
-                # if np.sum(np.abs(force)) > 50:
-                #     print("high force: ", force)
                 # TODO try to reset with moveJ if forcemode returns False
 
                 if self.robotiq_gripper:

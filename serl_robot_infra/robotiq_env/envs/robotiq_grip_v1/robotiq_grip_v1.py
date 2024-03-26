@@ -9,7 +9,5 @@ class RobotiqGripV1(RobotiqEnv):
     def compute_reward(self, obs) -> float:
         if int(self.gripper_state[1]) == 1 and 10 < self.gripper_state[0] < 30 and self.curr_force[2] < -1.:
             return 1.
-        elif self.curr_force[2] > 3.:       # neg reward if the downward force is too big
-            return -0.5
         else:
             return 0.0
