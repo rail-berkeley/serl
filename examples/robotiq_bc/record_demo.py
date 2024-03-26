@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
-    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
     obs, _ = env.reset()
 
