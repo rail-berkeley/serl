@@ -27,7 +27,7 @@ class DefaultEnvConfig:
 
     ROBOT_IP: str = "localhost"
     CONTROLLER_HZ: int = 0
-    GRIPPER_TIMEOUT: int = 0      # in milliseconds
+    GRIPPER_TIMEOUT: int = 0  # in milliseconds
     ERROR_DELTA: float = 0.
     FORCEMODE_DAMPING: float = 0.
     FORCEMODE_TASK_FRAME = np.zeros(6, )
@@ -129,7 +129,8 @@ class RobotiqEnv(gym.Env):
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
 
-    def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:      # TODO make better, no euler -> quat -> euler -> quat
+    def clip_safety_box(self,
+                        next_pos: np.ndarray) -> np.ndarray:  # TODO make better, no euler -> quat -> euler -> quat
         """Clip the pose to be within the safety box."""
         next_pos[:3] = np.clip(
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
@@ -230,11 +231,6 @@ class RobotiqEnv(gym.Env):
         obs = self._get_obs()
 
         return obs, {}
-
-    def _recover(self):
-        """Internal function to recover the robot from error state."""
-        # TODO make recover function
-        pass
 
     def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""

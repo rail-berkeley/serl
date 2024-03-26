@@ -24,9 +24,6 @@ class BCAgentNoImg(flax.struct.PyTreeNode):
 
     @partial(jax.jit, static_argnames="pmap_axis")
     def update(self, batch: Batch, pmap_axis: str = None):
-        # if self.config["image_keys"][0] not in batch["next_observations"]:
-        #     batch = _unpack(batch)        # TODO do include?
-
         # rng = self.state.rng
         # rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
         # obs = self.data_augmentation_fn(obs_rng, batch["observations"])
