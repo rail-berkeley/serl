@@ -40,12 +40,12 @@ flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", True, "Whether to save model.")
-flags.DEFINE_integer("batch_size", 512, "Batch size.")
+flags.DEFINE_integer("batch_size", 256, "Batch size.")
 
 flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity.")
 
-flags.DEFINE_multi_string("demo_paths", "robotiq_grip_v1/robotiq_test_20_demos_2024-03-25_16-39-22.pkl",
+flags.DEFINE_multi_string("demo_paths", "robotiq_bc/robotiq_test_20_demos_2024-03-26_12-23-50.pkl",
                           "paths to demos")
 flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/checkpoints",
                     "Path to save checkpoints.")
