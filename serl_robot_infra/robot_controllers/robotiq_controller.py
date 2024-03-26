@@ -46,6 +46,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.frequency = frequency
         self.kp = kp
         self.kd = kd
+        self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic()-1e6}
         self.verbose = verbose
         self.do_plot = plot
 
@@ -225,9 +226,11 @@ class RobotiqImpedanceController(threading.Thread):
         self.stop()
 
     async def send_gripper_command(self):
-        if self.target_grip[0] > 0.5 and self.gripper_state[0] == 100:
+        timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout["timeout"]
+        if self.target_grip[0] > 0.5 and timeout_exceeded:
             await self.robotiq_gripper.automatic_grip()
             self.target_grip[0] = 0.0
+            self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
         elif self.target_grip[0] < -0.5 and self.gripper_state[1] != 3:  # only release if obj detected
@@ -300,7 +303,7 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
-                self.print(f"{self.target_pos}, {self.curr_pos}, {force}")      # output to file
+                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")      # output to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()

@@ -13,6 +13,7 @@ class RobotiqCornerConfig(DefaultEnvConfig):
 
     ROBOT_IP: str = "172.22.22.2"
     CONTROLLER_HZ = 100
+    GRIPPER_TIMEOUT = 2000      # in milliseconds
     ERROR_DELTA: float = 0.05
     FORCEMODE_DAMPING: float = 0.0      # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)

@@ -27,17 +27,12 @@ class DefaultEnvConfig:
 
     ROBOT_IP: str = "localhost"
     CONTROLLER_HZ: int = 0
+    GRIPPER_TIMEOUT: int = 0      # in milliseconds
     ERROR_DELTA: float = 0.
-    FORCEMODE_DAMPING: float = 0.1
+    FORCEMODE_DAMPING: float = 0.
     FORCEMODE_TASK_FRAME = np.zeros(6, )
     FORCEMODE_SELECTION_VECTOR = np.ones(6, )
     FORCEMODE_LIMITS = np.zeros(6, )
-
-    # not used for now
-    REALSENSE_CAMERAS: Dict = {
-        "wrist_1": "130322274175",
-        "wrist_2": "127122270572",
-    }
 
 
 ##############################################################################
