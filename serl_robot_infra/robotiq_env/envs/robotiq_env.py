@@ -66,7 +66,6 @@ class RobotiqEnv(gym.Env):
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
-        self.joint_reset_cycle = 200  # reset the robot joint every 200 cycles  # TODO needed?
 
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
@@ -223,12 +222,8 @@ class RobotiqEnv(gym.Env):
 
     def reset(self, joint_reset=False, **kwargs):
         self.cycle_count += 1
-        if self.cycle_count % self.joint_reset_cycle == 0:
-            self.cycle_count = 0
-            joint_reset = True
 
         self.go_to_rest(joint_reset=joint_reset)
-        # self._recover()
         self.curr_path_length = 0
 
         self._update_currpos()
