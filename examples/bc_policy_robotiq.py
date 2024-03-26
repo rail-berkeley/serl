@@ -122,20 +122,22 @@ def main(_):
             },
             device=sharding.replicate(),
         )
+        try:
+            for step in tqdm(range(FLAGS.max_steps)):
+                batch = next(replay_iterator)
+                agent, info = agent.update(batch)
+                wandb_logger.log(info, step=step)
 
-        for step in tqdm(range(FLAGS.max_steps)):
-            batch = next(replay_iterator)
-            agent, info = agent.update(batch)
-            wandb_logger.log(info, step=step)
-
-            if (step + 1) % 10000 == 0 and FLAGS.save_model:
-                checkpoints.save_checkpoint(
-                    FLAGS.checkpoint_path,
-                    agent.state,
-                    step=step + 1,
-                    keep=100,
-                    overwrite=True,
-                )
+                if (step + 1) % 10000 == 0 and FLAGS.save_model:
+                    checkpoints.save_checkpoint(
+                        FLAGS.checkpoint_path,
+                        agent.state,
+                        step=step + 1,
+                        keep=100,
+                        overwrite=True,
+                    )
+        except KeyboardInterrupt:
+            print("interrupted by user")
 
     else:
         """
@@ -171,54 +173,57 @@ def main(_):
         success_counter = 0
         time_list = []
 
-        for episode in range(FLAGS.eval_n_trajs):
-            obs, _ = env.reset()
-            done = False
-            is_failure = False
-            is_success = False
-            start_time = time.time()
-            while not done:
-                actions = agent.sample_actions(
-                    observations=jax.device_put(obs),
-                    argmax=False,
-                    seed=rng,
-                )
-                actions = np.asarray(jax.device_get(actions))
-                print(f"sampled actions: {actions}")
+        try:
+            for episode in range(FLAGS.eval_n_trajs):
+                obs, _ = env.reset()
+                done = False
+                is_failure = False
+                is_success = False
+                start_time = time.time()
+                while not done:
+                    actions = agent.sample_actions(
+                        observations=jax.device_put(obs),
+                        argmax=False,
+                        seed=rng,
+                    )
+                    actions = np.asarray(jax.device_get(actions))
+                    print(f"sampled actions: {actions}")
 
-                next_obs, reward, done, truncated, info = env.step(actions)
-                obs = next_obs
+                    next_obs, reward, done, truncated, info = env.step(actions)
+                    obs = next_obs
 
-                if is_failure:
-                    done = True
-                    print("terminated by user")
+                    if is_failure:
+                        done = True
+                        print("terminated by user")
 
-                if is_success:
-                    reward = 1
-                    done = True
-                    print("success, reset now")
+                    if is_success:
+                        reward = 1
+                        done = True
+                        print("success, reset now")
 
-                if truncated:
-                    reward = 0
-                    done = True
-                    print("truncated, reset now")
+                    if truncated:
+                        reward = 0
+                        done = True
+                        print("truncated, reset now")
 
-                if done:
-                    if not is_failure:
-                        dt = time.time() - start_time
-                        time_list.append(dt)
-                        print(dt)
+                    if done:
+                        if not is_failure:
+                            dt = time.time() - start_time
+                            time_list.append(dt)
+                            print(dt)
 
-                    success_counter += reward
-                    print(reward)
-                    print(f"{success_counter}/{episode + 1}")
+                        success_counter += reward
+                        print(reward)
+                        print(f"{success_counter}/{episode + 1}")
 
-            wandb_logger.log(info, step=episode)
+                wandb_logger.log(info, step=episode)
+
+        except KeyboardInterrupt:
+            print("interrupted by user, exiting...")
 
         print(f"success rate: {success_counter / FLAGS.eval_n_trajs}")
         print(f"average time: {np.mean(time_list)}")
 
-    print("done")
     env.close()
 
 
