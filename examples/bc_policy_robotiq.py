@@ -136,8 +136,6 @@ def main(_):
                     overwrite=True,
                 )
 
-        wandb_logger.join()
-
     else:
         """
         Evaluation Mode
