@@ -40,11 +40,11 @@ flags.DEFINE_string("agent", "sac", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
-flags.DEFINE_bool("save_model", False, "Whether to save model.")
+flags.DEFINE_bool("save_model", True, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
 
-flags.DEFINE_integer("max_steps", 100, "Maximum number of training steps.")
+flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
@@ -58,13 +58,12 @@ flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation."
 # flag to indicate if this is a leaner or a actor
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
-flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", 'checkpoint_test_path', "Path to save checkpoints.")
 
 flags.DEFINE_boolean(
-    "debug", True, "Debug mode."
+    "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
 
 
@@ -144,9 +143,6 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
             if done or truncated:
                 running_return = 0.0
                 obs, _ = env.reset()
-
-        if FLAGS.render:
-            env.render()
 
         if step % FLAGS.steps_per_update == 0:
             client.update()
