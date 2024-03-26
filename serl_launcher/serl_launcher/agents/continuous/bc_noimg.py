@@ -51,10 +51,10 @@ class BCAgentNoImg(flax.struct.PyTreeNode):
             return actor_loss, {
                 "actor_loss": actor_loss,
                 "mse": mse.mean(),
-                # "log_probs": log_probs,
-                # "pi_actions": pi_actions,
-                # "mean_std": actor_std.mean(),
-                # "max_std": actor_std.max(),
+                "log_probs": log_probs,
+                "pi_actions": pi_actions,
+                "mean_std": actor_std.mean(),
+                "max_std": actor_std.max(),
             }
 
         # compute gradients and update params
