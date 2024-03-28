@@ -79,6 +79,11 @@ class ReplayBufferDataStore(ReplayBuffer, DataStoreBase):
     def get_latest_data(self, from_id: int):
         raise NotImplementedError  # TODO
 
+    def __del__(self):
+        if self._logger:
+            self._logger.close()
+            print("[ReplayBufferDataStore] RLDS logger closed successfully")
+
 
 class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStoreBase):
     def __init__(
