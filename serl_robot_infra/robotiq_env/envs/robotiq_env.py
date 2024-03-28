@@ -112,6 +112,7 @@ class RobotiqEnv(gym.Env):
         self.controller = None
 
         if fake_env:
+            print("[RobotiqEnv] is fake!")
             return
 
         self.controller = RobotiqImpedanceController(
@@ -123,7 +124,7 @@ class RobotiqEnv(gym.Env):
             verbose=True,
             plot=False
         )
-
+        print("controller started:  ", self.controller._started.is_set())
         self.controller.start()  # start Thread
 
         while not self.controller.is_ready():  # wait for controller
