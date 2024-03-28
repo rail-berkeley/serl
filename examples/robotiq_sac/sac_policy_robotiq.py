@@ -15,6 +15,7 @@ from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
+from serl_launcher.data.data_store import populate_data_store
 
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
@@ -37,7 +38,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "robotiq-grip-v1", "Name of environment.")
 flags.DEFINE_string("agent", "sac", "Name of agent.")
-flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
+flags.DEFINE_string("exp_name", "sac_robotiq_policy", "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", True, "Whether to save model.")
@@ -46,9 +47,11 @@ flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
+flags.DEFINE_multi_string("demo_paths", None,
+                          "paths to demos")
 
-flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
-flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
+flags.DEFINE_integer("random_steps", 1000, "Sample random actions for this many steps.")
+flags.DEFINE_integer("training_starts", 1000, "Training starts after this step.")
 flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
@@ -56,11 +59,15 @@ flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
 flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 
 # flag to indicate if this is a leaner or a actor
-flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
+flags.DEFINE_boolean("learner", True, "Is this a learner or a trainer.")  # TODO change back!
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
-flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
-flags.DEFINE_string("checkpoint_path", 'checkpoint_test_path', "Path to save checkpoints.")
+flags.DEFINE_integer("checkpoint_period", 10000, "Period to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/checkpoints', "Path to save checkpoints.")
+
+flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds', "Path to save RLDS logs.")
+flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")        # TODO does not work yet
+
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -91,14 +98,10 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
         nonlocal agent
         agent = agent.replace(state=agent.state.replace(params=params))
 
-    client.recv_network_callback(update_params)
-
-    eval_env = gym.make(FLAGS.env)
-    if FLAGS.env == "PandaPickCube-v0":
-        eval_env = gym.wrappers.FlattenObservation(eval_env)
-    eval_env = RecordEpisodeStatistics(eval_env)
+    client.recv_network_callback(update_params)     # TODO RLDS does not load
 
     obs, _ = env.reset()
+    print(f"obs:  {obs}")
     done = False
 
     # training loop
@@ -115,13 +118,13 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     seed=key,
-                    deterministic=False,
+                    # deterministic=False,
+                    argmax=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
 
         # Step environment
         with timer.context("step_env"):
-
             next_obs, reward, done, truncated, info = env.step(actions)
             next_obs = np.asarray(next_obs, dtype=np.float32)
             reward = np.asarray(reward, dtype=np.float32)
@@ -151,7 +154,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
             with timer.context("eval"):
                 evaluate_info = evaluate(
                     policy_fn=partial(agent.sample_actions, argmax=True),
-                    env=eval_env,
+                    env=env,
                     num_episodes=FLAGS.eval_n_trajs,
                 )
             stats = {"eval": evaluate_info}
@@ -206,30 +209,34 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
-    for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
-        # Train the networks
-        with timer.context("sample_replay_buffer"):
-            batch = next(replay_iterator)
+    try:
+        for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
+            # Train the networks
+            with timer.context("sample_replay_buffer"):
+                batch = next(replay_iterator)
 
-        with timer.context("train"):
-            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
-            agent = jax.block_until_ready(agent)
+            with timer.context("train"):
+                agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
+                agent = jax.block_until_ready(agent)
 
-            # publish the updated network
-            server.publish_network(agent.state.params)
+                # publish the updated network
+                server.publish_network(agent.state.params)
 
-        if update_steps % FLAGS.log_period == 0 and wandb_logger:
-            wandb_logger.log(update_info, step=update_steps)
-            wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
+            if update_steps % FLAGS.log_period == 0 and wandb_logger:
+                wandb_logger.log(update_info, step=update_steps)
+                wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
+                wandb_logger.log({"replay_buffer_size": len(replay_buffer)})
 
-        if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
-            assert FLAGS.checkpoint_path is not None
-            checkpoints.save_checkpoint(
-                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
-            )
+            if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0 and update_steps:
+                assert FLAGS.checkpoint_path is not None
+                checkpoints.save_checkpoint(
+                    FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+                )
 
-        update_steps += 1
-
+            update_steps += 1
+    finally:
+        print("closing learner, clearning up...")
+        del replay_buffer
 
 ##############################################################################
 
@@ -244,16 +251,21 @@ def main(_):
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    env = gym.make(FLAGS.env)
+    env = gym.make(
+        FLAGS.env,
+        fake_env=FLAGS.learner,
+        max_episode_length=FLAGS.max_traj_length,
+    )
     if FLAGS.actor:
         env = SpacemouseIntervention(env)
     # env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
-    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
 
     rng, sampling_rng = jax.random.split(rng)
+    print(f"obs shape: {env.observation_space.sample().shape}")
     agent: SACAgent = make_sac_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
@@ -270,8 +282,8 @@ def main(_):
         replay_buffer = make_replay_buffer(
             env,
             capacity=FLAGS.replay_buffer_capacity,
-            rlds_logger_path=FLAGS.log_rlds_path,
             type="replay_buffer",
+            rlds_logger_path=FLAGS.log_rlds_path,
             preload_rlds_path=FLAGS.preload_rlds_path,
         )
 
@@ -286,6 +298,11 @@ def main(_):
     if FLAGS.learner:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
+
+        if FLAGS.preload_rlds_path == None:
+            print(f"loaded demos from {FLAGS.demo_paths}")      # load demo trajectories the old way
+            replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
+
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
                 "batch_size": FLAGS.batch_size * FLAGS.utd_ratio,
@@ -301,6 +318,7 @@ def main(_):
             replay_iterator=replay_iterator,
             wandb_logger=wandb_logger,
         )
+
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
