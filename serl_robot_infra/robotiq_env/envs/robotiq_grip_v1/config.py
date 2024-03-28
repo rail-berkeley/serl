@@ -9,6 +9,8 @@ class RobotiqCornerConfig(DefaultEnvConfig):
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
     ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
+    # ABS_POSE_LIMIT_HIGH = np.array([0.0, -0.5, 0.15, 3.2, 0.1, 3.2])            # more conservative for tests
+    # ABS_POSE_LIMIT_LOW = np.array([-0.2, -0.6, 0.1, 3.0, -0.1, -3.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.2"
