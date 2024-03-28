@@ -107,7 +107,8 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
         with timer.context("sample_actions"):
             if step < FLAGS.random_steps:
-                actions = env.action_space.sample()
+                # actions = env.action_space.sample()
+                actions = np.zeros((7,))
             else:
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
@@ -119,7 +120,6 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
         # Step environment
         with timer.context("step_env"):
-
             next_obs, reward, done, truncated, info = env.step(actions)
             next_obs = np.asarray(next_obs, dtype=np.float32)
             reward = np.asarray(reward, dtype=np.float32)
