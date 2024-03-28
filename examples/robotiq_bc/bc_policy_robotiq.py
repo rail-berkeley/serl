@@ -47,7 +47,7 @@ flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity."
 
 flags.DEFINE_multi_string("demo_paths", "robotiq_bc/robotiq_test_20_demos_2024-03-26_12-23-50.pkl",
                           "paths to demos")
-flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/checkpoints",
+flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/robotiq_bc/checkpoints",
                     "Path to save checkpoints.")
 
 flags.DEFINE_integer(
