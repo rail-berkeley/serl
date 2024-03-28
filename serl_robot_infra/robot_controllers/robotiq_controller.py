@@ -87,8 +87,9 @@ class RobotiqImpedanceController(threading.Thread):
         if self.verbose:
             print(f"[RIC] Controller process spawned at {self.native_id}")
 
-    def print(self, msg):
-        self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
+    def print(self, msg, probability=1.):
+        if np.random.random() < probability:
+            self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
 
     async def start_robotiq_interfaces(self, gripper=True):
         for _ in range(5):  # try it 5 times
@@ -102,11 +103,11 @@ class RobotiqImpedanceController(threading.Thread):
                 if self.verbose:
                     gr_string = "(with gripper) " if gripper else ""
                     print(f"[RIC] Controller connected to robot {gr_string}at: {self.robot_ip}")
-                break
+                return
             except RuntimeError as e:
                 print("[RIC] ", e.__str__())
                 continue
-        # raise RuntimeError(f"[RIC] Could not connect to robot [{self.robot_ip}]")
+        raise RuntimeError(f"[RIC] Could not connect to robot [{self.robot_ip}]")
 
     def stop(self):
         self._stop.set()
@@ -280,6 +281,7 @@ class RobotiqImpedanceController(threading.Thread):
                     print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)")
                     self.robotiq_control.forceModeStop()
                     self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.5)
+                    self.print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)")
 
                     await self._update_robot_state()
                     with self.lock:
@@ -303,7 +305,7 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
-                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")      # output to file
+                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}", probability=1.)      # output to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()
