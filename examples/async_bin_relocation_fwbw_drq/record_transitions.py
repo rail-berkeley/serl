@@ -97,7 +97,7 @@ if __name__ == "__main__":
             )
 
     # Loop until we have enough transitions
-    while check_all_done():
+    while not check_all_done():
         next_obs, rew, done, truncated, info = env.step(action=np.zeros((7,)))
         next_obs = env.get_front_cam_obs()
         actions = info["intervene_action"]
