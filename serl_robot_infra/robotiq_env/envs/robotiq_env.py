@@ -199,28 +199,31 @@ class RobotiqEnv(gym.Env):
         """
 
         # Perform Carteasian reset
+        reset_Q = self.resetQ.copy()
+
+        self._send_reset_command(reset_Q)
+
+        while True:
+            time.sleep(0.1)
+            if self.controller.is_reset():
+                break  # wait for reset
+
+        self._update_currpos()
         if self.random_reset:  # randomize reset position in xy plane
-            # reset_pose = self.resetpos.copy()ss
-            # reset_pose[:2] += np.random.uniform(
-            #     np.negative(self.random_xy_range), self.random_xy_range, (2,)
-            # )
-            # euler_random = self._TARGET_POSE[3:].copy()
+            # reset_pose = self.resetpos.copy()
+            reset_pose = self.controller.get_target_pos()
+            reset_pose[:2] += np.random.uniform(
+                np.negative(self.random_xy_range), self.random_xy_range, (2,)
+            )
+            # euler_random = reset_pose[3:]
             # euler_random[-1] += np.random.uniform(
             #     np.negative(self.random_rz_range), self.random_rz_range
             # )
-            # reset_pose[3:] = euler_2_quat(euler_random)
-            # self.move_to(reset_pose)
-            pass
-        else:
-            reset_Q = self.resetQ.copy()
-            self._send_reset_command(reset_Q)
-
+            self.controller.set_target_pos(reset_pose)  # random movement after resetting
             while True:
                 time.sleep(0.1)
-                if self.controller.is_reset():
-                    break  # wait for reset
-
-            self._update_currpos()
+                if not self.controller.is_moving():
+                    break
 
     def reset(self, joint_reset=False, **kwargs):
         self.cycle_count += 1
