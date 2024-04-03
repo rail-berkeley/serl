@@ -60,6 +60,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
 
         self.reset_Q = np.zeros((6,), dtype=np.float32)  # reset state in Joint Space
+        self.reset_height = np.array([0.06], dtype=np.float32)      # TODO make customizable
         self._is_truncated = False
 
         self.delta = config.ERROR_DELTA
@@ -115,6 +116,9 @@ class RobotiqImpedanceController(threading.Thread):
     def stopped(self):
         return self._stop.is_set()
 
+    def is_moving(self):
+        return np.linalg.norm(self.get_state()["vel"], 2) > 0.01
+
     def set_target_pos(self, target_pos: np.ndarray):
         if target_pos.shape == (7,):
             target_orientation = target_pos[3:]
@@ -138,9 +142,12 @@ class RobotiqImpedanceController(threading.Thread):
         with self.lock:
             self.target_grip[:] = target_grip
 
-    def get_target_pos(self):
+    def get_target_pos(self, copy=True):
         with self.lock:
-            return self.target_pos
+            if copy:
+                return self.target_pos.copy()
+            else:
+                return self.target_pos
 
     async def _update_robot_state(self):
         pos = self.robotiq_receive.getActualTCPPose()
@@ -178,7 +185,7 @@ class RobotiqImpedanceController(threading.Thread):
         return not self._reset.is_set()
 
     def _calculate_force(self):
-        target_pos = self.get_target_pos()
+        target_pos = self.get_target_pos(copy=False)
         with self.lock:
             curr_pos = self.curr_pos
             curr_vel = self.curr_vel
@@ -240,7 +247,7 @@ class RobotiqImpedanceController(threading.Thread):
             # print("release")
 
     def _truncate_check(self):
-        if self.curr_force[2] > 8.:     # TODO add better criteria
+        if self.curr_force[2] > 10.:     # TODO add better criteria
             self._is_truncated = True
         else:
             self._is_truncated = False
@@ -270,7 +277,11 @@ class RobotiqImpedanceController(threading.Thread):
             self._is_ready.set()
 
             while not self.stopped():
-                if self._reset.is_set():  # move to reset joint space pose with moveJ
+                if self._reset.is_set() and self.curr_pos[2] < self.reset_height:
+                    # move up first, then in joint-space
+                    self.target_pos[2] = self.reset_height
+
+                elif self._reset.is_set() and not self.is_moving():  # move to reset joint space pose with moveJ
                     # first disable vaccum gripper
                     if self.robotiq_gripper:
                         self.target_grip[0] = -1.
