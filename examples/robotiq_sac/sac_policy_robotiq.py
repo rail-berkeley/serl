@@ -8,6 +8,7 @@ import numpy as np
 import tqdm
 from absl import app, flags
 from flax.training import checkpoints
+from datetime import datetime
 
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
@@ -59,15 +60,16 @@ flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
 flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 
 # flag to indicate if this is a leaner or a actor
-flags.DEFINE_boolean("learner", True, "Is this a learner or a trainer.")  # TODO change back!
+flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")  # TODO change back!
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_integer("checkpoint_period", 10000, "Period to save checkpoints.")
-flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/checkpoints', "Path to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/checkpoints',
+                    "Path to save checkpoints.")
 
-flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds', "Path to save RLDS logs.")
-flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")        # TODO does not work yet
-
+flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds',
+                    "Path to save RLDS logs.")
+flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")  # TODO does not work yet
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -98,7 +100,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
         nonlocal agent
         agent = agent.replace(state=agent.state.replace(params=params))
 
-    client.recv_network_callback(update_params)     # TODO RLDS does not load
+    client.recv_network_callback(update_params)  # TODO RLDS does not load
 
     obs, _ = env.reset()
     print(f"obs:  {obs}")
@@ -112,14 +114,15 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
         with timer.context("sample_actions"):
             if step < FLAGS.random_steps:
+                print("sampling randomly!")
                 actions = env.action_space.sample()
             else:
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    seed=key,
+                    # seed=key,
                     # deterministic=False,
-                    argmax=False,
+                    argmax=True,  # TODO which one to use?
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -227,16 +230,17 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
                 wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
                 wandb_logger.log({"replay_buffer_size": len(replay_buffer)})
 
-            if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0 and update_steps:
+            if FLAGS.checkpoint_period and (update_steps + 1) % FLAGS.checkpoint_period == 0:
                 assert FLAGS.checkpoint_path is not None
                 checkpoints.save_checkpoint(
-                    FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
+                    FLAGS.checkpoint_path, agent.state, step=update_steps + 1, keep=20
                 )
 
             update_steps += 1
     finally:
         print("closing learner, clearning up...")
         del replay_buffer
+
 
 ##############################################################################
 
@@ -246,6 +250,7 @@ def main(_):
     num_devices = len(devices)
     sharding = jax.sharding.PositionalSharding(devices)
     assert FLAGS.batch_size % num_devices == 0
+    FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + datetime.now().strftime("%m%d-%H:%M")
 
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
@@ -300,7 +305,7 @@ def main(_):
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
 
         if FLAGS.preload_rlds_path == None:
-            print(f"loaded demos from {FLAGS.demo_paths}")      # load demo trajectories the old way
+            print(f"loaded demos from {FLAGS.demo_paths}")  # load demo trajectories the old way
             replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
 
         replay_iterator = replay_buffer.get_iterator(
@@ -318,7 +323,6 @@ def main(_):
             replay_iterator=replay_iterator,
             wandb_logger=wandb_logger,
         )
-
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
