@@ -12,6 +12,7 @@ from datetime import datetime
 
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+from gymnasium.wrappers import TransformReward
 
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.evaluation import evaluate
@@ -45,6 +46,7 @@ flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", True, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
+flags.DEFINE_integer("reward_scale", 1, "Reward Scale to help out SAC algorithm")
 
 flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
@@ -219,7 +221,10 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
                 batch = next(replay_iterator)
 
             with timer.context("train"):
-                agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
+                if FLAGS.utd_ratio == 1:
+                    agent, update_info = agent.update(batch=batch)      # try it without utd
+                else:
+                    agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
                 agent = jax.block_until_ready(agent)
 
                 # publish the updated network
@@ -268,6 +273,7 @@ def main(_):
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
+    env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
 
     rng, sampling_rng = jax.random.split(rng)
     print(f"obs shape: {env.observation_space.sample().shape}")
@@ -306,7 +312,7 @@ def main(_):
 
         if FLAGS.preload_rlds_path == None:
             print(f"loaded demos from {FLAGS.demo_paths}")  # load demo trajectories the old way
-            replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths)
+            replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths, reward_scaling=FLAGS.reward_scale)
 
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
