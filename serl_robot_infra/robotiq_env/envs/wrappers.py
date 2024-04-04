@@ -10,14 +10,15 @@ sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
 
 class SpacemouseIntervention(gym.ActionWrapper):
-    def __init__(self, env):
+    def __init__(self, env, gripper_action_span=3):
         super().__init__(env)
 
         self.gripper_enabled = True
 
         self.expert = SpaceMouseExpert()
         self.last_intervene = 0
-        self.left, self.right = False, False
+        self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
+        self.right = self.left.copy()
 
         self.invert_axes = [-1, -1, 1, 1, -1, -1]
         self.deadspace = 0.15
@@ -31,11 +32,11 @@ class SpacemouseIntervention(gym.ActionWrapper):
         """
         expert_a = self.get_deadspace_action()
 
-        if np.linalg.norm(expert_a) > 0.001 or self.left or self.right:  # also read buttons with no movement
+        if np.linalg.norm(expert_a) > 0.001 or self.left.any() or self.right.any():  # also read buttons with no movement
             self.last_intervene = time.time()
 
         if self.gripper_enabled:
-            gripper_action = np.zeros((1,)) + int(self.left) - int(self.right)
+            gripper_action = np.zeros((1,)) + int(self.left.any()) - int(self.right.any())
             expert_a = np.concatenate((expert_a, gripper_action), axis=0)
 
         if time.time() - self.last_intervene < 0.5:
@@ -51,7 +52,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
         negative = np.clip((expert_a + self.deadspace) / (1. - self.deadspace), a_min=-1.0, a_max=0.0)
         expert_a = positive + negative
 
-        self.left, self.right = tuple(buttons)
+        self.left, self.right = np.roll(self.left, -1), np.roll(self.right, -1)     # shift them one to the left
+        self.left[-1], self.right[-1] = tuple(buttons)
 
         return np.array(expert_a, dtype=np.float32)
 
@@ -79,8 +81,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
         # print(f"new action: {new_action}")
         obs, rew, done, truncated, info = self.env.step(new_action)
         info["intervene_action"] = new_action
-        info["left"] = self.left
-        info["right"] = self.right
+        info["left"] = self.left.any()
+        info["right"] = self.right.any()
         return obs, rew, done, truncated, info
 
 
