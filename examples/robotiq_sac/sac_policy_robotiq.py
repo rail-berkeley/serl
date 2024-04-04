@@ -273,8 +273,8 @@ def main(_):
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
-    env = RecordEpisodeStatistics(env)
     env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
+    env = RecordEpisodeStatistics(env)
 
     rng, sampling_rng = jax.random.split(rng)
     print(f"obs shape: {env.observation_space.sample().shape}")

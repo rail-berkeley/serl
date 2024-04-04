@@ -13,6 +13,7 @@ from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
+from gymnasium.wrappers import TransformReward
 from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
 
 exit_program = threading.Event()
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
+    env = TransformReward(env, lambda r: 10. * r)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
     obs, _ = env.reset()
@@ -91,7 +93,7 @@ if __name__ == "__main__":
                 print(
                     f"{rew}\tGot {success_count} successes of {total_count} trials. {success_needed} successes needed."
                 )
-                pbar.update(rew)
+                pbar.update(int(rew > 0.99))
                 obs, _ = env.reset()
 
         with open(file_path, "wb") as f:
