@@ -33,7 +33,7 @@ def on_esc(key):
 if __name__ == "__main__":
     env = gym.make("robotiq-grip-v1")
     env = SpacemouseIntervention(env)
-    # env = RelativeFrame(env)
+    env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
