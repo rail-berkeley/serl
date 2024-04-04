@@ -277,7 +277,7 @@ class RobotiqImpedanceController(threading.Thread):
             self._is_ready.set()
 
             while not self.stopped():
-                if self._reset.is_set() and self.curr_pos[2] < self.reset_height:
+                if self._reset.is_set() and self.curr_pos[2] < self.reset_height - 0.01:
                     # move up first, then in joint-space
                     self.target_pos[2] = self.reset_height
 
