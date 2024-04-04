@@ -131,7 +131,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.target_pos[:3] = target_pos[:3]
             self.target_pos[3:] = target_orientation
 
-        # print("target: ", self.target_pos)
+        self.print(f"target: {self.target_pos}")
 
     def set_reset_Q(self, reset_Q: np.ndarray):
         self._reset.set()
@@ -163,7 +163,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = force
-            self.gripper_state[:] = [pressure, float(obj_status.value)]
+            self.gripper_state[:] = [pressure / 100., float(obj_status.value)]      # pressure between [0, 1]
 
     def get_state(self):
         with self.lock:
@@ -316,7 +316,7 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
-                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}", probability=1.)      # output to file
+                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")      # output to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()
@@ -338,6 +338,7 @@ class RobotiqImpedanceController(threading.Thread):
                 time.sleep(max(0., a))
                 if a < 0:  # log how slow the loop runs
                     self.err += 1
+                    self.print(f"over dt: {-a:.5f} s")
                 else:
                     self.noerr += 1
 
