@@ -3,8 +3,9 @@ import numpy as np
 
 
 class RobotiqCornerConfig(DefaultEnvConfig):
-    RESET_Q = np.array([[1.38228, -1.24648, 1.9504, -2.2732, -1.5645, -0.18799]])
-    RANDOM_RESET = True
+    # RESET_Q = np.array([[1.38228, -1.24648, 1.9504, -2.2732, -1.5645, -0.18799]])     # old one
+    RESET_Q = np.array([[1.34231, -1.24585, 1.94961, -2.27267, -1.56428, -0.22641]])
+    RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.05,)
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
