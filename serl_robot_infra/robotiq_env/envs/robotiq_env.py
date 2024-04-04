@@ -124,11 +124,11 @@ class RobotiqEnv(gym.Env):
             verbose=True,
             plot=False
         )
-        print("controller started:  ", self.controller._started.is_set())
         self.controller.start()  # start Thread
 
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
+        print("[RIC] Controller has started and is ready!")
 
     def clip_safety_box(self,
                         next_pos: np.ndarray) -> np.ndarray:  # TODO make better, no euler -> quat -> euler -> quat
@@ -161,7 +161,7 @@ class RobotiqEnv(gym.Env):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
-        # next_pos = self.curr_pos.copy()
+        # next_pos = self.curr_pos.copy()       # TODO might be better with actual pos!
         next_pos = self.controller.get_target_pos()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
@@ -233,7 +233,6 @@ class RobotiqEnv(gym.Env):
 
         self._update_currpos()
         obs = self._get_obs()
-
         return obs, {}
 
     def _send_pos_command(self, target_pos: np.ndarray):
