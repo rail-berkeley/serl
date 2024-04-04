@@ -20,6 +20,7 @@ from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.data.data_store import populate_data_store
 
 from serl_launcher.wrappers.chunking import ChunkingWrapper
+from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
@@ -32,7 +33,7 @@ from serl_launcher.utils.launcher import (
 )
 
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper, BinaryRewardClassifierWrapper
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
 import robotiq_env
 
@@ -268,7 +269,7 @@ def main(_):
     )
     if FLAGS.actor:
         env = SpacemouseIntervention(env)
-    # env = RelativeFrame(env)
+    env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
