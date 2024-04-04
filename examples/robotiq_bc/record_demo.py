@@ -98,8 +98,8 @@ if __name__ == "__main__":
             pkl.dump(transitions, f)
             print(f"saved {success_needed} demos to {file_path}")
 
-    except KeyboardInterrupt:
-        print(f'\nProgram was interrupted, cleaning up...')
+    except KeyboardInterrupt as e:
+        print(f'\nProgram was interrupted, cleaning up...  ', e.__str__())
 
     finally:
         env.close()
