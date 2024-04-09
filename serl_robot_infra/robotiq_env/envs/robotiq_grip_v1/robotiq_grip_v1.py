@@ -11,7 +11,7 @@ class RobotiqGripV1(RobotiqEnv):
     def compute_reward(self, obs, action) -> float:
         # huge action gives negative reward (like in mountain car)
         neg_rew = -0.1 * np.sum(np.power(action, 2))
-        # neg_rew = 0.
+        # TODO maybe add neg reward for sucking too early
 
         if self.reached_goal_state(obs):
             return 10. + neg_rew
