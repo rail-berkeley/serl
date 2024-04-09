@@ -55,8 +55,8 @@ class RobotiqEnv(gym.Env):
 
         self.curr_pos = np.zeros((7,), dtype=np.float32)
         self.curr_vel = np.zeros((6,), dtype=np.float32)
-        self.Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
-        self.Qd = np.zeros((6,), dtype=np.float32)
+        self.curr_Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
+        self.curr_Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((3,), dtype=np.float32)
         self.curr_torque = np.zeros((3,), dtype=np.float32)
 
@@ -258,8 +258,8 @@ class RobotiqEnv(gym.Env):
         self.curr_vel[:] = state['vel']
         self.curr_force[:] = state['force']
         self.curr_torque[:] = state['torque']
-        self.Q[:] = state['Q']
-        self.Qd[:] = state['Qd']
+        self.curr_Q[:] = state['Q']
+        self.curr_Qd[:] = state['Qd']
         self.gripper_state[:] = state['gripper']
 
     def _is_truncated(self):
