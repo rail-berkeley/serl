@@ -347,6 +347,17 @@ class RobotiqImpedanceController(threading.Thread):
             # mandatory cleanup
             self.robotiq_control.forceModeStop()
 
+            # release gripper
+            if self.robotiq_gripper:
+                self.target_grip[0] = -1.
+                await self.send_gripper_command()
+                time.sleep(0.1)
+
+            # move to real home
+            pi = 3.1415
+            reset_Q = [pi / 2., -pi / 2., pi / 2., -pi / 2., -pi / 2., 0.]
+            self.robotiq_control.moveJ(reset_Q, speed=1., acceleration=0.5)
+
             # terminate
             self.robotiq_control.disconnect()
             self.robotiq_receive.disconnect()
