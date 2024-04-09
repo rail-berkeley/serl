@@ -21,4 +21,4 @@ class RobotiqGripV1(RobotiqEnv):
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
         state = obs["state"]
-        return 0.1 < state['gripper_state'][0] < 0.4 and state['tcp_force'][2] < -3.
+        return 0.1 < state['gripper_state'][0] < 0.8 and state['tcp_force'][2] < -3.
