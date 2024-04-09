@@ -60,15 +60,18 @@ flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the ser
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
-flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
+flags.DEFINE_integer("eval_n_trajs", 3, "Number of trajectories for evaluation.")
 
 # flag to indicate if this is a leaner or a actor
-flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")  # TODO change back!
+flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_integer("checkpoint_period", 10000, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/checkpoints',
                     "Path to save checkpoints.")
+
+flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
+flags.DEFINE_integer("eval_checkpoint_path", 0, "evaluate the policy from ckpt from this path")
 
 flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds',
                     "Path to save RLDS logs.")
@@ -90,6 +93,45 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     """
+    if FLAGS.eval_checkpoint_step:
+        success_counter = 0
+        time_list = []
+
+        ckpt = checkpoints.restore_checkpoint(
+            FLAGS.checkpoint_path,
+            agent.state,
+            step=FLAGS.eval_checkpoint_step,
+        )
+        agent = agent.replace(state=ckpt)
+
+        for episode in range(FLAGS.eval_n_trajs):
+            obs, _ = env.reset()
+            done = False
+            start_time = time.time()
+            while not done:
+                actions = agent.sample_actions(
+                    observations=jax.device_put(obs),
+                    argmax=True,
+                )
+                actions = np.asarray(jax.device_get(actions))
+
+                next_obs, reward, done, truncated, info = env.step(actions)
+                obs = next_obs
+
+                if done:
+                    if reward:
+                        dt = time.time() - start_time
+                        time_list.append(dt)
+                        print(dt)
+
+                    success_counter += int(reward > 0.99)
+                    print(reward)
+                    print(f"{success_counter}/{episode + 1}")
+
+        print(f"success rate: {success_counter / FLAGS.eval_n_trajs}")
+        print(f"average time: {np.mean(time_list)}")
+        return  # after done eval, return and exit
+
     client = TrainerClient(
         "actor_env",
         FLAGS.ip,
@@ -150,7 +192,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
             obs = next_obs
             if done or truncated:
-                print(f"running return: {running_return}   done:{done}  truncated:{truncated}")
+                # print(f"running return: {running_return}   done:{done}  truncated:{truncated}")
                 running_return = 0.0
                 obs, _ = env.reset()
 
@@ -276,9 +318,6 @@ def main(_):
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
     env = RecordEpisodeStatistics(env)
-    """
-    env = gym.make(FLAGS.env)
-    """
 
     rng, sampling_rng = jax.random.split(rng)
     print(f"obs shape: {env.observation_space.sample().shape}")

@@ -58,8 +58,8 @@ def make_bc_agent_no_img(
         network_kwargs={
             "activations": nn.tanh,
             "use_layer_norm": False,
-            # "hidden_dims": [256, 256],
-            "hidden_dims": [128, 64],
+            "hidden_dims": [256, 256],
+            # "hidden_dims": [128, 64],
         },
         policy_kwargs={
             "tanh_squash_distribution": False,

@@ -30,6 +30,8 @@ from serl_launcher.networks.reward_classifier import load_classifier_func
 # from franka_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
+from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
+
 import robotiq_env
 
 FLAGS = flags.FLAGS
@@ -45,10 +47,8 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("max_steps", 100000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity.")
 
-flags.DEFINE_multi_string("demo_paths", "robotiq_bc/robotiq_test_20_demos_2024-03-26_12-23-50.pkl",
-                          "paths to demos")
-flags.DEFINE_string("checkpoint_path", "/home/nico/real-world-rl/serl/examples/robotiq_bc/checkpoints",
-                    "Path to save checkpoints.")
+flags.DEFINE_multi_string("demo_paths", None, "paths to demos")
+flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
 
 flags.DEFINE_integer(
     "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
@@ -80,7 +80,7 @@ def main(_):
         fake_env=not FLAGS.eval_checkpoint_step,
     )
     env = SpacemouseIntervention(env)
-    # env = RelativeFrame(env)
+    env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
@@ -183,8 +183,8 @@ def main(_):
                 while not done:
                     actions = agent.sample_actions(
                         observations=jax.device_put(obs),
-                        argmax=False,
-                        seed=rng,
+                        argmax=True,
+                        # seed=rng,
                     )
                     actions = np.asarray(jax.device_get(actions))
                     print(f"sampled actions: {actions}")
