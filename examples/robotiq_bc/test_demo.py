@@ -44,7 +44,7 @@ if __name__ == "__main__":
     listener_2 = keyboard.Listener(on_press=on_esc, daemon=True)
     listener_2.start()
 
-    file_path = "robotiq_test_20_demos_2024-03-26_12-23-50.pkl"
+    file_path = "robotiq_test_20_demos_mar26_rew1.pkl.old"
 
     with open(file_path, "rb") as f:
         transitions = pkl.load(f)
