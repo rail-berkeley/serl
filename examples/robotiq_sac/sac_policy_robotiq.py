@@ -71,7 +71,7 @@ flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/r
                     "Path to save checkpoints.")
 
 flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
-flags.DEFINE_integer("eval_checkpoint_path", 0, "evaluate the policy from ckpt from this path")
+flags.DEFINE_string("eval_checkpoint_path", None, "evaluate the policy from ckpt from this path")
 
 flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds',
                     "Path to save RLDS logs.")
@@ -98,7 +98,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
         time_list = []
 
         ckpt = checkpoints.restore_checkpoint(
-            FLAGS.checkpoint_path,
+            FLAGS.eval_checkpoint_path,
             agent.state,
             step=FLAGS.eval_checkpoint_step,
         )
@@ -381,6 +381,8 @@ def main(_):
         # actor loop
         print_green("starting actor loop")
         actor(agent, data_store, env, sampling_rng)
+        print_green("actor loop finished")
+        env.close()
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")
