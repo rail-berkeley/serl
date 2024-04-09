@@ -385,7 +385,14 @@ class SACAgent(flax.struct.PyTreeNode):
         # Config
         assert not entropy_per_dim, "Not implemented"
         if target_entropy is None:
-            target_entropy = -actions.shape[-1] / 2
+            # target_entropy = -actions.shape[-1] / 2
+            print(f"actions shape: {actions.shape}")
+
+            # from https://github.com/NickKaparinos/OpenAI-Gym-Projects/blob/master/Classic%20Control/MountainCarContinuous/main.py:
+            # target_entropy = -np.prod(env.action_space.shape)
+            from numpy import prod
+            target_entropy = -prod(actions.shape)
+            print(f"target_entropy: {target_entropy}")
 
         return cls(
             state=state,

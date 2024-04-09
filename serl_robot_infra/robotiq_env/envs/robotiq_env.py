@@ -161,8 +161,8 @@ class RobotiqEnv(gym.Env):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
-        # next_pos = self.curr_pos.copy()       # TODO might be better with actual pos!
-        next_pos = self.controller.get_target_pos()
+        next_pos = self.curr_pos.copy()         # TODO might be better with actual pos (but will be delayed to target)
+        # next_pos = self.controller.get_target_pos()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
         # orientation
@@ -182,13 +182,16 @@ class RobotiqEnv(gym.Env):
         time.sleep(max(0, (1.0 / self.hz) - dt))
 
         self._update_currpos()
-        ob = self._get_obs()
-        reward = self.compute_reward(ob)
+        obs = self._get_obs()
+        reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
-        done = self.curr_path_length >= self.max_episode_length or (reward > 0.99)
-        return ob, int(reward), done, truncated, {}
+        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs)
+        return obs, reward, done, truncated, {}
 
-    def compute_reward(self, obs) -> bool:
+    def compute_reward(self, obs, action) -> float:
+        return 0.  # overwrite for each task
+
+    def reached_goal_state(self, obs) -> bool:
         return False  # overwrite for each task
 
     def go_to_rest(self, joint_reset=False):

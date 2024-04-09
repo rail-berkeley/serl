@@ -6,10 +6,10 @@ python sac_policy_robotiq.py "$@" \
     --exp_name=sac_robotiq_policy \
     --seed 0 \
     --max_steps 10000 \
-    --random_steps 600 \
-    --training_starts 600 \
+    --random_steps 0 \
+    --training_starts 0 \
     --utd_ratio 8 \
-    --batch_size 256 \
-    --eval_period 2000 \
-    --demo_paths "/home/nico/real-world-rl/serl/examples/robotiq_bc/robotiq_test_20_demos_2024-03-26_12-23-50.pkl" \
+    --batch_size 1024 \
+    --eval_period 1000 \
+    --reward_scale 1 \
 #    --debug

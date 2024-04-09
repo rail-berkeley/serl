@@ -117,15 +117,15 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
         with timer.context("sample_actions"):
             if step < FLAGS.random_steps:
-                print("sampling randomly!")
+                # print("sampling randomly!")
                 actions = env.action_space.sample()
             else:
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    # seed=key,
+                    seed=key,
                     # deterministic=False,
-                    argmax=True,  # TODO which one to use?
+                    argmax=False,  # TODO which one to use?
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -150,6 +150,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 
             obs = next_obs
             if done or truncated:
+                print(f"running return: {running_return}   done:{done}  truncated:{truncated}")
                 running_return = 0.0
                 obs, _ = env.reset()
 
@@ -223,7 +224,7 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
 
             with timer.context("train"):
                 if FLAGS.utd_ratio == 1:
-                    agent, update_info = agent.update(batch=batch)      # try it without utd
+                    agent, update_info = agent.update(batch=batch)  # try it without utd
                 else:
                     agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
                 agent = jax.block_until_ready(agent)
@@ -275,6 +276,9 @@ def main(_):
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
     env = RecordEpisodeStatistics(env)
+    """
+    env = gym.make(FLAGS.env)
+    """
 
     rng, sampling_rng = jax.random.split(rng)
     print(f"obs shape: {env.observation_space.sample().shape}")
@@ -311,7 +315,7 @@ def main(_):
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
 
-        if FLAGS.preload_rlds_path == None:
+        if FLAGS.preload_rlds_path is None and FLAGS.demo_paths is not None:
             print(f"loaded demos from {FLAGS.demo_paths}")  # load demo trajectories the old way
             replay_buffer = populate_data_store(replay_buffer, FLAGS.demo_paths, reward_scaling=FLAGS.reward_scale)
 

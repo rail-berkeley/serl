@@ -84,20 +84,20 @@ def make_sac_agent(seed, sample_obs, sample_action):
         critic_network_kwargs={
             "activations": nn.tanh,
             "use_layer_norm": True,
-            # "hidden_dims": [256, 256],        # TODO trying it with simpler network
-            "hidden_dims": [128, 64],
+            "hidden_dims": [256, 256],        # TODO trying it with simpler network
+            # "hidden_dims": [128, 64],
         },
         policy_network_kwargs={
             "activations": nn.tanh,
             "use_layer_norm": True,
-            # "hidden_dims": [256, 256],
-            "hidden_dims": [128, 64],
+            "hidden_dims": [256, 256],
+            # "hidden_dims": [128, 64],
         },
-        temperature_init=1e-2,
-        discount=0.95,                  # TODO maybe try 0.98 or lower (only 100 steps!)
+        temperature_init=1e-2,      #  1e-2
+        discount=0.99,                  # TODO maybe try 0.98 or lower (only 100 steps!)
         backup_entropy=False,
-    # critic_ensemble_size=10,          # isREDQ with these
-        # critic_subsample_size=2,
+        critic_ensemble_size=10,          # isREDQ with these
+        critic_subsample_size=2,
     )
 
 
