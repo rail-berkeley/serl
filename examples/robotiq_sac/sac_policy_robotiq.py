@@ -199,7 +199,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
         if step % FLAGS.steps_per_update == 0:
             client.update()
 
-        if step % FLAGS.eval_period == 0:
+        if step % FLAGS.eval_period == 0 and step:
             with timer.context("eval"):
                 evaluate_info = evaluate(
                     policy_fn=partial(agent.sample_actions, argmax=True),
@@ -380,9 +380,13 @@ def main(_):
 
         # actor loop
         print_green("starting actor loop")
-        actor(agent, data_store, env, sampling_rng)
-        print_green("actor loop finished")
-        env.close()
+        try:
+            actor(agent, data_store, env, sampling_rng)
+            print_green("actor loop finished")
+        except KeyboardInterrupt:
+            print_green("actor loop interrupted")
+        finally:
+            env.close()
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")
