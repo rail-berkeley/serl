@@ -60,7 +60,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
 
         self.reset_Q = np.zeros((6,), dtype=np.float32)  # reset state in Joint Space
-        self.reset_height = np.array([0.06], dtype=np.float32)      # TODO make customizable
+        self.reset_height = np.array([0.1], dtype=np.float32)      # TODO make customizable
         self._is_truncated = False
 
         self.delta = config.ERROR_DELTA
