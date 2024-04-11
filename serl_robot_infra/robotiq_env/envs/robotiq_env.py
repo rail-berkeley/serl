@@ -17,7 +17,7 @@ from robot_controllers.robotiq_controller import RobotiqImpedanceController
 class DefaultEnvConfig:
     """Default configuration for RobotiqEnv. Fill in the values below."""
 
-    RESET_Q = np.zeros((6,))
+    RESET_Q = np.zeros((6, ))
     RANDOM_RESET = (False,)
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
@@ -202,7 +202,14 @@ class RobotiqEnv(gym.Env):
         """
 
         # Perform Carteasian reset
-        reset_Q = self.resetQ.copy()
+        reset_Q = np.zeros((6))
+        if self.resetQ.shape == (6, ):
+            reset_Q[:] = self.resetQ.copy()
+        elif self.resetQ.shape[1] == 6 and len(self.resetQ.shape) == 2:
+            choice = np.random.randint(self.resetQ.shape[0])
+            reset_Q[:] = self.resetQ[choice, :].copy()         # make random guess
+        else:
+            raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
         self._send_reset_command(reset_Q)
 
@@ -215,9 +222,9 @@ class RobotiqEnv(gym.Env):
         if self.random_reset:  # randomize reset position in xy plane
             # reset_pose = self.resetpos.copy()
             reset_pose = self.controller.get_target_pos()
-            reset_pose[:2] += np.random.uniform(
-                np.negative(self.random_xy_range), self.random_xy_range, (2,)
-            )
+            reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
+            reset_pose[:2] += reset_shift
+
             # euler_random = reset_pose[3:]
             # euler_random[-1] += np.random.uniform(
             #     np.negative(self.random_rz_range), self.random_rz_range
@@ -227,16 +234,19 @@ class RobotiqEnv(gym.Env):
                 time.sleep(0.1)
                 if not self.controller.is_moving():
                     break
+            return reset_shift
+        else:
+            return np.zeros((2,))
 
     def reset(self, joint_reset=False, **kwargs):
         self.cycle_count += 1
 
-        self.go_to_rest(joint_reset=joint_reset)
+        shift = self.go_to_rest(joint_reset=joint_reset)
         self.curr_path_length = 0
 
         self._update_currpos()
         obs = self._get_obs()
-        return obs, {}
+        return obs, {"reset_shift": shift}
 
     def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""
