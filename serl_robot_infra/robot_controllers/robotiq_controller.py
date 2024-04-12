@@ -298,7 +298,6 @@ class RobotiqImpedanceController(threading.Thread):
         await self.start_robotiq_interfaces(gripper=True)
 
         self.robotiq_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
-        self.start_t = time.monotonic()
 
         try:
             dt = 1. / self.frequency
