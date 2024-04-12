@@ -30,7 +30,7 @@ from serl_launcher.networks.reward_classifier import load_classifier_func
 # from franka_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
-from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
+from robotiq_env.envs.relative_env import RelativeFrame
 
 import robotiq_env
 

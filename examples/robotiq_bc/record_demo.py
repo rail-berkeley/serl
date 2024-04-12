@@ -14,7 +14,7 @@ from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
 from gymnasium.wrappers import TransformReward
-from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
+from robotiq_env.envs.relative_env import RelativeFrame
 
 exit_program = threading.Event()
 
