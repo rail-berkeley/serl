@@ -213,10 +213,8 @@ class RobotiqEnv(gym.Env):
 
         self._send_reset_command(reset_Q)
 
-        while True:
-            time.sleep(0.1)
-            if self.controller.is_reset():
-                break  # wait for reset
+        while not self.controller.is_reset():
+            time.sleep(0.1)     # wait for the reset operation
 
         self._update_currpos()
         if self.random_reset:  # randomize reset position in xy plane
@@ -230,10 +228,8 @@ class RobotiqEnv(gym.Env):
             #     np.negative(self.random_rz_range), self.random_rz_range
             # )
             self.controller.set_target_pos(reset_pose)  # random movement after resetting
-            while True:
+            while self.controller.is_moving():
                 time.sleep(0.1)
-                if not self.controller.is_moving():
-                    break
             return reset_shift
         else:
             return np.zeros((2,))

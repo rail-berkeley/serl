@@ -40,13 +40,14 @@ class RobotiqImpedanceController(threading.Thread):
         self._stop = threading.Event()
         self._reset = threading.Event()
         self._is_ready = threading.Event()
+        self._is_truncated = threading.Event()
         self.lock = threading.Lock()
 
         self.robot_ip = robot_ip
         self.frequency = frequency
         self.kp = kp
         self.kd = kd
-        self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic()-1e6}
+        self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic() - 1e6}
         self.verbose = verbose
         self.do_plot = plot
 
@@ -60,8 +61,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
 
         self.reset_Q = np.zeros((6,), dtype=np.float32)  # reset state in Joint Space
-        self.reset_height = np.array([0.1], dtype=np.float32)      # TODO make customizable
-        self._is_truncated = False
+        self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
         self.delta = config.ERROR_DELTA
         self.fm_damping = config.FORCEMODE_DAMPING
@@ -88,9 +88,11 @@ class RobotiqImpedanceController(threading.Thread):
         if self.verbose:
             print(f"[RIC] Controller process spawned at {self.native_id}")
 
-    def print(self, msg, probability=1.):
+    def print(self, msg, probability=1., both=False):
         if np.random.random() < probability:
             self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
+            if both:
+                print(msg)
 
     async def start_robotiq_interfaces(self, gripper=True):
         for _ in range(5):  # try it 5 times
@@ -134,9 +136,9 @@ class RobotiqImpedanceController(threading.Thread):
         self.print(f"target: {self.target_pos}")
 
     def set_reset_Q(self, reset_Q: np.ndarray):
-        self._reset.set()
         with self.lock:
             self.reset_Q[:] = reset_Q
+        self._reset.set()
 
     def set_gripper_pos(self, target_grip: np.ndarray):
         with self.lock:
@@ -163,7 +165,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = force
-            self.gripper_state[:] = [pressure / 100., float(obj_status.value)]      # pressure between [0, 1]
+            self.gripper_state[:] = [pressure / 100., float(obj_status.value)]  # pressure between [0, 1]
 
     def get_state(self):
         with self.lock:
@@ -234,7 +236,8 @@ class RobotiqImpedanceController(threading.Thread):
         self.stop()
 
     async def send_gripper_command(self):
-        timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout["timeout"]
+        timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout[
+            "timeout"]
         if self.target_grip[0] > 0.5 and timeout_exceeded:
             await self.robotiq_gripper.automatic_grip()
             self.target_grip[0] = 0.0
@@ -247,19 +250,49 @@ class RobotiqImpedanceController(threading.Thread):
             # print("release")
 
     def _truncate_check(self):
-        if self.curr_force[2] > 10.:     # TODO add better criteria
-            self._is_truncated = True
+        downward_force = self.curr_force[2] > 10
+        if downward_force:  # TODO add better criteria
+            self._is_truncated.set()
         else:
-            self._is_truncated = False
+            self._is_truncated.clear()
 
     def is_truncated(self):
-        return self._is_truncated
+        return self._is_truncated.is_set()
 
     def run(self):
         try:
             asyncio.run(self.run_async())  # gripper has to be awaited, both init and commands
         finally:
             self.stop()
+
+    async def _go_to_reset_pose(self):
+        self.robotiq_control.forceModeStop()
+
+        # first disable vaccum gripper
+        if self.robotiq_gripper:
+            self.target_grip[0] = -1.
+            await self.send_gripper_command()
+            time.sleep(0.1)
+
+        # then move up (so no boxes are moved)
+        while self.curr_pos[2] < self.reset_height:
+            assert self.robotiq_control.speedL([0., 0., 0.25, 0., 0., 0.], acceleration=0.8)
+            await self._update_robot_state()
+            time.sleep(0.01)
+        self.robotiq_control.speedStop(a=1.)
+
+        # then move to desired Jointspace position
+        assert self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.8)
+        self.print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)", both=self.verbose)
+
+        await self._update_robot_state()
+        with self.lock:
+            self.target_pos = self.curr_pos.copy()
+
+        self.robotiq_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
+        self.robotiq_control.zeroFtSensor()
+
+        self._reset.clear()
 
     async def run_async(self):
         await self.start_robotiq_interfaces(gripper=True)
@@ -277,35 +310,12 @@ class RobotiqImpedanceController(threading.Thread):
             self._is_ready.set()
 
             while not self.stopped():
-                if self._reset.is_set() and self.curr_pos[2] < self.reset_height - 0.01:
-                    # move up first, then in joint-space
-                    self.target_pos[2] = self.reset_height
-
-                elif self._reset.is_set() and not self.is_moving():  # move to reset joint space pose with moveJ
-                    # first disable vaccum gripper
-                    if self.robotiq_gripper:
-                        self.target_grip[0] = -1.
-                        await self.send_gripper_command()
-                        time.sleep(0.1)
-
-                    # then move to Jointspace position
-                    print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)")
-                    self.robotiq_control.forceModeStop()
-                    self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.5)
-                    self.print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)")
-
-                    await self._update_robot_state()
-                    with self.lock:
-                        self.target_pos = self.curr_pos.copy()
-
-                    self.robotiq_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
-                    self.robotiq_control.zeroFtSensor()
-
-                    self._reset.clear()
+                if self._reset.is_set():
+                    await self._go_to_reset_pose()
 
                 t_now = time.monotonic()
 
-                # update robot state
+                # update robot state and check for truncation
                 await self._update_robot_state()
                 self._truncate_check()
 
@@ -316,18 +326,24 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
-                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")      # output to file
+                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")  # log to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()
-                assert self.robotiq_control.forceMode(
+                fm_successful = self.robotiq_control.forceMode(
                     self.fm_task_frame,
                     self.fm_selection_vector,
                     force,
                     2,
                     self.fm_limits
                 )
-                # TODO try to reset with moveJ if forcemode returns False
+                if not fm_successful:  # truncate if the robot ends up in a singularity
+                    self._is_truncated.set()
+
+                    # disconnect and reconnect, otherwise the controller won't take any commands
+                    self.robotiq_control.disconnect()
+                    time.sleep(0.5)
+                    self.robotiq_control.reconnect()
 
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
@@ -336,14 +352,11 @@ class RobotiqImpedanceController(threading.Thread):
 
                 a = dt - (time.monotonic() - t_now)
                 time.sleep(max(0., a))
-                if a < 0:  # log how slow the loop runs
-                    self.err += 1
-                    self.print(f"over dt: {-a:.5f} s")
-                else:
-                    self.noerr += 1
+                self.err, self.noerr = self.err + int(a < 0.), self.noerr + int(a >= 0.)    # some logging
 
         finally:
-            print(f"[RTDEPositionalController] >dt: {self.err}     <dt (good): {self.noerr}")
+            if self.verbose:
+                print(f"[RTDEPositionalController] >dt: {self.err}     <dt (good): {self.noerr}")
             # mandatory cleanup
             self.robotiq_control.forceModeStop()
 
@@ -356,7 +369,7 @@ class RobotiqImpedanceController(threading.Thread):
             # move to real home
             pi = 3.1415
             reset_Q = [pi / 2., -pi / 2., pi / 2., -pi / 2., -pi / 2., 0.]
-            self.robotiq_control.moveJ(reset_Q, speed=1., acceleration=0.5)
+            self.robotiq_control.moveJ(reset_Q, speed=1., acceleration=0.8)
 
             # terminate
             self.robotiq_control.disconnect()
