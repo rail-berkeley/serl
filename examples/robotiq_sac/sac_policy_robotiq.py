@@ -20,7 +20,7 @@ from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.data.data_store import populate_data_store
 
 from serl_launcher.wrappers.chunking import ChunkingWrapper
-from franka_env.envs.relative_env import RelativeFrame  # TODO make robotiq_env
+from robotiq_env.envs.relative_env import RelativeFrame
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
@@ -145,7 +145,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
         nonlocal agent
         agent = agent.replace(state=agent.state.replace(params=params))
 
-    client.recv_network_callback(update_params)  # TODO RLDS does not load
+    client.recv_network_callback(update_params)
 
     obs, _ = env.reset()
     print(f"obs:  {obs}")
@@ -166,8 +166,8 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     seed=key,
-                    # deterministic=False,
-                    argmax=False,  # TODO which one to use?
+                    argmax=False,
+                    # deterministic=False,              # sample without argmax for more diverse actions
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -311,7 +311,7 @@ def main(_):
         max_episode_length=FLAGS.max_traj_length,
     )
     if FLAGS.actor:
-        env = SpacemouseIntervention(env)
+        env = SpacemouseIntervention(env)       # TODO really needed?
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
