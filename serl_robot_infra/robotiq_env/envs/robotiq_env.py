@@ -1,14 +1,42 @@
 """Gym Interface for Robotiq"""
 
+import time
+import threading
+import copy
 import numpy as np
 import gymnasium as gym
-import copy
-import time
+import cv2
+import queue
 from typing import Dict
+from datetime import datetime
+from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
+
+from franka_env.camera.video_capture import VideoCapture
+from franka_env.camera.rs_capture import RSCapture      # TODO make robotiq (both)
 
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
+
+
+class ImageDisplayer(threading.Thread):
+    def __init__(self, queue):
+        threading.Thread.__init__(self)
+        self.queue = queue
+        self.daemon = True  # make this a daemon thread
+
+    def run(self):
+        while True:
+            img_array = self.queue.get()  # retrieve an image from the queue
+            if img_array is None:  # None is our signal to exit
+                break
+
+            frame = np.concatenate(
+                [v for k, v in img_array.items() if "full" not in k], axis=0
+            )
+
+            cv2.imshow("RealSense Cameras", frame)
+            cv2.waitKey(1)
 
 
 ##############################################################################
@@ -17,7 +45,7 @@ from robot_controllers.robotiq_controller import RobotiqImpedanceController
 class DefaultEnvConfig:
     """Default configuration for RobotiqEnv. Fill in the values below."""
 
-    RESET_Q = np.zeros((6, ))
+    RESET_Q = np.zeros((6,))
     RANDOM_RESET = (False,)
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
@@ -34,6 +62,11 @@ class DefaultEnvConfig:
     FORCEMODE_SELECTION_VECTOR = np.ones(6, )
     FORCEMODE_LIMITS = np.zeros(6, )
 
+    REALSENSE_CAMERAS: Dict = {
+        "shoulder": "",
+        "wrist": "",
+    }
+
 
 ##############################################################################
 
@@ -44,7 +77,8 @@ class RobotiqEnv(gym.Env):
             hz: int = 10,
             fake_env=False,
             config=DefaultEnvConfig,
-            max_episode_length: int = 100
+            max_episode_length: int = 100,
+            save_video=False,
     ):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -66,6 +100,11 @@ class RobotiqEnv(gym.Env):
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
+
+        if save_video:
+            print("Saving videos!")
+        self.save_video = save_video
+        self.recording_frames = []
 
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
@@ -95,17 +134,17 @@ class RobotiqEnv(gym.Env):
                         "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
-                )
-                # "images": gym.spaces.Dict(        # Images are ignored for now
-                #     {
-                #         "wrist_1": gym.spaces.Box(
-                #             0, 255, shape=(128, 128, 3), dtype=np.uint8
-                #         ),
-                #         "wrist_2": gym.spaces.Box(
-                #             0, 255, shape=(128, 128, 3), dtype=np.uint8
-                #         ),
-                #     }
-                # ),
+                ),
+                "images": gym.spaces.Dict(  # TODO add depth info
+                    {
+                        "shoulder": gym.spaces.Box(
+                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                        ),
+                        "wrist": gym.spaces.Box(
+                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                        ),
+                    }
+                ),
             }
         )
         self.cycle_count = 0
@@ -125,6 +164,12 @@ class RobotiqEnv(gym.Env):
             plot=False
         )
         self.controller.start()  # start Thread
+
+        self.cap = None
+        self.init_cameras(config.REALSENSE_CAMERAS)
+        self.img_queue = queue.Queue()
+        self.displayer = ImageDisplayer(self.img_queue)
+        self.displayer.start()
 
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
@@ -161,7 +206,7 @@ class RobotiqEnv(gym.Env):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
-        next_pos = self.curr_pos.copy()         # TODO might be better with actual pos (but will be delayed to target)
+        next_pos = self.curr_pos.copy()  # TODO might be better with actual pos (but will be delayed to target)
         # next_pos = self.controller.get_target_pos()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
@@ -203,18 +248,18 @@ class RobotiqEnv(gym.Env):
 
         # Perform Carteasian reset
         reset_Q = np.zeros((6))
-        if self.resetQ.shape == (6, ):
+        if self.resetQ.shape == (6,):
             reset_Q[:] = self.resetQ.copy()
         elif self.resetQ.shape[1] == 6 and len(self.resetQ.shape) == 2:
             choice = np.random.randint(self.resetQ.shape[0])
-            reset_Q[:] = self.resetQ[choice, :].copy()         # make random guess
+            reset_Q[:] = self.resetQ[choice, :].copy()  # make random guess
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
         self._send_reset_command(reset_Q)
 
         while not self.controller.is_reset():
-            time.sleep(0.1)     # wait for the reset operation
+            time.sleep(0.1)  # wait for the reset operation
 
         self._update_currpos()
         if self.random_reset:  # randomize reset position in xy plane
@@ -243,6 +288,80 @@ class RobotiqEnv(gym.Env):
         self._update_currpos()
         obs = self._get_obs()
         return obs, {"reset_shift": shift}
+
+    def save_video_recording(self):
+        try:
+            if len(self.recording_frames):
+                video_writer = cv2.VideoWriter(
+                    f'./videos/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4',
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    10,
+                    self.recording_frames[0].shape[:2][::-1],
+                )
+                for frame in self.recording_frames:
+                    video_writer.write(frame)
+                video_writer.release()
+            self.recording_frames.clear()
+        except Exception as e:
+            print(f"Failed to save video: {e}")
+
+    def init_cameras(self, name_serial_dict=None):
+        """Init both cameras."""
+        if self.cap is not None:  # close cameras if they are already open
+            self.close_cameras()
+
+        self.cap = OrderedDict()
+        for cam_name, cam_serial in name_serial_dict.items():
+            cap = VideoCapture(
+                RSCapture(name=cam_name, serial_number=cam_serial, depth=False)
+            )
+            self.cap[cam_name] = cap
+
+    def crop_image(self, name, image) -> np.ndarray:
+        """Crop realsense images to be a square."""
+        if name == "wrist_1":
+            return image[:, 80:560, :]
+        elif name == "wrist_2":
+            return image[:, 80:560, :]
+        else:
+            raise ValueError(f"Camera {name} not recognized in cropping")
+
+    def get_im(self) -> Dict[str, np.ndarray]:
+        """Get images from the realsense cameras."""
+        images = {}
+        display_images = {}
+        for key, cap in self.cap.items():
+            try:
+                rgb = cap.read()
+                cropped_rgb = self.crop_image(key, rgb)
+                resized = cv2.resize(
+                    cropped_rgb, self.observation_space["images"][key].shape[:2][::-1]
+                )
+                images[key] = resized[..., ::-1]
+                display_images[key] = resized
+                display_images[key + "_full"] = cropped_rgb
+            except queue.Empty:
+                input(
+                    f"{key} camera frozen. Check connect, then press enter to relaunch..."
+                )
+                cap.close()
+                self.init_cameras(self.config.REALSENSE_CAMERAS)
+                return self.get_im()
+
+        self.recording_frames.append(
+            np.concatenate([display_images[f"{k}_full"] for k in self.cap], axis=0)
+        )
+        self.img_queue.put(display_images)
+        return images
+
+    def close_cameras(self):
+        """Close both wrist cameras."""
+        try:
+            for cap in self.cap.values():
+                cap.close()
+        except Exception as e:
+            print(f"Failed to close cameras: {e}")
+
 
     def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""
