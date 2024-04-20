@@ -202,14 +202,17 @@ class SpacemouseIntervention(gym.ActionWrapper):
             expert_a = np.concatenate((expert_a, gripper_action), axis=0)
 
         if time.time() - self.last_intervene < 0.5:
-            return expert_a
+            return expert_a, True
 
-        return action
+        return action, False
 
     def step(self, action):
-        new_action = self.action(action)
+
+        new_action, replaced = self.action(action)
+
         obs, rew, done, truncated, info = self.env.step(new_action)
-        info["intervene_action"] = new_action
+        if replaced:
+            info["intervene_action"] = new_action
         info["left"] = self.left
         info["right"] = self.right
         return obs, rew, done, truncated, info
