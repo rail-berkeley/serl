@@ -23,7 +23,9 @@ class RelativeFrame(gym.Wrapper):
             }
         ),
         ......
-    }, and at least 6 DoF action space with (x, y, z, rx, ry, rz, ...)
+    }, and at least 6 DoF action space with (x, y, z, rx, ry, rz, ...).
+    By convention, the 7th dimension of the action space is used for the gripper.
+
     """
 
     def __init__(self, env: Env, include_relative_pose=True):
