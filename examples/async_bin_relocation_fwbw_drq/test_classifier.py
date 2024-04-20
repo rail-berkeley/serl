@@ -55,8 +55,10 @@ if __name__ == "__main__":
     obs, _ = env.reset()
 
     for i in tqdm(range(1000)):
-        next_obs, rew, done, truncated, info = env.step(action=np.zeros((7,)))
-        actions = info["intervene_action"]
+        actions = np.zeros((7,))
+        next_obs, rew, done, truncated, info = env.step(action=actions)
+        if "intervene_action" in info:
+            actions = info["intervene_action"]
 
         obs = next_obs
 
