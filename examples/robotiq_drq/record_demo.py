@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     transitions = []
     success_count = 0
-    success_needed = 3
+    success_needed = 20
     total_count = 0
     pbar = tqdm(total=success_needed)
 

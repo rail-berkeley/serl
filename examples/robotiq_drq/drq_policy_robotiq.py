@@ -12,7 +12,6 @@ from absl import app, flags
 from flax.training import checkpoints
 from datetime import datetime
 
-
 import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
@@ -32,14 +31,10 @@ from serl_launcher.utils.launcher import (
 )
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-from franka_env.envs.relative_env import RelativeFrame
-from franka_env.envs.wrappers import (
-    GripperCloseEnv,
-    SpacemouseIntervention,
-    Quat2EulerWrapper,
-)
+from robotiq_env.envs.relative_env import RelativeFrame
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
-import franka_env
+import robotiq_env
 
 devices = jax.local_devices()
 num_devices = len(devices)
@@ -74,7 +69,8 @@ flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
-flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_drq/checkpoints', "Path to save checkpoints.")
+flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_drq/checkpoints',
+                    "Path to save checkpoints.")
 
 flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
 flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
@@ -86,6 +82,7 @@ flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
 )  # debug mode will disable wandb logging
+
 
 def print_green(x):
     return print("\033[92m {}\033[00m".format(x))
@@ -113,6 +110,7 @@ listener = pynput.keyboard.Listener(
     on_press=pause_callback
 )  # to enable keyboard based pause
 listener.start()
+
 
 ##############################################################################
 
@@ -423,7 +421,7 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
     rng, sampling_rng = jax.random.split(rng)
-    print(f"obs shape: {env.observation_space.sample().shape}")
+    # print(f"obs shape: {env.observation_space.sample().shape}")
     agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),

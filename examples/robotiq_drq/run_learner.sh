@@ -12,4 +12,5 @@ python drq_policy_robotiq.py "$@" \
     --eval_period 1000 \
     --encoder_type resnet-pretrained \
     --checkpoint_period 10000 \
-    --demo_path TODO \
+    --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/pcb_insert_20_demos_apr23_firstwithcam.pkl \
+    --debug

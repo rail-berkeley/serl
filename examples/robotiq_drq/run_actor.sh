@@ -13,3 +13,4 @@ python drq_policy_robotiq.py "$@" \
     --batch_size 512 \
     --eval_period 1000 \
     --encoder_type resnet-pretrained \
+    --debug

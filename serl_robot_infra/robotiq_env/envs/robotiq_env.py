@@ -286,8 +286,10 @@ class RobotiqEnv(gym.Env):
             #     np.negative(self.random_rz_range), self.random_rz_range
             # )
             self.controller.set_target_pos(reset_pose)  # random movement after resetting
+            time.sleep(0.1)
             while self.controller.is_moving():
                 time.sleep(0.1)
+            print(reset_shift, reset_pose)
             return reset_shift
         else:
             return np.zeros((2,))
