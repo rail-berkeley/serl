@@ -13,8 +13,9 @@ from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
 
 from franka_env.camera.video_capture import VideoCapture
-from franka_env.camera.rs_capture import RSCapture      # TODO make robotiq (both)
+from franka_env.camera.rs_capture import RSCapture  # TODO make robotiq (both)
 
+from robotiq_env.utils.real_time_plotter import DataClient
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
@@ -34,7 +35,8 @@ class ImageDisplayer(threading.Thread):
             frame = np.concatenate(
                 [v for k, v in img_array.items() if "full" not in k], axis=0
             )
-
+            cv2.namedWindow("RealSense Cameras", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("RealSense Cameras", 300, 700)
             cv2.imshow("RealSense Cameras", frame)
             cv2.waitKey(1)
 
@@ -79,6 +81,7 @@ class RobotiqEnv(gym.Env):
             config=DefaultEnvConfig,
             max_episode_length: int = 100,
             save_video=False,
+            realtime_plot=False,
     ):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -105,6 +108,8 @@ class RobotiqEnv(gym.Env):
             print("Saving videos!")
         self.save_video = save_video
         self.recording_frames = []
+
+        self.realtime_plot = realtime_plot
 
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
@@ -135,7 +140,7 @@ class RobotiqEnv(gym.Env):
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
                 ),
-                "images": gym.spaces.Dict(  # TODO add depth info
+                "images": gym.spaces.Dict(  # TODO add depth info, or make bigger (only 128x128x3)
                     {
                         "shoulder": gym.spaces.Box(
                             0, 255, shape=(128, 128, 3), dtype=np.uint8
@@ -170,6 +175,14 @@ class RobotiqEnv(gym.Env):
         self.img_queue = queue.Queue()
         self.displayer = ImageDisplayer(self.img_queue)
         self.displayer.start()
+        print("[CAM] Cameras are ready!")
+
+        if self.realtime_plot:
+            try:
+                self.plotting_client = DataClient()
+            except ConnectionRefusedError:
+                print("Plotting Client could not be opened, continuing without plotting")
+                self.realtime_plot = False
 
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
@@ -248,9 +261,9 @@ class RobotiqEnv(gym.Env):
 
         # Perform Carteasian reset
         reset_Q = np.zeros((6))
-        if self.resetQ.shape == (6,):
+        if self.resetQ.shape == (1, 6):
             reset_Q[:] = self.resetQ.copy()
-        elif self.resetQ.shape[1] == 6 and len(self.resetQ.shape) == 2:
+        elif self.resetQ.shape[1] == 6 and self.resetQ.shape[0] > 1:
             choice = np.random.randint(self.resetQ.shape[0])
             reset_Q[:] = self.resetQ[choice, :].copy()  # make random guess
         else:
@@ -281,6 +294,8 @@ class RobotiqEnv(gym.Env):
 
     def reset(self, joint_reset=False, **kwargs):
         self.cycle_count += 1
+        if self.save_video:
+            self.save_video_recording()
 
         shift = self.go_to_rest(joint_reset=joint_reset)
         self.curr_path_length = 0
@@ -293,7 +308,7 @@ class RobotiqEnv(gym.Env):
         try:
             if len(self.recording_frames):
                 video_writer = cv2.VideoWriter(
-                    f'./videos/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4',
+                    f'/home/nico/real-world-rl/spacemouse_tests/videos/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4',
                     cv2.VideoWriter_fourcc(*"mp4v"),
                     10,
                     self.recording_frames[0].shape[:2][::-1],
@@ -312,6 +327,7 @@ class RobotiqEnv(gym.Env):
 
         self.cap = OrderedDict()
         for cam_name, cam_serial in name_serial_dict.items():
+            print(f"cam serial: {cam_serial}")
             cap = VideoCapture(
                 RSCapture(name=cam_name, serial_number=cam_serial, depth=False)
             )
@@ -319,10 +335,10 @@ class RobotiqEnv(gym.Env):
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
-        if name == "wrist_1":
-            return image[:, 80:560, :]
-        elif name == "wrist_2":
-            return image[:, 80:560, :]
+        if name == "wrist":
+            return image[:, 184:664, :]
+        elif name == "shoulder":
+            return image[:, 184:664, :]
         else:
             raise ValueError(f"Camera {name} not recognized in cropping")
 
@@ -362,7 +378,6 @@ class RobotiqEnv(gym.Env):
         except Exception as e:
             print(f"Failed to close cameras: {e}")
 
-
     def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""
         self.controller.set_target_pos(target_pos=target_pos)
@@ -391,6 +406,7 @@ class RobotiqEnv(gym.Env):
         return self.controller.is_truncated()
 
     def _get_obs(self) -> dict:
+        images = self.get_im()
         state_observation = {
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
@@ -398,7 +414,10 @@ class RobotiqEnv(gym.Env):
             "tcp_force": self.curr_force,
             "tcp_torque": self.curr_torque,
         }
-        return copy.deepcopy(dict(state=state_observation))
+        if self.realtime_plot:
+            self.plotting_client.send(np.concatenate([self.curr_force, self.curr_torque]))
+
+        return copy.deepcopy(dict(images=images, state=state_observation))
 
     def close(self):
         if self.controller:
