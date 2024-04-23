@@ -104,6 +104,7 @@ if __name__ == "__main__":
         print(f'\nProgram was interrupted, cleaning up...  ', e.__str__())
 
     finally:
+        pbar.close()
         env.close()
         listener_1.stop()
         listener_2.stop()

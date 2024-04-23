@@ -198,7 +198,7 @@ class ResNetEncoder(nn.Module):
     norm: str = "group"
     add_spatial_coordinates: bool = False
     pooling_method: str = "avg"
-    use_spatial_softmax: bool = False
+    # use_spatial_softmax: bool = False
     softmax_temperature: float = 1.0
     use_multiplicative_cond: bool = False
     num_spatial_blocks: int = 8
@@ -323,7 +323,7 @@ class ResNetEncoder(nn.Module):
 
 class PreTrainedResNetEncoder(nn.Module):
     pooling_method: str = "avg"
-    use_spatial_softmax: bool = False
+    # use_spatial_softmax: bool = False
     softmax_temperature: float = 1.0
     num_spatial_blocks: int = 8
     bottleneck_dim: Optional[int] = None

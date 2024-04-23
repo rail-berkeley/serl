@@ -1,5 +1,7 @@
 import gymnasium as gym
 import numpy as np
+from agentlace import action
+
 from robotiq_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 import time
 from scipy.spatial.transform import Rotation as R
@@ -72,6 +74,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
         z_rot = R.from_rotvec(np.array([0, 0, z_angle]))
         action[:6] *= self.invert_axes  # if some want to be inverted
         action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
+
+        # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
         action[3:6] = z_rot.inv().apply(action[3:6])  # z rotation invariant rotation
 
         return action

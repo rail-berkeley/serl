@@ -75,7 +75,7 @@ flags.DEFINE_string("eval_checkpoint_path", None, "evaluate the policy from ckpt
 
 flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds',
                     "Path to save RLDS logs.")
-flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")  # TODO does not work yet
+flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
