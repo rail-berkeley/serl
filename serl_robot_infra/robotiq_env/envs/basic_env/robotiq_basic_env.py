@@ -1,7 +1,7 @@
 import numpy as np
 
 from robotiq_env.envs.robotiq_env import RobotiqEnv
-from robotiq_env.envs.robotiq_grip_v1.config import RobotiqCornerConfig
+from robotiq_env.envs.basic_env.config import RobotiqCornerConfig
 
 
 # used for float value comparisons (pressure of vacuum-gripper)
@@ -9,7 +9,7 @@ def is_close(value, target):
     return abs(value - target) < 1e-4
 
 
-class RobotiqGripV1(RobotiqEnv):
+class RobotiqBasicEnv(RobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=RobotiqCornerConfig)
 
