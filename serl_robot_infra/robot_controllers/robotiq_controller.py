@@ -164,7 +164,8 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
-            self.curr_force[:] = force
+            # use moving average (5), since the force fluctuates heavily
+            self.curr_force[:] = 0.2 * np.array(force) + 0.8 * self.curr_force[:]
             self.gripper_state[:] = [pressure / 100., float(obj_status.value)]  # pressure between [0, 1]
 
     def get_state(self):
