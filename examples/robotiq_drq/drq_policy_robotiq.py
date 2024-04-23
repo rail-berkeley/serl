@@ -52,7 +52,7 @@ flags.DEFINE_integer("batch_size", 512, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
+flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
