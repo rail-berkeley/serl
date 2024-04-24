@@ -62,7 +62,9 @@ class Critic(nn.Module):
             obs_enc = self.encoder(observations)
 
         inputs = jnp.concatenate([obs_enc, actions], -1)
-        outputs = self.network(inputs, train=train)
+        outputs = self.network(inputs, train)
+        # train=train throws: "RuntimeWarning: kwargs are not supported in vmap, so "train" is(are) ignored"
+
         if self.init_final is not None:
             value = nn.Dense(
                 1,
@@ -179,6 +181,8 @@ class Policy(nn.Module):
     def __call__(
         self, observations: jnp.ndarray, temperature: float = 1.0, train: bool = False
     ) -> distrax.Distribution:
+        info_dict = {key:value.shape for key, value in observations.items()}
+        # print(f"policy observations shape: {info_dict}")        # TODO remove
         if self.encoder is None:
             obs_enc = observations
         else:
