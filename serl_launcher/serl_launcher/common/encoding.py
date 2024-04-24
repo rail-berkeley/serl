@@ -72,7 +72,7 @@ class EncodingWrapper(nn.Module):
         return encoded
 
 
-class GCEncodingWrapper(nn.Module):
+class GCEncodingWrapper(nn.Module):         # never used
     """
     Encodes observations and goals into a single flat encoding. Handles all the
     logic about when/how to combine observations and goals.

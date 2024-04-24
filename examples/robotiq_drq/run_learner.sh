@@ -1,14 +1,14 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
-export XLA_PYTHON_CLIENT_MEM_FRACTION=.05 && \
+export XLA_PYTHON_CLIENT_MEM_FRACTION=.3 && \
 python drq_policy_robotiq.py "$@" \
     --learner \
     --env robotiq_camera_env \
     --exp_name=drq_robotiq_policy \
     --seed 0 \
-    --random_steps 100 \
-    --training_starts 100 \
+    --random_steps 0 \
+    --training_starts 0 \
     --utd_ratio 4 \
-    --batch_size 256 \
+    --batch_size 128 \
     --eval_period 1000 \
     --encoder_type resnet-pretrained \
     --checkpoint_period 10000 \
