@@ -192,6 +192,8 @@ class DrQAgent(SACAgent):
             image_keys=image_keys,
         )
 
+        print(f"encoder def: {encoder_def}")
+
         encoders = {
             "critic": encoder_def,
             "actor": encoder_def,
