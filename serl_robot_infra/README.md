@@ -48,7 +48,8 @@ The HTTP server is used to communicate between the ROS controller and gym enviro
 | startimp | Stop the impedance controller |
 | stopimp | Start the impedance controller |
 | pose | Command robot to go to desired end-effector pose given in base frame (xyz+quaternion) |
-| getpos | Return current end-effector pose in robot base frame (xyz+rpy)|
+| getpos | Return current end-effector pose in robot base frame (xyz+quaternion)|
+| getpos_euler | Return current end-effector pose in robot base frame (xyz+rpy)|
 | getvel | Return current end-effector velocity in robot base frame |
 | getforce | Return estimated force on end-effector in stiffness frame |
 | gettorque | Return estimated torque on end-effector in stiffness frame |
@@ -71,7 +72,7 @@ These commands can also be called in terminal. Useful ones include:
 curl -X POST http://127.0.0.1:5000/activate_gripper # Activate gripper
 curl -X POST http://127.0.0.1:5000/close_gripper # Close gripper
 curl -X POST http://127.0.0.1:5000/open_gripper # Open gripper
-curl -X POST http://127.0.0.1:5000/getpos # Print current end-effector pose
+curl -X POST http://127.0.0.1:5000/getpos_euler # Print current end-effector pose
 curl -X POST http://127.0.0.1:5000/jointreset # Perform joint reset
 curl -X POST http://127.0.0.1:5000/stopimp # Stop the impedance controller
 curl -X POST http://127.0.0.1:5000/startimp # Start the impedance controller (**Only run this after stopimp**)
