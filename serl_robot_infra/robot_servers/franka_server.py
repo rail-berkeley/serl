@@ -158,7 +158,13 @@ class FrankaServer:
         self.q = np.array(list(msg.q)).reshape((7,))
         self.force = np.array(list(msg.K_F_ext_hat_K)[:3])
         self.torque = np.array(list(msg.K_F_ext_hat_K)[3:])
-        self.vel = self.jacobian @ self.dq
+        try:
+            self.vel = self.jacobian @ self.dq
+        except:
+            self.vel = np.zeros(6)
+            rospy.logwarn(
+                "Jacobian not set, end-effector velocity temporarily not available"
+            )
 
     def _set_jacobian(self, msg):
         jacobian = np.array(list(msg.zero_jacobian)).reshape((6, 7), order="F")
@@ -230,6 +236,12 @@ def main(_):
     @webapp.route("/getpos", methods=["POST"])
     def get_pos():
         return jsonify({"pose": np.array(robot_server.pos).tolist()})
+
+    @webapp.route("/getpos_euler", methods=["POST"])
+    def get_pos_euler():
+        r = R.from_quat(robot_server.pos[3:])
+        euler = r.as_euler("xyz")
+        return jsonify({"pose": np.concatenate([robot_server.pos[:3], euler]).tolist()})
 
     @webapp.route("/getvel", methods=["POST"])
     def get_vel():

@@ -36,9 +36,7 @@ The peg insertion task is best for getting started with running SERL on a real r
     python serl_robo_infra/robot_servers/franka_server.py --gripper_type=<Robotiq|Franka|None> --robot_ip=<robot_IP> --gripper_ip=<[Optional] Robotiq_gripper_IP>
     ```
     This should start the impedance controller and a Flask server ready to recieve requests.
-5. The reward in this task is given by checking whether the end-effector pose matches a fixed target pose. Grasp the desired peg with  `curl -X POST http://127.0.0.1:5000/close_gripper` and manually move the arm into a pose where the peg is inserted into the board. Print the current pose with `curl -X POST http://127.0.0.1:5000/getpos` and update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
-
-    **Note: the `getpos` command prints the pose in xyz+quaternion format, but `TARGET_POSE` expects xyz+euler(rpy) format. Please use your favourite quat to euler calculator to do the conversion.
+5. The reward in this task is given by checking whether the end-effector pose matches a fixed target pose. Grasp the desired peg with  `curl -X POST http://127.0.0.1:5000/close_gripper` and manually move the arm into a pose where the peg is inserted into the board. Print the current pose with `curl -X POST http://127.0.0.1:5000/getpos_euler` and update the `TARGET_POSE` in [peg_env/config.py](../serl_robot_infra/franka_env/envs/peg_env/config.py) with the measured end-effector pose.
 
     **Note: make sure the wrist joint is centered (away from joint limits) and z-axis euler angle is positive at the target pose to avoid discontinuities.
 
