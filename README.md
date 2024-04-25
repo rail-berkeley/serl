@@ -20,7 +20,7 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
   - [Run with Franka Arm on Real Robot](#run-with-franka-arm-on-real-robot)
   - [Contribution](#contribution)
   - [Citation](#citation)
- 
+
 ## Major bug fix
 We fixed a major issue in the intervention action frame. See release [v0.1.1](https://github.com/rail-berkeley/serl/releases/tag/v0.1.1) Please update your code with the main branch.
 
