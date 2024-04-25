@@ -12,8 +12,8 @@ from datetime import datetime
 from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
 
-from franka_env.camera.video_capture import VideoCapture
-from franka_env.camera.rs_capture import RSCapture  # TODO make robotiq (both)
+from robotiq_env.camera.video_capture import VideoCapture
+from robotiq_env.camera.rs_capture import RSCapture
 
 from robotiq_env.utils.real_time_plotter import DataClient
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
