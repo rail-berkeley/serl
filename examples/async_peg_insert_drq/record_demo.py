@@ -49,8 +49,10 @@ if __name__ == "__main__":
         raise PermissionError(f"No permission to write to {file_dir}")
 
     while success_count < success_needed:
-        next_obs, rew, done, truncated, info = env.step(action=np.zeros((6,)))
-        actions = info["intervene_action"]
+        actions = np.zeros((6,))
+        next_obs, rew, done, truncated, info = env.step(action=actions)
+        if "intervene_action" in info:
+            actions = info["intervene_action"]
 
         transition = copy.deepcopy(
             dict(
