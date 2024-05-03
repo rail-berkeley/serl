@@ -328,6 +328,7 @@ class PreTrainedResNetEncoder(nn.Module):
     num_spatial_blocks: int = 8
     bottleneck_dim: Optional[int] = None
     pretrained_encoder: nn.module = None
+    use_depth_only: bool = False
 
     @nn.compact
     def __call__(
@@ -337,6 +338,12 @@ class PreTrainedResNetEncoder(nn.Module):
         train: bool = True,
     ):
         x = observations
+
+        # use DDD instead of RGB and pass it through resnet
+        if self.use_depth_only:
+            assert x.shape == (128, 128, 1)
+            x = jnp.repeat(x, 3, axis=-1)
+
         if encode:
             x = self.pretrained_encoder(x, train=train)
 

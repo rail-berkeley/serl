@@ -82,6 +82,7 @@ class RobotiqEnv(gym.Env):
             max_episode_length: int = 100,
             save_video=False,
             realtime_plot=False,
+            camera_mode="rgb",  # one of (rgb, depth, both)
     ):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -108,6 +109,7 @@ class RobotiqEnv(gym.Env):
             print("Saving videos!")
         self.save_video = save_video
         self.recording_frames = []
+        self.camera_mode = camera_mode
 
         self.realtime_plot = realtime_plot
 
@@ -127,6 +129,32 @@ class RobotiqEnv(gym.Env):
             np.ones((7,), dtype=np.float32),
         )
 
+        if camera_mode=="rgb":
+            image_space = gym.spaces.Dict(  # TODO add depth info, or make bigger (only 128x128x3)
+                    {
+                        "shoulder": gym.spaces.Box(
+                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                        ),
+                        "wrist": gym.spaces.Box(
+                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                        ),
+                    })
+        elif camera_mode=="depth":
+            image_space = gym.spaces.Dict(
+                {
+                    "shoulder": gym.spaces.Box(
+                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
+                    ),
+                    "wrist": gym.spaces.Box(
+                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
+                    )
+                }
+            )
+        elif camera_mode=="both":
+            raise NotImplementedError("not yet implemented")
+        else:
+            raise NotImplementedError(f"camera mode {camera_mode} not implemented")
+
         self.observation_space = gym.spaces.Dict(
             {
                 "state": gym.spaces.Dict(
@@ -140,20 +168,12 @@ class RobotiqEnv(gym.Env):
                         "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                     }
                 ),
-                "images": gym.spaces.Dict(  # TODO add depth info, or make bigger (only 128x128x3)
-                    {
-                        "shoulder": gym.spaces.Box(
-                            0, 255, shape=(128, 128, 3), dtype=np.uint8
-                        ),
-                        "wrist": gym.spaces.Box(
-                            0, 255, shape=(128, 128, 3), dtype=np.uint8
-                        ),
-                    }
-                ),
+                "images": image_space,
             }
         )
         self.cycle_count = 0
         self.controller = None
+        self.cap = None
 
         if fake_env:
             print("[RobotiqEnv] is fake!")
@@ -170,7 +190,6 @@ class RobotiqEnv(gym.Env):
         )
         self.controller.start()  # start Thread
 
-        self.cap = None
         self.init_cameras(config.REALSENSE_CAMERAS)
         self.img_queue = queue.Queue()
         self.displayer = ImageDisplayer(self.img_queue)
@@ -219,8 +238,7 @@ class RobotiqEnv(gym.Env):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
-        next_pos = self.curr_pos.copy()  # TODO might be better with actual pos (but will be delayed to target)
-        # next_pos = self.controller.get_target_pos()
+        next_pos = self.curr_pos.copy()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
         # orientation
@@ -338,13 +356,13 @@ class RobotiqEnv(gym.Env):
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
         if name == "wrist":
-            return image[:, 184:664, :]
+            return image[:, 80:560, :]
         elif name == "shoulder":
-            return image[:, 184:664, :]
+            return image[:, 80:560, :]
         else:
             raise ValueError(f"Camera {name} not recognized in cropping")
 
-    def get_im(self) -> Dict[str, np.ndarray]:
+    def get_image(self) -> Dict[str, np.ndarray]:
         """Get images from the realsense cameras."""
         images = {}
         display_images = {}
@@ -359,18 +377,37 @@ class RobotiqEnv(gym.Env):
                 display_images[key] = resized
                 display_images[key + "_full"] = cropped_rgb
             except queue.Empty:
-                input(
-                    f"{key} camera frozen. Check connect, then press enter to relaunch..."
-                )
+                input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
                 cap.close()
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
-                return self.get_im()
+                return self.get_image()
 
         self.recording_frames.append(
             np.concatenate([display_images[f"{k}_full"] for k in self.cap], axis=0)
         )
         self.img_queue.put(display_images)
         return images
+
+    def get_depth(self) -> Dict[str, np.ndarray]:
+        depth = {}
+        display_depth = {}
+        for key, cap in self.cap.items():
+            try:
+                depth = cap.read()
+                cropped_depth = self.crop_image(key, depth)
+                resized = cv2.resize(
+                    cropped_depth, self.observation_space["images"][key].shape[:2][::-1]
+                )
+            except queue.Empty:
+                input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
+                cap.close()
+                self.init_cameras(self.config.REALSENSE_CAMERAS)
+                return self.get_depth()
+        self.recording_frames.append(
+            np.concatenate([display_depth[f"{k}_full"] for k in self.cap], axis=0)
+        )
+        self.img_queue.put(display_depth)
+        return depth
 
     def close_cameras(self):
         """Close both wrist cameras."""
@@ -408,7 +445,7 @@ class RobotiqEnv(gym.Env):
         return self.controller.is_truncated()
 
     def _get_obs(self) -> dict:
-        images = self.get_im()
+        images = self.get_image()
         state_observation = {
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,

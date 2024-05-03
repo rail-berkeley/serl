@@ -33,10 +33,10 @@ class DrQAgent(SACAgent):
         temperature_def: nn.Module,
         # Optimizer
         actor_optimizer_kwargs={
-            "learning_rate": 3e-4,
+            "learning_rate": 3e-4,      # 3e-4
         },
         critic_optimizer_kwargs={
-            "learning_rate": 3e-4,
+            "learning_rate": 3e-4,      # 3e-4
         },
         temperature_optimizer_kwargs={
             "learning_rate": 3e-4,
@@ -86,7 +86,12 @@ class DrQAgent(SACAgent):
         # Config
         assert not entropy_per_dim, "Not implemented"
         if target_entropy is None:
-            target_entropy = -actions.shape[-1] / 2
+            # target_entropy = -actions.shape[-1] / 2
+            from numpy import prod
+            target_entropy = -prod(actions.shape)
+
+        print(f"config: discount: {discount}, target_entropy: {target_entropy}")
+        print(f"actor_optimizer {actor_optimizer_kwargs} critic_optimizer {critic_optimizer_kwargs} temperature {temperature_optimizer_kwargs}")
 
         return cls(
             state=state,
@@ -172,6 +177,10 @@ class DrQAgent(SACAgent):
                 pre_pooling=True,
                 name="pretrained_encoder",
             )
+
+            use_depth_only = list(observations.values())[0].shape[-3:] == (128, 128, 1)        # only one channel means depth
+            print(f"use depth only: {use_depth_only}")
+
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     pooling_method="spatial_learned_embeddings",
@@ -179,6 +188,7 @@ class DrQAgent(SACAgent):
                     bottleneck_dim=256,
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
+                    use_depth_only=use_depth_only,
                 )
                 for image_key in image_keys
             }
@@ -192,7 +202,7 @@ class DrQAgent(SACAgent):
             image_keys=image_keys,
         )
 
-        print(f"encoder def: {encoder_def}")
+        # print(f"encoder def: {encoder_def}")
 
         encoders = {
             "critic": encoder_def,

@@ -30,7 +30,7 @@ from serl_launcher.utils.launcher import (
     make_wandb_logger,
 )
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
 from robotiq_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
@@ -46,6 +46,8 @@ flags.DEFINE_string("env", "robotiq_camera_env", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", "DRQ first tests", "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
+flags.DEFINE_string("camera_mode", "rgb", "Camera mode, one of (rgb, depth, both)")
+
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 512, "Batch size.")
@@ -97,7 +99,7 @@ def pause_callback(key):
     global PAUSE_EVENT_FLAG
     try:
         # chosen a rarely used key to avoid conflicts. this listener is always on, even when the program is not in focus
-        if key == pynput.keyboard.Key.pause:
+        if not PAUSE_EVENT_FLAG.is_set() and key == pynput.keyboard.Key.pause:
             print("Requested pause training")
             # set the PAUSE FLAG to pause the actor/learner loop
             PAUSE_EVENT_FLAG.set()
@@ -208,10 +210,10 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     deterministic=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
+                print(actions)
 
         # Step environment
         with timer.context("step_env"):
-
             next_obs, reward, done, truncated, info = env.step(actions)
 
             # override the action with the intervention action
@@ -330,23 +332,30 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     # wait till the replay buffer is filled with enough data
     timer = Timer()
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
+        # Train the networks
+        """with timer.context("sample_replay_buffer"):
+            batch = next(replay_iterator) if len(replay_buffer) > 0 else None
+            demo_batch = next(demo_iterator)
+            batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
+
+        with timer.context("train"):
+            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)"""
+
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
         for critic_step in range(FLAGS.utd_ratio - 1):
             with timer.context("sample_replay_buffer"):
-                batch = next(replay_iterator)
+                batch = next(replay_iterator) if len(replay_buffer) > 0 else None
                 demo_batch = next(demo_iterator)
-                batch = concat_batches(batch, demo_batch, axis=0)
+                batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
 
             with timer.context("train_critics"):
-                agent, critics_info = agent.update_critics(
-                    batch,
-                )
+                agent, critics_info = agent.update_critics(batch,)
 
         with timer.context("train"):
-            batch = next(replay_iterator)
+            batch = next(replay_iterator) if len(replay_buffer) > 0 else None
             demo_batch = next(demo_iterator)
-            batch = concat_batches(batch, demo_batch, axis=0)
+            batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -358,7 +367,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
             wandb_logger.log(update_info, step=update_steps)
             wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
 
-        if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
+        if FLAGS.checkpoint_period and update_steps and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
                 FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
@@ -371,7 +380,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
             response = input(
                 "Do you want to continue (c), save training state and exit (s) or simply exit (e)? "
             )
-            if response == "c":
+            if "c" in response:
                 print("Continuing")
                 PAUSE_EVENT_FLAG.clear()
             else:
@@ -407,6 +416,7 @@ def main(_):
     # create env and load dataset
     env = gym.make(
         FLAGS.env,
+        camera_mode=FLAGS.camera_mode,
         fake_env=FLAGS.learner,
         max_episode_length=FLAGS.max_traj_length,
     )
@@ -414,6 +424,7 @@ def main(_):
         env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
+    env = ScaleObservationWrapper(env)      # scale obs space
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -421,7 +432,6 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
     rng, sampling_rng = jax.random.split(rng)
-    # print(f"obs shape: {env.observation_space.sample().shape}")
     agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
@@ -462,6 +472,7 @@ def main(_):
         )
         import pickle as pkl
 
+        # TOOD check for depth or rgb
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
