@@ -128,10 +128,16 @@ def make_drq_agent(
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.96,  # 0.99
+        discount=0.99,  # 0.99
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
+        actor_optimizer_kwargs={
+            "learning_rate": 3e-3,  # 3e-4
+        },
+        critic_optimizer_kwargs={
+            "learning_rate": 3e-3,  # 3e-4
+        },
     )
     return agent
 
