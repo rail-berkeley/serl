@@ -159,6 +159,9 @@ class RobotiqImpedanceController(threading.Thread):
         force = self.robotiq_receive.getActualTCPForce()
         pressure = await self.robotiq_gripper.get_current_pressure()
         obj_status = await self.robotiq_gripper.get_object_status()
+
+        pressure /= 100.   # pressure between [0, 1]
+        grip_status = 0. if obj_status.value == 3 else 1.  # 3-> no object detected, [0, 1, 2]-> obj detected
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = vel
@@ -166,7 +169,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_Qd[:] = Qd
             # use moving average (5), since the force fluctuates heavily
             self.curr_force[:] = 0.2 * np.array(force) + 0.8 * self.curr_force[:]
-            self.gripper_state[:] = [pressure / 100., float(obj_status.value)]  # pressure between [0, 1]
+            self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
         with self.lock:
