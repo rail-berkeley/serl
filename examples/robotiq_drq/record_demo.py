@@ -64,6 +64,7 @@ if __name__ == "__main__":
         raise PermissionError(f"No permission to write to {file_dir}")
 
     try:
+        running_reward = 0.
         while success_count < success_needed:
             if exit_program.is_set():
                 raise KeyboardInterrupt  # stop program, but clean up before
@@ -84,8 +85,9 @@ if __name__ == "__main__":
             transitions.append(transition)
 
             obs = next_obs
+            running_reward += rew
 
-            if done:
+            if done or truncated:
                 success_count += int(rew > 0.99)
                 total_count += 1
                 print(
@@ -93,6 +95,9 @@ if __name__ == "__main__":
                 )
                 pbar.update(int(rew > 0.99))
                 obs, _ = env.reset()
+                print("Reward total:", running_reward)
+                running_reward = 0.
+
 
         with open(file_path, "wb") as f:
             pkl.dump(transitions, f)
