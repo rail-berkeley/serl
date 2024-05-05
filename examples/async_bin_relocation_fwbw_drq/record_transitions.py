@@ -97,10 +97,12 @@ if __name__ == "__main__":
             )
 
     # Loop until we have enough transitions
-    while check_all_done():
-        next_obs, rew, done, truncated, info = env.step(action=np.zeros((7,)))
+    while not check_all_done():
+        actions = np.zeros((7,))
+        next_obs, rew, done, truncated, info = env.step(action=actions)
+        if "intervene_action" in info:
+            actions = info["intervene_action"]
         next_obs = env.get_front_cam_obs()
-        actions = info["intervene_action"]
 
         transition = copy.deepcopy(
             dict(

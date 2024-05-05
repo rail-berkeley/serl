@@ -23,7 +23,9 @@ class RelativeFrame(gym.Wrapper):
             }
         ),
         ......
-    }, and at least 6 DoF action space with (x, y, z, rx, ry, rz, ...)
+    }, and at least 6 DoF action space with (x, y, z, rx, ry, rz, ...).
+    By convention, the 7th dimension of the action space is used for the gripper.
+
     """
 
     def __init__(self, env: Env, include_relative_pose=True):
@@ -44,7 +46,9 @@ class RelativeFrame(gym.Wrapper):
 
         # this is to convert the spacemouse intervention action
         if "intervene_action" in info:
-            info["intervene_action"] = self.transform_action(info["intervene_action"])
+            info["intervene_action"] = self.transform_action_inv(
+                info["intervene_action"]
+            )
 
         # Update adjoint matrix
         self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
@@ -93,4 +97,13 @@ class RelativeFrame(gym.Wrapper):
         """
         action = np.array(action)  # in case action is a jax read-only array
         action[:6] = self.adjoint_matrix @ action[:6]
+        return action
+
+    def transform_action_inv(self, action: np.ndarray):
+        """
+        Transform action from spatial(base) frame into body(end-effector) frame
+        using the adjoint matrix.
+        """
+        action = np.array(action)
+        action[:6] = np.linalg.inv(self.adjoint_matrix) @ action[:6]
         return action
