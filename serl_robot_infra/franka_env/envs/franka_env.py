@@ -1,6 +1,6 @@
 """Gym Interface for Franka"""
 import numpy as np
-import gymnasium as gym
+import gym
 import cv2
 import copy
 from scipy.spatial.transform import Rotation

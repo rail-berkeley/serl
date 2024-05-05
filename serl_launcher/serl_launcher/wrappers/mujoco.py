@@ -1,6 +1,6 @@
 from typing import Callable, Union
 
-import gymnasium as gym
+import gym
 import numpy as np
 from scipy.spatial.transform import Rotation
 

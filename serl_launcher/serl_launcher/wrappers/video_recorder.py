@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 
-import gymnasium as gym
+import gym
 import imageio
 import numpy as np
 import tensorflow as tf

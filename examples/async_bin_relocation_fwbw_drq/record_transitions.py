@@ -7,7 +7,7 @@ Usage:
 add `--record_failed_only` to only record failed transitions
 """
 
-import gymnasium as gym
+import gym
 from tqdm import tqdm
 import numpy as np
 import copy

@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 from tqdm import tqdm
 import numpy as np
 import copy

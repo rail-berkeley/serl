@@ -3,7 +3,7 @@
 import time
 from functools import partial
 
-import gymnasium as gym
+import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -20,7 +20,7 @@ from serl_launcher.utils.launcher import (
     make_replay_buffer,
 )
 
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer

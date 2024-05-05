@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 
 
 class UnnormalizeActionProprio(gym.ActionWrapper, gym.ObservationWrapper):

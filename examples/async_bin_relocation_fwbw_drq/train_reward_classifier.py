@@ -7,7 +7,7 @@ from flax.core import frozen_dict
 from flax.training import checkpoints
 import optax
 from tqdm import tqdm
-import gymnasium as gym
+import gym
 import os
 from absl import app, flags
 
