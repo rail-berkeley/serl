@@ -1,7 +1,7 @@
 import collections
 from typing import Any, Iterator, Optional, Sequence, Tuple, Union
 
-import gymnasium as gym
+import gym
 import jax
 import numpy as np
 from serl_launcher.data.dataset import Dataset, DatasetDict

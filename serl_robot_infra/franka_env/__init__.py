@@ -1,4 +1,4 @@
-from gymnasium.envs.registration import register
+from gym.envs.registration import register
 import numpy as np
 
 register(

@@ -1,5 +1,5 @@
 import numpy as np
-import gymnasium as gym
+import gym
 import time
 import requests
 import copy

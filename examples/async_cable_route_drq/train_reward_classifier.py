@@ -5,7 +5,7 @@ import flax.linen as nn
 from flax.training import checkpoints
 import optax
 from tqdm import tqdm
-import gymnasium as gym
+import gym
 
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.utils.train_utils import concat_batches

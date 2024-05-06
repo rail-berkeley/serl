@@ -1,7 +1,7 @@
 from threading import Lock
 from typing import Union, Iterable
 
-import gymnasium as gym
+import gym
 import jax
 from serl_launcher.data.replay_buffer import ReplayBuffer
 from serl_launcher.data.memory_efficient_replay_buffer import (

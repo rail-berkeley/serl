@@ -13,7 +13,7 @@ setup(
         "typing_extensions",
         "opencv-python",
         "lz4",
-        "agentlace@git+https://github.com/youliangtan/agentlace.git@e61032fbce8a1e6d3dc2aeba21de082e4bf46fe3",
+        "agentlace@git+https://github.com/youliangtan/agentlace.git@892d1557264d7bb1d5df04b37638c850c9d36f35",
     ],
     packages=find_packages(),
     zip_safe=False,
