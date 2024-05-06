@@ -11,7 +11,7 @@ from pynput import keyboard
 from robotiq_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
 import robotiq_env
@@ -32,12 +32,16 @@ def on_esc(key):
 
 
 if __name__ == "__main__":
-    env = gym.make("robotiq_camera_env")
+    env = gym.make("robotiq_camera_env",
+                   camera_mode="rgb",
+                   max_episode_length=100
+                   )
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
+    env = ScaleObservationWrapper(env)
     env = SERLObsWrapper(env)
-    # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
     obs, _ = env.reset()
 
@@ -97,7 +101,6 @@ if __name__ == "__main__":
                 obs, _ = env.reset()
                 print("Reward total:", running_reward)
                 running_reward = 0.
-
 
         with open(file_path, "wb") as f:
             pkl.dump(transitions, f)

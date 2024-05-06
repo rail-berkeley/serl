@@ -80,9 +80,9 @@ class RobotiqEnv(gym.Env):
             fake_env=False,
             config=DefaultEnvConfig,
             max_episode_length: int = 100,
-            save_video=False,
-            realtime_plot=False,
-            camera_mode="rgb",  # one of (rgb, depth, both)
+            save_video: bool = False,
+            realtime_plot: bool = False,
+            camera_mode: str = "rgb",  # one of (rgb, depth, both, None)
     ):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -105,7 +105,7 @@ class RobotiqEnv(gym.Env):
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
 
-        if save_video:
+        if camera_mode is not None and save_video:
             print("Saving videos!")
         self.save_video = save_video
         self.recording_frames = []
@@ -129,17 +129,17 @@ class RobotiqEnv(gym.Env):
             np.ones((7,), dtype=np.float32),
         )
 
-        if camera_mode=="rgb":
+        if camera_mode == "rgb":
             image_space = gym.spaces.Dict(  # TODO add depth info, or make bigger (only 128x128x3)
-                    {
-                        "shoulder": gym.spaces.Box(
-                            0, 255, shape=(128, 128, 3), dtype=np.uint8
-                        ),
-                        "wrist": gym.spaces.Box(
-                            0, 255, shape=(128, 128, 3), dtype=np.uint8
-                        ),
-                    })
-        elif camera_mode=="depth":
+                {
+                    "shoulder": gym.spaces.Box(
+                        0, 255, shape=(128, 128, 3), dtype=np.uint8
+                    ),
+                    "wrist": gym.spaces.Box(
+                        0, 255, shape=(128, 128, 3), dtype=np.uint8
+                    ),
+                })
+        elif camera_mode == "depth":
             image_space = gym.spaces.Dict(
                 {
                     "shoulder": gym.spaces.Box(
@@ -150,27 +150,31 @@ class RobotiqEnv(gym.Env):
                     )
                 }
             )
-        elif camera_mode=="both":
+        elif camera_mode == "both":
             raise NotImplementedError("not yet implemented")
-        else:
+        elif camera_mode is not None:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
-        self.observation_space = gym.spaces.Dict(
+        state_space = gym.spaces.Dict(
             {
-                "state": gym.spaces.Dict(
-                    {
-                        "tcp_pose": gym.spaces.Box(
-                            -np.inf, np.inf, shape=(7,)
-                        ),  # xyz + quat
-                        "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                        "gripper_state": gym.spaces.Box(-np.inf, np.inf, shape=(2,)),
-                        "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
-                        "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
-                    }
-                ),
-                "images": image_space,
+                "tcp_pose": gym.spaces.Box(
+                    -np.inf, np.inf, shape=(7,)
+                ),  # xyz + quat
+                "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
+                "gripper_state": gym.spaces.Box(-np.inf, np.inf, shape=(2,)),
+                "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
             }
         )
+
+        if self.camera_mode is None:
+            self.observation_space = gym.spaces.Dict({"state": state_space})
+        else:
+            self.observation_space = gym.spaces.Dict({
+                "state": state_space,
+                "images": image_space,
+            })
+
         self.cycle_count = 0
         self.controller = None
         self.cap = None
@@ -185,16 +189,18 @@ class RobotiqEnv(gym.Env):
             kp=10000,
             kd=2200,
             config=config,
-            verbose=True,
-            plot=False
+            verbose=False,
+            plot=False,
+            old_obs=camera_mode is None
         )
         self.controller.start()  # start Thread
 
-        self.init_cameras(config.REALSENSE_CAMERAS)
-        self.img_queue = queue.Queue()
-        self.displayer = ImageDisplayer(self.img_queue)
-        self.displayer.start()
-        print("[CAM] Cameras are ready!")
+        if self.camera_mode is not None:
+            self.init_cameras(config.REALSENSE_CAMERAS)
+            self.img_queue = queue.Queue()
+            self.displayer = ImageDisplayer(self.img_queue)
+            self.displayer.start()
+            print("[CAM] Cameras are ready!")
 
         if self.realtime_plot:
             try:
@@ -307,7 +313,7 @@ class RobotiqEnv(gym.Env):
             time.sleep(0.1)
             while self.controller.is_moving():
                 time.sleep(0.1)
-            print(reset_shift, reset_pose)
+            # print(reset_shift, reset_pose)
             return reset_shift
         else:
             return np.zeros((2,))
@@ -445,7 +451,6 @@ class RobotiqEnv(gym.Env):
         return self.controller.is_truncated()
 
     def _get_obs(self) -> dict:
-        images = self.get_image()
         state_observation = {
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
@@ -456,7 +461,11 @@ class RobotiqEnv(gym.Env):
         if self.realtime_plot:
             self.plotting_client.send(np.concatenate([self.curr_force, self.curr_torque]))
 
-        return copy.deepcopy(dict(images=images, state=state_observation))
+        if self.camera_mode is not None:
+            images = self.get_image()
+            return copy.deepcopy(dict(images=images, state=state_observation))
+        else:
+            return copy.deepcopy(dict(state=state_observation))
 
     def close(self):
         if self.controller:

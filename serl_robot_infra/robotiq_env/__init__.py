@@ -10,5 +10,5 @@ register(
 register(
     id="robotiq_camera_env",
     entry_point="robotiq_env.envs.camera_env:RobotiqCameraEnv",
-    max_episode_steps=300,
+    max_episode_steps=100,
 )

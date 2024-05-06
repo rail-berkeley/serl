@@ -65,7 +65,7 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
         self.force_scale = force_scale
         self.torque_scale = torque_scale
 
-    def observation(self, obs) -> WrapperObsType:
+    def observation(self, obs):
         obs["state"]["tcp_pose"][:3] *= self.translation_scale
         obs["state"]["tcp_pose"][3:] *= self.rotation_scale
         obs["state"]["tcp_vel"][:3] *= self.velocity_scale

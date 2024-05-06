@@ -9,8 +9,8 @@ class RobotiqCameraConfig(DefaultEnvConfig):
     RANDOM_RZ_RANGE = (0.0,)
     # ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
     # ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
-    ABS_POSE_LIMIT_HIGH = np.array([0.05, 0.1, 0.22, 3.2, 0.1, 3.2])
-    ABS_POSE_LIMIT_LOW = np.array([-0.49, -0.75, -0.006, 3.0, -0.1, -3.2])
+    ABS_POSE_LIMIT_HIGH = np.array([0.2, -0.4, 0.22, 3.2, 0.18, 3.2])
+    ABS_POSE_LIMIT_LOW = np.array([-0.2, -0.7, - 0.006, 2.8, -0.18, -3.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.2"
@@ -20,7 +20,7 @@ class RobotiqCameraConfig(DefaultEnvConfig):
     FORCEMODE_DAMPING: float = 0.0  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
-    FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
+    FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.1, 1., 1., 1.])
 
     REALSENSE_CAMERAS = {
         "wrist": "218622271597",

@@ -33,6 +33,7 @@ class RobotiqImpedanceController(threading.Thread):
             config=None,
             verbose=False,
             plot=False,
+            old_obs=False,
             *args,
             **kwargs
     ):
@@ -50,6 +51,7 @@ class RobotiqImpedanceController(threading.Thread):
         self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic() - 1e6}
         self.verbose = verbose
         self.do_plot = plot
+        self.old_obs = old_obs      # use the old observation layout
 
         self.target_pos = np.zeros((7,), dtype=np.float32)  # new as quat to avoid +- problems with axis angle repr.
         self.target_grip = np.zeros((1,), dtype=np.float32)
@@ -167,9 +169,13 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
-            # use moving average (5), since the force fluctuates heavily
-            self.curr_force[:] = 0.2 * np.array(force) + 0.8 * self.curr_force[:]
-            self.gripper_state[:] = [pressure, grip_status]
+            if self.old_obs:
+                self.curr_force[:] = np.asarray(force)      # old representation for SAC policy
+                self.gripper_state[:] = [pressure, float(obj_status.value)]
+            else:
+                # use moving average (5), since the force fluctuates heavily
+                self.curr_force[:] = 0.2 * np.array(force) + 0.8 * self.curr_force[:]
+                self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
         with self.lock:
@@ -207,6 +213,13 @@ class RobotiqImpedanceController(threading.Thread):
         rot_diff = R.from_quat(target_pos[3:]) * R.from_quat(curr_pos[3:]).inv()
         vel_rot_diff = R.from_rotvec(curr_vel[3:]).inv()
         torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
+
+        # TODO make better and more general (tcp force check)
+        # check for big downward tcp force and adapt accordingly
+        # if self.curr_force[2] > 0.5 and force_pos[2] < 0.:
+        #     print(force_pos[2], end="  ")
+        #     force_pos[2] = max((1.5 - self.curr_force[2]), 0.) * force_pos[2] + min(self.curr_force[2] - 0.5, 1.) * 20.
+        #     print(force_pos[2])
 
         return np.concatenate((force_pos, torque))
 
@@ -248,13 +261,13 @@ class RobotiqImpedanceController(threading.Thread):
             self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
-        elif self.target_grip[0] < -0.5 and self.gripper_state[1] != 3:  # only release if obj detected
+        elif self.target_grip[0] < -0.5:
             await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             # print("release")
 
     def _truncate_check(self):
-        downward_force = self.curr_force[2] > 10
+        downward_force = self.curr_force[2] > 10.
         if downward_force:  # TODO add better criteria
             self._is_truncated.set()
         else:
@@ -276,7 +289,7 @@ class RobotiqImpedanceController(threading.Thread):
         if self.robotiq_gripper:
             self.target_grip[0] = -1.
             await self.send_gripper_command()
-            time.sleep(0.1)
+            time.sleep(0.2)
 
         # then move up (so no boxes are moved)
         while self.curr_pos[2] < self.reset_height:

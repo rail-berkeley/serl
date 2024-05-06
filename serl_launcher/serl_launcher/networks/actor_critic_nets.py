@@ -181,7 +181,7 @@ class Policy(nn.Module):
     def __call__(
         self, observations: jnp.ndarray, temperature: float = 1.0, train: bool = False
     ) -> distrax.Distribution:
-        info_dict = {key:value.shape for key, value in observations.items()}
+        # info_dict = {key:value.shape for key, value in observations.items()}
         # print(f"policy observations shape: {info_dict}")        # TODO remove
         if self.encoder is None:
             obs_enc = observations

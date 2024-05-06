@@ -114,6 +114,7 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
                     argmax=True,
                 )
                 actions = np.asarray(jax.device_get(actions))
+                # print(actions)
 
                 next_obs, reward, done, truncated, info = env.step(actions)
                 obs = next_obs
@@ -309,6 +310,7 @@ def main(_):
         FLAGS.env,
         fake_env=FLAGS.learner,
         max_episode_length=FLAGS.max_traj_length,
+        camera_mode=None,
     )
     if FLAGS.actor:
         env = SpacemouseIntervention(env)       # TODO really needed?
@@ -316,7 +318,7 @@ def main(_):
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
-    env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
+    # env = TransformReward(env, lambda r: FLAGS.reward_scale * r)
     env = RecordEpisodeStatistics(env)
 
     rng, sampling_rng = jax.random.split(rng)
