@@ -216,10 +216,10 @@ class RobotiqImpedanceController(threading.Thread):
 
         # TODO make better and more general (tcp force check)
         # check for big downward tcp force and adapt accordingly
-        # if self.curr_force[2] > 0.5 and force_pos[2] < 0.:
-        #     print(force_pos[2], end="  ")
-        #     force_pos[2] = max((1.5 - self.curr_force[2]), 0.) * force_pos[2] + min(self.curr_force[2] - 0.5, 1.) * 20.
-        #     print(force_pos[2])
+        if self.curr_force[2] > 0.5 and force_pos[2] < 0.:
+            print(force_pos[2], end="  ")
+            force_pos[2] = max((1.5 - self.curr_force[2]), 0.) * force_pos[2] + min(self.curr_force[2] - 0.5, 1.) * 20.
+            print(force_pos[2])
 
         return np.concatenate((force_pos, torque))
 
@@ -261,7 +261,7 @@ class RobotiqImpedanceController(threading.Thread):
             self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
-        elif self.target_grip[0] < -0.5:
+        elif self.target_grip[0] < -0.5 and not np.isclose(self.gripper_state[0], 1., atol=1e-4):
             await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             # print("release")
