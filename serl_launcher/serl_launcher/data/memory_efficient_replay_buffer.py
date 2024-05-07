@@ -121,7 +121,9 @@ class MemoryEfficientReplayBuffer(ReplayBuffer):
                     else:
                         indx[i] = self.np_random.randint(len(self))
         else:
-            raise NotImplementedError()
+            # raise NotImplementedError()
+            # print(f"indx is {indx}")
+            assert type(indx) == np.ndarray
 
         if keys is None:
             keys = self.dataset_dict.keys()
