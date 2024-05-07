@@ -11,7 +11,7 @@ from flax.core import frozen_dict
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
 from serl_launcher.common.encoding import EncodingWrapper
-from serl_launcher.common.optimizers import make_optimizer
+from serl_launcher.common.optimizers import make_optimizer, make_adam_optimizer
 from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
@@ -298,6 +298,8 @@ class DrQAgent(SACAgent):
             }
         )
 
+        # TODO implement K=2 and M=2
+
         new_state = self.state.replace(rng=rng)
 
         new_agent = self.replace(state=new_state)
@@ -315,6 +317,8 @@ class DrQAgent(SACAgent):
         new_agent = self
         if self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
+
+        # TODO implement K=2 and M=2
 
         rng = new_agent.state.rng
         rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
