@@ -215,6 +215,7 @@ class FrankaEnv(gym.Env):
         return ob, int(reward), done, False, {}
 
     def compute_reward(self, obs) -> bool:
+        """We are using a sparse reward function."""
         current_pose = obs["state"]["tcp_pose"]
         # convert from quat to euler first
         euler_angles = quat_2_euler(current_pose[3:])

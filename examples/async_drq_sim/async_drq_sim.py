@@ -8,7 +8,10 @@ import numpy as np
 import tqdm
 from absl import app, flags
 from flax.training import checkpoints
+import cv2
+import os
 
+import pickle as pkl
 import gym
 from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
@@ -26,9 +29,15 @@ from serl_launcher.utils.launcher import (
     make_wandb_logger,
     make_replay_buffer,
 )
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ManipulatorEnvObsWrapper
 
 import franka_sim
+
+# new manipulator gym env # TODO remove this
+from manipulator_gym.manipulator_env import ManipulatorEnv, StateEncoding
+from manipulator_gym.interfaces.interface_service import ActionClientInterface
+from manipulator_gym.interfaces.base_interface import ManipulatorInterface
+from manipulator_gym.utils.gym_wrappers import ResizeObsImageWrapper
 
 FLAGS = flags.FLAGS
 
@@ -61,6 +70,7 @@ flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
+flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -100,11 +110,11 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
     client.recv_network_callback(update_params)
 
-    eval_env = gym.make(FLAGS.env)
-    if FLAGS.env == "PandaPickCubeVision-v0":
-        eval_env = SERLObsWrapper(eval_env)
-        eval_env = ChunkingWrapper(eval_env, obs_horizon=1, act_exec_horizon=None)
-    eval_env = RecordEpisodeStatistics(eval_env)
+    # eval_env = gym.make(FLAGS.env)
+    # if FLAGS.env == "PandaPickCubeVision-v0":
+    #     eval_env = SERLObsWrapper(eval_env)
+    #     eval_env = ChunkingWrapper(eval_env, obs_horizon=1, act_exec_horizon=None)
+    # eval_env = RecordEpisodeStatistics(env)
 
     obs, _ = env.reset()
     done = False
@@ -153,15 +163,15 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         if step % FLAGS.steps_per_update == 0:
             client.update()
 
-        if step % FLAGS.eval_period == 0:
-            with timer.context("eval"):
-                evaluate_info = evaluate(
-                    policy_fn=partial(agent.sample_actions, argmax=True),
-                    env=eval_env,
-                    num_episodes=FLAGS.eval_n_trajs,
-                )
-            stats = {"eval": evaluate_info}
-            client.request("send-stats", stats)
+        # if step % FLAGS.eval_period == 0:
+        #     with timer.context("eval"):
+        #         evaluate_info = evaluate(
+        #             policy_fn=partial(agent.sample_actions, argmax=True),
+        #             env=eval_env,
+        #             num_episodes=FLAGS.eval_n_trajs,
+        #         )
+        #     stats = {"eval": evaluate_info}
+        #     client.request("send-stats", stats)
 
         timer.tock("total")
 
@@ -264,10 +274,22 @@ def main(_):
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    if FLAGS.render:
-        env = gym.make(FLAGS.env, render_mode="human")
+    if FLAGS.env == "PandaPickCubeVision-v0":
+        print("Using PandaPickCubeVision-v0")
+        if FLAGS.render:
+            env = gym.make(FLAGS.env, render_mode="human")
+        else:
+            env = gym.make(FLAGS.env)
     else:
-        env = gym.make(FLAGS.env)
+        print("Using manipulator gym env")
+        env = ManipulatorEnv(
+            # manipulator_interface=ActionClientInterface(host=FLAGS.ip),
+            manipulator_interface=ManipulatorInterface(), # for testing
+            state_encoding=StateEncoding.POS_EULER,
+            use_wrist_cam=True,
+        )
+        env = ResizeObsImageWrapper(env, resize_size={"image_primary": (128, 128), "image_wrist": (128, 128)})
+        env = ManipulatorEnvObsWrapper(env)
 
     if FLAGS.env == "PandaPickCube-v0":
         env = gym.wrappers.FlattenObservation(env)
@@ -275,7 +297,15 @@ def main(_):
         env = SERLObsWrapper(env)
         env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
+    print(f"observation_space: {env.observation_space}")
+    print(f"action_space: {env.action_space}")
+
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
+    print(f"image_keys: {image_keys}")
+    obs, _ =  env.reset()
+    for key in obs.keys():
+        print(f"key: {key}, shape: {obs[key].shape}")
+    print("\033[91m {}\033[00m".format("-"*50))
 
     rng, sampling_rng = jax.random.split(rng)
     agent: DrQAgent = make_drq_agent(
@@ -292,6 +322,41 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
+
+    # NOTE: this assumes that all data are expert demonstrations
+    def preload_data_transform(data, metadata):
+        obs = data["observations"]
+        next_obs = data["next_observations"]
+        
+        # convert data img shape from (h, w, c) to (1, h, w, c)
+        # and resize to 128x128
+        for key in image_keys:
+            if len(obs[key].shape) == 3:
+                obs[key] = cv2.resize(obs[key], (128, 128))
+                obs[key] = np.expand_dims(obs[key], axis=0)
+
+            if len(next_obs[key].shape) == 3:
+                next_obs[key] = cv2.resize(next_obs[key], (128, 128))
+                next_obs[key] = np.expand_dims(next_obs[key], axis=0)
+        
+        # convert data state shape from (N,) to (1, N)
+        if len(obs["state"].shape) == 1:
+            obs["state"] = np.expand_dims(obs["state"], axis=0)
+        if len(next_obs["state"].shape) == 1:
+            next_obs["state"] = np.expand_dims(next_obs["state"], axis=0)
+
+        data["observations"] = obs
+        data["next_observations"] = next_obs
+        
+        # relabel the reward to 1 when terminated or truncated
+        # and 0 otherwise
+        if metadata["step"] == metadata["step_size"] - 1:
+            data["rewards"] = 1.0
+        else:
+            data["rewards"] = 0.0
+
+        return data
+
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = make_replay_buffer(
             env,
@@ -300,6 +365,7 @@ def main(_):
             type="memory_efficient_replay_buffer",
             image_keys=image_keys,
             preload_rlds_path=FLAGS.preload_rlds_path,
+            preload_data_transform=preload_data_transform,
         )
 
         # set up wandb and logging
@@ -313,6 +379,17 @@ def main(_):
     if FLAGS.learner:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
+
+        print_green("replay buffer created")
+        print_green(f"replay_buffer size: {len(replay_buffer)}")
+
+        if FLAGS.demo_path:
+            # Check if the file exists
+            if not os.path.exists(FLAGS.demo_path):
+                raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+
+            with open(FLAGS.demo_path, "rb") as f:
+                trajs = pkl.load(f)
 
         # learner loop
         print_green("starting learner loop")

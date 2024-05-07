@@ -198,6 +198,7 @@ def make_replay_buffer(
     type: str = "replay_buffer",
     image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
     preload_rlds_path: Optional[str] = None,
+    preload_data_transform: Optional[callable] = None,
 ):
     """
     This is the high-level helper function to
@@ -210,6 +211,7 @@ def make_replay_buffer(
     - type: support only for "replay_buffer" and "memory_efficient_replay_buffer"
     - image_keys: list of image keys, used only "memory_efficient_replay_buffer"
     - preload_rlds_path: path to preloaded RLDS trajectories
+    - preload_data_transform: data transformation function for preloaded RLDS data
     """
     print("shape of observation space and action space")
     print(env.observation_space)
@@ -251,7 +253,12 @@ def make_replay_buffer(
     if preload_rlds_path:
         print(f" - Preloaded {preload_rlds_path} to replay buffer")
         dataset = tfds.builder_from_directory(preload_rlds_path).as_dataset(split="all")
-        populate_datastore(replay_buffer, dataset, type="with_dones")
+        populate_datastore(
+            replay_buffer,
+            dataset,
+            data_transform=preload_data_transform,
+            type="with_dones",
+        )
         print(f" - done populated {len(replay_buffer)} samples to replay buffer")
 
     return replay_buffer
