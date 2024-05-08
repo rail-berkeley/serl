@@ -8,7 +8,11 @@ import numpy as np
 import tqdm
 from absl import app, flags
 from flax.training import checkpoints
+import cv2
+import os
 
+from typing import Any, Dict, Optional
+import pickle as pkl
 import gym
 from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
@@ -16,10 +20,12 @@ from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.utils.train_utils import concat_batches
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
 
+from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.utils.launcher import (
     make_drq_agent,
     make_trainer_config,
@@ -32,7 +38,7 @@ import franka_sim
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "HalfCheetah-v4", "Name of environment.")
+flags.DEFINE_string("env", "PandaPickCubeVision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 1000, "Maximum length of trajectory.")
@@ -59,6 +65,7 @@ flags.DEFINE_boolean("render", False, "Render the environment.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 # "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
+flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
 
@@ -173,7 +180,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
+def learner(
+    rng,
+    agent: DrQAgent,
+    replay_buffer: MemoryEfficientReplayBufferDataStore,
+    demo_buffer: Optional[MemoryEfficientReplayBufferDataStore] = None,
+    wandb_logger=None,
+):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
@@ -210,14 +223,32 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
     server.publish_network(agent.state.params)
     print_green("sent initial network to actor")
 
+    # 50/50 sampling from RLPD, half from demo and half from online experience if
+    # demo_buffer is provided
+    demo_iterator = None
+    if demo_buffer is None:
+        single_buffer_batch_size = FLAGS.batch_size
+    else:
+        single_buffer_batch_size = FLAGS.batch_size // 2
+
     # create replay buffer iterator
     replay_iterator = replay_buffer.get_iterator(
         sample_args={
-            "batch_size": FLAGS.batch_size,
+            "batch_size": single_buffer_batch_size,
             "pack_obs_and_next_obs": True,
         },
         device=sharding.replicate(),
     )
+
+    # if demo_buffer is provided, create demo buffer iterator
+    if demo_buffer is not None:
+        demo_iterator = demo_buffer.get_iterator(
+            sample_args={
+                "batch_size": single_buffer_batch_size,
+                "pack_obs_and_next_obs": True,
+            },
+            device=sharding.replicate(),
+        )
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
@@ -228,6 +259,12 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
 
+                # we will concatenate the demo data with the online data
+                # if demo_buffer is provided
+                if demo_iterator is not None:
+                    demo_batch = next(demo_iterator)
+                    batch = concat_batches(batch, demo_batch, axis=0)
+
             with timer.context("train_critics"):
                 agent, critics_info = agent.update_critics(
                     batch,
@@ -235,6 +272,12 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
 
         with timer.context("train"):
             batch = next(replay_iterator)
+
+            # we will concatenate the demo data with the online data
+            # if demo_buffer is provided
+            if demo_iterator is not None:
+                demo_batch = next(demo_iterator)
+                batch = concat_batches(batch, demo_batch, axis=0)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -260,6 +303,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
 
 def main(_):
     assert FLAGS.batch_size % num_devices == 0
+
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
 
@@ -292,6 +336,12 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
+    def preload_data_transform(data, metadata) -> Optional[Dict[str, Any]]:
+        # NOTE: Create your own custom data transform function here if you
+        # are loading this via with --preload_rlds_path with tf rlds data
+        # This default does nothing
+        return data
+
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = make_replay_buffer(
             env,
@@ -300,6 +350,7 @@ def main(_):
             type="memory_efficient_replay_buffer",
             image_keys=image_keys,
             preload_rlds_path=FLAGS.preload_rlds_path,
+            preload_data_transform=preload_data_transform,
         )
 
         # set up wandb and logging
@@ -314,12 +365,37 @@ def main(_):
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
 
+        print_green("replay buffer created")
+        print_green(f"replay_buffer size: {len(replay_buffer)}")
+
+        # if demo data is provided, load it into the demo buffer
+        # in the learner node
+        if FLAGS.demo_path:
+            # Check if the file exists
+            if not os.path.exists(FLAGS.demo_path):
+                raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+
+            demo_buffer = MemoryEfficientReplayBufferDataStore(
+                env.observation_space,
+                env.action_space,
+                capacity=10000,
+                image_keys=image_keys,
+            )
+            with open(FLAGS.demo_path, "rb") as f:
+                trajs = pkl.load(f)
+                for traj in trajs:
+                    demo_buffer.insert(traj)
+            print(f"demo buffer size: {len(demo_buffer)}")
+        else:
+            demo_buffer = None
+
         # learner loop
         print_green("starting learner loop")
         learner(
             sampling_rng,
             agent,
             replay_buffer,
+            demo_buffer=demo_buffer,  # None if no demo data is provided
             wandb_logger=wandb_logger,
         )
 

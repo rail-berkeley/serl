@@ -9,11 +9,12 @@ import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 
+import pickle as pkl
+import os
 import gym
 from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 from serl_launcher.agents.continuous.drq import DrQAgent
-from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.utils.train_utils import concat_batches
@@ -389,13 +390,17 @@ def main(_):
             capacity=10000,
             image_keys=image_keys,
         )
-        import pickle as pkl
 
-        with open(FLAGS.demo_path, "rb") as f:
-            trajs = pkl.load(f)
-            for traj in trajs:
-                demo_buffer.insert(traj)
-        print(f"demo buffer size: {len(demo_buffer)}")
+        if FLAGS.demo_path:
+            # Check if the file exists
+            if not os.path.exists(FLAGS.demo_path):
+                raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+
+            with open(FLAGS.demo_path, "rb") as f:
+                trajs = pkl.load(f)
+                for traj in trajs:
+                    demo_buffer.insert(traj)
+            print(f"demo buffer size: {len(demo_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
