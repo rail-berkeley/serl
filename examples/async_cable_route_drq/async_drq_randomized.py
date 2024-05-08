@@ -390,7 +390,7 @@ def main(_):
             capacity=10000,
             image_keys=image_keys,
         )
-        
+
         if FLAGS.demo_path:
             # Check if the file exists
             if not os.path.exists(FLAGS.demo_path):

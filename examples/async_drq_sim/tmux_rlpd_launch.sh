@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # use the default values if the env variables are not set
-EXAMPLE_DIR=${EXAMPLE_DIR:-"examples/async_rlpd_drq_sim"}
+EXAMPLE_DIR=${EXAMPLE_DIR:-"examples/async_drq_sim"}
 CONDA_ENV=${CONDA_ENV:-"serl"}
 
 cd $EXAMPLE_DIR
@@ -35,7 +35,7 @@ tmux split-window -v
 tmux send-keys -t serl_session:0.0 "conda activate $CONDA_ENV && bash run_actor.sh" C-m
 
 # Navigate to the activate the conda environment in the second pane
-tmux send-keys -t serl_session:0.1 "conda activate $CONDA_ENV && bash run_learner.sh" C-m
+tmux send-keys -t serl_session:0.1 "conda activate $CONDA_ENV && bash run_learner.sh --demo_path franka_lift_cube_image_20_trajs.pkl" C-m
 
 # Attach to the tmux session
 tmux attach-session -t serl_session

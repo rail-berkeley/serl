@@ -24,18 +24,31 @@ class SERLObsWrapper(gym.ObservationWrapper):
         }
         return obs
 
+
 class ManipulatorEnvObsWrapper(gym.ObservationWrapper):
     """
     This observation wrapper is to be used with the ManipulatorEnv.
     from:
         https://github.com/rail-berkeley/manipulator_gym
-        
+
     The will convert the observation space to be compatible with the SERL
+
+    E.g. to make manipulator_env compatible with SERL:
+
+        env = ManipulatorEnv(
+            # manipulator_interface=ActionClientInterface(host=FLAGS.ip),
+            manipulator_interface=ManipulatorInterface(), # for testing
+            state_encoding=StateEncoding.POS_EULER,
+            use_wrist_cam=True,
+        )
+        env = ResizeObsImageWrapper(env, resize_size={"image_primary": (128, 128), "image_wrist": (128, 128)})
+        env = ManipulatorEnvObsWrapper(env)
     """
+
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = gym.spaces.Dict(
-            {   
+            {
                 # convert (N) to (1, N)
                 "state": gym.spaces.Box(
                     low=self.env.observation_space["state"].low[None],
@@ -51,7 +64,8 @@ class ManipulatorEnvObsWrapper(gym.ObservationWrapper):
                         shape=(1, *self.env.observation_space[key].shape),
                         dtype=self.env.observation_space[key].dtype,
                     )
-                    for key in self.observation_space.keys() if key.startswith("image")
+                    for key in self.observation_space.keys()
+                    if key.startswith("image")
                 },
             }
         )
@@ -59,8 +73,6 @@ class ManipulatorEnvObsWrapper(gym.ObservationWrapper):
     def observation(self, obs):
         obs = {
             "state": obs["state"][None],
-            **{
-                key: obs[key][None] for key in obs if key.startswith("image")
-            },
+            **{key: obs[key][None] for key in obs if key.startswith("image")},
         }
         return obs

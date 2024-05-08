@@ -90,7 +90,7 @@ bash run_actor.sh
 
 **✨ One-liner launcher (requires `tmux`) ✨**
 ```bash
-bash examples/async_rlpd_drq_sim/tmux_launch.sh
+bash examples/async_drq_sim/tmux_rlpd_launch.sh
 ```
 
 ### Without using one-liner tmux launcher
@@ -98,7 +98,7 @@ bash examples/async_rlpd_drq_sim/tmux_launch.sh
 You can opt for running the commands individually in 2 different terminals.
 
 ```bash
-cd examples/async_rlpd_drq_sim
+cd examples/async_drq_sim
 
 # to use pre-trained ResNet weights, please download
 # note manual download is only for now, once repo is public, auto download will work
@@ -109,9 +109,9 @@ wget \
 https://github.com/rail-berkeley/serl/releases/download/franka_sim_lift_cube_demos/franka_lift_cube_image_20_trajs.pkl
 ```
 
-Run learner node:
+Run learner node, while provide the path to the demo trajectories in the `--demo_path` argument.
 ```bash
-bash run_learner.sh
+bash run_learner.sh --demo_path franka_lift_cube_image_20_trajs.pkl
 ```
 
 Run actor node with rendering window:
@@ -163,3 +163,9 @@ With the example above, we can load the data from the replay buffer by providing
 ```
 
 This is similar to the `examples/async_rlpd_drq_sim/run_learner.sh` script, which uses `--demo_path` argument which load .pkl offline demo trajectories.
+
+
+### Troubleshooting
+
+1. If you receive a Out of Memory error, try reducing the batch size in the `run_learner.sh` script.  by adding the `--batch_size` argument. For example, `bash run_learner.sh --batch_size 64`.
+2. If the provided offline RLDS data is throwing an error, this usually means the data is not compatible with current SERL format. You can provide a custom data transform with the `data_transform(data, metadata) -> data` function in the `examples/async_drq_sim/asyn_drq_sim.py` script.
