@@ -163,7 +163,7 @@ class RobotiqImpedanceController(threading.Thread):
         obj_status = await self.robotiq_gripper.get_object_status()
 
         pressure /= 100.   # pressure between [0, 1]
-        grip_status = 0. if obj_status.value == 3 else 1.  # 3-> no object detected, [0, 1, 2]-> obj detected
+        grip_status = [0., 1., 1., 0.][obj_status.value]  # 3-> no object detected, [0, 1, 2]-> obj detected
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = vel
@@ -174,7 +174,7 @@ class RobotiqImpedanceController(threading.Thread):
                 self.gripper_state[:] = [pressure, float(obj_status.value)]
             else:
                 # use moving average (5), since the force fluctuates heavily
-                self.curr_force[:] = 0.2 * np.array(force) + 0.8 * self.curr_force[:]
+                self.curr_force[:] = 0.1 * np.array(force) + 0.9 * self.curr_force[:]
                 self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
@@ -202,7 +202,7 @@ class RobotiqImpedanceController(threading.Thread):
             curr_pos = self.curr_pos
             curr_vel = self.curr_vel
 
-        # calc position force
+        # calc position for
         kp, kd = self.kp, self.kd
         diff_p = np.clip(target_pos[:3] - curr_pos[:3], a_min=-self.delta, a_max=self.delta)
         vel_delta = 2 * self.delta * self.frequency
@@ -217,9 +217,9 @@ class RobotiqImpedanceController(threading.Thread):
         # TODO make better and more general (tcp force check)
         # check for big downward tcp force and adapt accordingly
         if self.curr_force[2] > 0.5 and force_pos[2] < 0.:
-            print(force_pos[2], end="  ")
+            # print(force_pos[2], end="  ")
             force_pos[2] = max((1.5 - self.curr_force[2]), 0.) * force_pos[2] + min(self.curr_force[2] - 0.5, 1.) * 20.
-            print(force_pos[2])
+            # print(force_pos[2])
 
         return np.concatenate((force_pos, torque))
 
@@ -267,7 +267,7 @@ class RobotiqImpedanceController(threading.Thread):
             # print("release")
 
     def _truncate_check(self):
-        downward_force = self.curr_force[2] > 10.
+        downward_force = self.curr_force[2] > 20.
         if downward_force:  # TODO add better criteria
             self._is_truncated.set()
         else:
