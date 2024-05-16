@@ -129,14 +129,14 @@ def make_drq_agent(
         },
         temperature_init=1e-2,
         discount=0.99,  # 0.99
-        backup_entropy=False,
+        backup_entropy=True,        # default: False
         critic_ensemble_size=10,
         critic_subsample_size=2,
         actor_optimizer_kwargs={
-            "learning_rate": 3e-3,  # 3e-4
+            "learning_rate": 3e-4,  # 3e-4
         },
         critic_optimizer_kwargs={
-            "learning_rate": 3e-3,  # 3e-4
+            "learning_rate": 3e-4,  # 3e-4
         },
     )
     return agent

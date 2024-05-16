@@ -44,17 +44,17 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "robotiq_camera_env", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
-flags.DEFINE_string("exp_name", "DRQ first tests", "Name of the experiment for wandb logging.")
+flags.DEFINE_string("exp_name", "DRQ agent", "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_string("camera_mode", "rgb", "Camera mode, one of (rgb, depth, both)")
 
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
-flags.DEFINE_integer("batch_size", 512, "Batch size.")
+flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity.")
+flags.DEFINE_integer("replay_buffer_capacity", 20000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
@@ -222,7 +222,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
             reward = np.asarray(reward, dtype=np.float32)
             info = np.asarray(info)
-            running_return += reward
+            running_return = running_return * 0.99 + reward
             transition = dict(
                 observations=obs,
                 actions=actions,
@@ -237,6 +237,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             if done or truncated:
                 stats = {"train": info}  # send stats to the learner to log
                 client.request("send-stats", stats)
+                print(f"running return: {running_return}")
                 running_return = 0.0
                 obs, _ = env.reset()
 
@@ -345,17 +346,17 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
         for critic_step in range(FLAGS.utd_ratio - 1):
             with timer.context("sample_replay_buffer"):
-                batch = next(replay_iterator) if len(replay_buffer) > 0 else None
+                batch = next(replay_iterator)
                 demo_batch = next(demo_iterator)
-                batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
+                batch = concat_batches(batch, demo_batch, axis=0)
 
             with timer.context("train_critics"):
                 agent, critics_info = agent.update_critics(batch,)
 
         with timer.context("train"):
-            batch = next(replay_iterator) if len(replay_buffer) > 0 else None
+            batch = next(replay_iterator)
             demo_batch = next(demo_iterator)
-            batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
+            batch = concat_batches(batch, demo_batch, axis=0)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -366,6 +367,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         if update_steps % FLAGS.log_period == 0 and wandb_logger:
             wandb_logger.log(update_info, step=update_steps)
             wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
+            wandb_logger.log({"replay_buffer_size": len(replay_buffer)})
 
         if FLAGS.checkpoint_period and update_steps and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
@@ -420,11 +422,11 @@ def main(_):
         fake_env=FLAGS.learner,
         max_episode_length=FLAGS.max_traj_length,
     )
-    if FLAGS.actor:
-        env = SpacemouseIntervention(env)
+    # if FLAGS.actor:
+    #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
-    env = ScaleObservationWrapper(env)      # scale obs space
+    env = ScaleObservationWrapper(env)      # scale obs space (after quat2euler, but before serlobswr)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -467,12 +469,12 @@ def main(_):
         demo_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
-            capacity=10000,
+            capacity=2000,
             image_keys=image_keys,
         )
         import pickle as pkl
 
-        # TOOD check for depth or rgb
+        # TODO check for depth or rgb
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
