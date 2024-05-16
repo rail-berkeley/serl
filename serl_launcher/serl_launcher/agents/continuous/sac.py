@@ -167,9 +167,10 @@ class SACAgent(flax.struct.PyTreeNode):
         )
         chex.assert_shape(target_q, (batch_size,))
 
-        if self.config["backup_entropy"]:
+        if self.config["backup_entropy"]:       # not the same as in original jaxrl_m SAC implementation: https://github.com/dibyaghosh/jaxrl_m/blob/main/examples/mujoco/sac.py
             temperature = self.forward_temperature()
-            target_q = target_q - temperature * next_actions_log_probs
+            # target_q = target_q - temperature * next_actions_log_probs        # serl original
+            target_q = target_q - self.config["discount"] * batch["masks"] * next_actions_log_probs * temperature  # as in jaxrl_m
 
         predicted_qs = self.forward_critic(
             batch["observations"], batch["actions"], rng=rng, grad_params=params
@@ -180,7 +181,7 @@ class SACAgent(flax.struct.PyTreeNode):
         )
         target_qs = target_q[None].repeat(self.config["critic_ensemble_size"], axis=0)
         chex.assert_equal_shape([predicted_qs, target_qs])
-        critic_loss = jnp.mean((predicted_qs - target_qs) ** 2)
+        critic_loss = jnp.mean(jnp.sum((predicted_qs - target_qs) ** 2, axis=0))
 
         info = {
             "critic_loss": critic_loss,
