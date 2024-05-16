@@ -14,7 +14,8 @@ class RobotiqCameraEnv(RobotiqEnv):
         super().__init__(**kwargs, config=RobotiqCameraConfig)
         self.plot_costs_yes = False
         if self.plot_costs_yes:
-            self.reward_hist = dict(action_cost=[], suction_cost=[], non_central_cost=[], suction_reward=[], downward_force_cost=[])
+            self.reward_hist = dict(action_cost=[], suction_cost=[], non_central_cost=[], suction_reward=[],
+                                    downward_force_cost=[])
 
     """def compute_reward(self, obs, action) -> float:
         # huge action gives negative reward (like in mountain car)
@@ -45,15 +46,15 @@ class RobotiqCameraEnv(RobotiqEnv):
             return 0.0 - total_cost + suction_reward"""
 
     def compute_reward(self, obs, action) -> float:
-        action_cost = 0.2 * np.sum(np.power(action, 2))
-        step_cost = 0.02
+        action_cost = 0.1 * np.sum(np.power(action, 2))
+        step_cost = 0.01
 
-        downward_force_cost = 0.4 * max(obs["state"]["tcp_force"][2] - 5, 0.)
+        downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 5., 0.)
+
         if self.reached_goal_state(obs):
             return 100. - action_cost - step_cost - downward_force_cost
         else:
             return 0. - action_cost - step_cost - downward_force_cost
-
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
