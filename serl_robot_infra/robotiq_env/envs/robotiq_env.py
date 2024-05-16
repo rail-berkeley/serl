@@ -267,7 +267,10 @@ class RobotiqEnv(gym.Env):
         obs = self._get_obs()
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
-        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs)
+
+        reward = reward if not truncated else reward - 100.     # truncation penalty
+
+        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
         return obs, reward, done, truncated, {}
 
     def compute_reward(self, obs, action) -> float:
