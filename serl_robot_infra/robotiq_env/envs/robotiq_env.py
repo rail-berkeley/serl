@@ -90,6 +90,7 @@ class RobotiqEnv(gym.Env):
         self.config = config
 
         self.resetQ = config.RESET_Q
+        self.curr_reset_pose = np.zeros((7,), dtype=np.float32)
 
         self.curr_pos = np.zeros((7,), dtype=np.float32)
         self.curr_vel = np.zeros((6,), dtype=np.float32)
@@ -129,31 +130,28 @@ class RobotiqEnv(gym.Env):
             np.ones((7,), dtype=np.float32),
         )
 
-        if camera_mode == "rgb":
-            image_space = gym.spaces.Dict(  # TODO add depth info, or make bigger (only 128x128x3)
-                {
-                    "shoulder": gym.spaces.Box(
+        image_space_definition = {}
+        if camera_mode in ["rgb", "both"]:
+            # image_space_definition["shoulder"] = gym.spaces.Box(      # TODO only temporary with one image
+            #             0, 255, shape=(128, 128, 3), dtype=np.uint8
+            # )
+            image_space_definition["wrist"] = gym.spaces.Box(
                         0, 255, shape=(128, 128, 3), dtype=np.uint8
-                    ),
-                    "wrist": gym.spaces.Box(
-                        0, 255, shape=(128, 128, 3), dtype=np.uint8
-                    ),
-                })
-        elif camera_mode == "depth":
-            image_space = gym.spaces.Dict(
-                {
-                    "shoulder": gym.spaces.Box(
-                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
-                    ),
-                    "wrist": gym.spaces.Box(
-                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
-                    )
-                }
             )
-        elif camera_mode == "both":
-            raise NotImplementedError("not yet implemented")
+
+        elif camera_mode in ["depth", "both"]:
+            image_space_definition["shoulder_depth"] = gym.spaces.Box(
+                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
+            )
+            image_space_definition["wrist_depth"] = gym.spaces.Box(
+                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
+            )
         elif camera_mode is not None:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
+
+        image_space = gym.spaces.Dict(
+            image_space_definition
+        )
 
         state_space = gym.spaces.Dict(
             {
@@ -167,13 +165,11 @@ class RobotiqEnv(gym.Env):
             }
         )
 
-        if self.camera_mode is None:
-            self.observation_space = gym.spaces.Dict({"state": state_space})
-        else:
-            self.observation_space = gym.spaces.Dict({
-                "state": state_space,
-                "images": image_space,
-            })
+        obs_space_definition = {"state": state_space}
+        if self.camera_mode in ["rgb", "both", "depth"]:
+            obs_space_definition["images"] = image_space
+
+        self.observation_space = gym.spaces.Dict(obs_space_definition)
 
         self.cycle_count = 0
         self.controller = None
@@ -302,11 +298,13 @@ class RobotiqEnv(gym.Env):
             time.sleep(0.1)  # wait for the reset operation
 
         self._update_currpos()
+        reset_pose = self.controller.get_target_pos()
+
         if self.random_reset:  # randomize reset position in xy plane
             # reset_pose = self.resetpos.copy()
-            reset_pose = self.controller.get_target_pos()
             reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
             reset_pose[:2] += reset_shift
+            self.curr_reset_pose[:] = reset_pose
 
             # euler_random = reset_pose[3:]
             # euler_random[-1] += np.random.uniform(
@@ -319,6 +317,7 @@ class RobotiqEnv(gym.Env):
             # print(reset_shift, reset_pose)
             return reset_shift
         else:
+            self.curr_reset_pose[:] = reset_pose
             return np.zeros((2,))
 
     def reset(self, joint_reset=False, **kwargs):
@@ -361,6 +360,7 @@ class RobotiqEnv(gym.Env):
                 RSCapture(name=cam_name, serial_number=cam_serial, depth=False)
             )
             self.cap[cam_name] = cap
+            # TODO make simultaneous depth capture
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
@@ -399,7 +399,6 @@ class RobotiqEnv(gym.Env):
 
     def get_depth(self) -> Dict[str, np.ndarray]:
         depth = {}
-        display_depth = {}
         for key, cap in self.cap.items():
             try:
                 depth = cap.read()
@@ -407,15 +406,12 @@ class RobotiqEnv(gym.Env):
                 resized = cv2.resize(
                     cropped_depth, self.observation_space["images"][key].shape[:2][::-1]
                 )
+                depth[key] = resized[..., ::-1]
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
                 cap.close()
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_depth()
-        self.recording_frames.append(
-            np.concatenate([display_depth[f"{k}_full"] for k in self.cap], axis=0)
-        )
-        self.img_queue.put(display_depth)
         return depth
 
     def close_cameras(self):
@@ -466,6 +462,8 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode is not None:
             images = self.get_image()
+            # TODO remove, temporarly set every image to black
+            # images = np.ones_like(images) * 255
             return copy.deepcopy(dict(images=images, state=state_observation))
         else:
             return copy.deepcopy(dict(state=state_observation))
