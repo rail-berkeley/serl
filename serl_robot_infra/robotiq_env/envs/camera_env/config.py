@@ -4,7 +4,7 @@ import numpy as np
 
 class RobotiqCameraConfig(DefaultEnvConfig):
     RESET_Q = np.array([[1.3502, -1.2897, 1.9304, -2.2098, -1.5661, 1.4027]])
-    RANDOM_RESET = True
+    RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.05,)
     RANDOM_RZ_RANGE = (0.0,)
     # ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
@@ -23,6 +23,6 @@ class RobotiqCameraConfig(DefaultEnvConfig):
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.1, 1., 1., 1.])
 
     REALSENSE_CAMERAS = {
-        "wrist": "218622271597",
-        "shoulder": "218622270808"
+        "wrist": "218622279756",
+        # "shoulder": "218622277164"
     }
