@@ -274,7 +274,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None):
+def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
@@ -320,16 +320,6 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         },
         device=sharding.replicate(),
     )
-    # demo_iterator = demo_buffer.get_iterator(
-    #     sample_args={
-    #         "batch_size": FLAGS.batch_size // 2,
-    #         "pack_obs_and_next_obs": True,
-    #     },
-    #     device=sharding.replicate(),
-    # )
-
-    # if FLAGS.debug:     # debug without replay buffer
-    #     replay_iterator = demo_iterator
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
@@ -348,16 +338,12 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         for critic_step in range(FLAGS.utd_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
-                # demo_batch = next(demo_iterator) if len(replay_buffer) < 5000 else next(replay_iterator)
-                # batch = concat_batches(batch, demo_batch, axis=0)
 
             with timer.context("train_critics"):
                 agent, critics_info = agent.update_critics(batch,)
 
         with timer.context("train"):
             batch = next(replay_iterator)
-            # demo_batch = next(demo_iterator) if len(replay_buffer) < 5000 else next(replay_iterator)
-            # batch = concat_batches(batch, demo_batch, axis=0)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -468,32 +454,27 @@ def main(_):
     if FLAGS.learner:
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
-        demo_buffer = MemoryEfficientReplayBufferDataStore(
-            env.observation_space,
-            env.action_space,
-            capacity=2000,
-            image_keys=image_keys,
-        )
-        import pickle as pkl
 
-        # TODO check for depth or rgb
+        import pickle as pkl
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
-                # TODO only temporary to test one image only
-                traj["observations"].pop("shoulder")
-                traj["next_observations"].pop("shoulder")
+                # check which observations can be ignored for this run
+                for obs_name in traj["observations"].keys():
+                    if obs_name not in env.observation_space.spaces:
+                        traj["observations"].pop(obs_name)
+                        traj["next_observations"].pop(obs_name)
+                        print(f"ignored {obs_name} in demo trajectories")
 
-                replay_buffer.insert(traj)      # TODO only temporary, to test demos in replaybuffer
-        print(f"demo buffer size: {len(replay_buffer)}")
+                replay_buffer.insert(traj)
+        print(f"replay buffer size: {len(replay_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
         learner(
             sampling_rng,
             agent,
-            replay_buffer,
-            demo_buffer=demo_buffer,
+            replay_buffer=replay_buffer,
             wandb_logger=wandb_logger,
         )
 
