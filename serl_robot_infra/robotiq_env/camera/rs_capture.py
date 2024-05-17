@@ -25,8 +25,10 @@ class RSCapture:
             self.cfg.enable_stream(rs.stream.depth, dim[0], dim[1], rs.format.z16, fps)
         self.profile = self.pipe.start(self.cfg)
 
-        # depth_sensor = self.profile.get_device().query_sensors()[0]
-        # depth_sensor.set_option(rs.option.enable_auto_white_balance, True)      # TODO needed?
+        # for some weird reason, these values have to be set in order for the image to appear with good lightning
+        for sensor in self.profile.get_device().query_sensors():
+            sensor.set_option(rs.option.enable_auto_exposure, False)
+            sensor.set_option(rs.option.enable_auto_white_balance, True)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
