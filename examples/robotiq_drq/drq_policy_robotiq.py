@@ -458,14 +458,18 @@ def main(_):
         import pickle as pkl
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
-            for traj in trajs:
-                # check which observations can be ignored for this run
-                for obs_name in traj["observations"].keys():
-                    if obs_name not in env.observation_space.spaces:
-                        traj["observations"].pop(obs_name)
-                        traj["next_observations"].pop(obs_name)
-                        print(f"ignored {obs_name} in demo trajectories")
 
+            # check which observations can be ignored for this run
+            to_pop = []
+            for obs_name in [i for i in trajs[0]["observations"].keys()]:
+                if obs_name not in env.observation_space.spaces:
+                    to_pop.append(obs_name)
+            print(f"ignored {to_pop} observation in the demo trajectories")
+
+            for traj in trajs:
+                for obs_name in to_pop:
+                    traj["observations"].pop(obs_name)
+                    traj["next_observations"].pop(obs_name)
                 replay_buffer.insert(traj)
         print(f"replay buffer size: {len(replay_buffer)}")
 
