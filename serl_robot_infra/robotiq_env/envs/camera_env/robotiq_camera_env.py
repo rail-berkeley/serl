@@ -50,11 +50,16 @@ class RobotiqCameraEnv(RobotiqEnv):
         step_cost = 0.01
 
         downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 5., 0.)
+        suction_reward = 0.5 * float(obs["state"]["gripper_state"][1] > 0.9)
+
+        # TODO make cost for being at orientation limit
+        # TODO make cost for being too far away from starting position
 
         if self.reached_goal_state(obs):
+            # TODO make offset end position cost with self.curr_reset_pose
             return 100. - action_cost - step_cost - downward_force_cost
         else:
-            return 0. - action_cost - step_cost - downward_force_cost
+            return 0. + suction_reward - action_cost - step_cost - downward_force_cost
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis

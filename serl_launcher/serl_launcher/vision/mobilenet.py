@@ -40,8 +40,8 @@ class MobileNetEncoder(nn.Module):
         std = jnp.array((0.229, 0.224, 0.225))[None, ...]
 
         # normalization constants calculated from the demo trajectories ...demos_mai3_streamlined.pkl
-        mean = jnp.array((0.68992649, 0.66665285, 0.57000176))[None, ...]
-        std = jnp.array((0.35203312, 0.29289631, 0.29029032))[None, ...]
+        # mean = jnp.array((0.68992649, 0.66665285, 0.57000176))[None, ...]
+        # std = jnp.array((0.35203312, 0.29289631, 0.29029032))[None, ...]
 
         x = x.astype(jnp.float32) / 255.0
         x = (x - mean) / std

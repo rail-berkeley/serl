@@ -133,10 +133,49 @@ def make_drq_agent(
         critic_ensemble_size=10,
         critic_subsample_size=2,
         actor_optimizer_kwargs={
-            "learning_rate": 3e-4,  # 3e-4
+            "learning_rate": 3e-3,  # 3e-4
         },
         critic_optimizer_kwargs={
-            "learning_rate": 3e-4,  # 3e-4
+            "learning_rate": 3e-3,  # 3e-4
+        },
+    )
+    return agent
+
+
+def make_drq_agent_no_images(
+    seed, sample_obs, sample_action, image_keys=(), encoder_type="small"
+):
+    agent = DrQAgent.create_drq_no_images(
+        jax.random.PRNGKey(seed),
+        sample_obs,
+        sample_action,
+        image_keys=image_keys,
+        policy_kwargs={
+            "tanh_squash_distribution": True,
+            "std_parameterization": "exp",
+            "std_min": 1e-5,
+            "std_max": 5,
+        },
+        critic_network_kwargs={
+            "activations": nn.tanh,
+            "use_layer_norm": True,
+            "hidden_dims": [256, 256],
+        },
+        policy_network_kwargs={
+            "activations": nn.tanh,
+            "use_layer_norm": True,
+            "hidden_dims": [256, 256],
+        },
+        temperature_init=1e-2,
+        discount=0.99,  # 0.99
+        backup_entropy=True,        # default: False
+        critic_ensemble_size=10,
+        critic_subsample_size=2,
+        actor_optimizer_kwargs={
+            "learning_rate": 3e-3,  # 3e-4
+        },
+        critic_optimizer_kwargs={
+            "learning_rate": 3e-3,  # 3e-4
         },
     )
     return agent

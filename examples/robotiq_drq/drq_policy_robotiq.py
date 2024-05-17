@@ -54,7 +54,7 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 20000, "Replay buffer capacity.")
+flags.DEFINE_integer("replay_buffer_capacity", 5000, "Replay buffer capacity.")     # quite low to forget old ones
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
@@ -210,7 +210,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     deterministic=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
-                print(actions)
+                # print(actions)
 
         # Step environment
         with timer.context("step_env"):
@@ -270,8 +270,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 client.stop()
                 break
 
-    print("Actor loop finished")
-
 
 ##############################################################################
 
@@ -317,18 +315,21 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     # 50/50 sampling from RLPD, half from demo and half from online experience
     replay_iterator = replay_buffer.get_iterator(
         sample_args={
-            "batch_size": FLAGS.batch_size // 2,
+            "batch_size": FLAGS.batch_size,
             "pack_obs_and_next_obs": True,
         },
         device=sharding.replicate(),
     )
-    demo_iterator = demo_buffer.get_iterator(
-        sample_args={
-            "batch_size": FLAGS.batch_size // 2,
-            "pack_obs_and_next_obs": True,
-        },
-        device=sharding.replicate(),
-    )
+    # demo_iterator = demo_buffer.get_iterator(
+    #     sample_args={
+    #         "batch_size": FLAGS.batch_size // 2,
+    #         "pack_obs_and_next_obs": True,
+    #     },
+    #     device=sharding.replicate(),
+    # )
+
+    # if FLAGS.debug:     # debug without replay buffer
+    #     replay_iterator = demo_iterator
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
@@ -347,16 +348,16 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
         for critic_step in range(FLAGS.utd_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
-                demo_batch = next(demo_iterator)
-                batch = concat_batches(batch, demo_batch, axis=0)
+                # demo_batch = next(demo_iterator) if len(replay_buffer) < 5000 else next(replay_iterator)
+                # batch = concat_batches(batch, demo_batch, axis=0)
 
             with timer.context("train_critics"):
                 agent, critics_info = agent.update_critics(batch,)
 
         with timer.context("train"):
             batch = next(replay_iterator)
-            demo_batch = next(demo_iterator)
-            batch = concat_batches(batch, demo_batch, axis=0)
+            # demo_batch = next(demo_iterator) if len(replay_buffer) < 5000 else next(replay_iterator)
+            # batch = concat_batches(batch, demo_batch, axis=0)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -369,13 +370,14 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
             wandb_logger.log({"timer": timer.get_average_times()}, step=update_steps)
             wandb_logger.log({"replay_buffer_size": len(replay_buffer)})
 
-        if FLAGS.checkpoint_period and update_steps and update_steps % FLAGS.checkpoint_period == 0:
+        update_steps += 1
+
+        if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
                 FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
             )
 
-        update_steps += 1
 
         if PAUSE_EVENT_FLAG.is_set():
             print("Learner loop interrupted")
@@ -478,8 +480,12 @@ def main(_):
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
             for traj in trajs:
-                demo_buffer.insert(traj)
-        print(f"demo buffer size: {len(demo_buffer)}")
+                # TODO only temporary to test one image only
+                traj["observations"].pop("shoulder")
+                traj["next_observations"].pop("shoulder")
+
+                replay_buffer.insert(traj)      # TODO only temporary, to test demos in replaybuffer
+        print(f"demo buffer size: {len(replay_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
@@ -497,7 +503,13 @@ def main(_):
 
         # actor loop
         print_green("starting actor loop")
-        actor(agent, data_store, env, sampling_rng)
+        try:
+            actor(agent, data_store, env, sampling_rng)
+            print_green("actor loop finished")
+        except KeyboardInterrupt:
+            print_green("actor loop interrupted")
+        finally:
+            env.close()
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")
