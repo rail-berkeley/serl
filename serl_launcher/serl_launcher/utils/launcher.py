@@ -21,11 +21,12 @@ from serl_launcher.data.data_store import (
     ReplayBufferDataStore,
 )
 
+
 ##############################################################################
 
 
 def make_bc_agent(
-    seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
+        seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
 ):
     return BCAgent.create(
         jax.random.PRNGKey(seed),
@@ -102,7 +103,7 @@ def make_sac_agent(seed, sample_obs, sample_action):
 
 
 def make_drq_agent(
-    seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
+        seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
 ):
     agent = DrQAgent.create_drq(
         jax.random.PRNGKey(seed),
@@ -129,46 +130,7 @@ def make_drq_agent(
         },
         temperature_init=1e-2,
         discount=0.99,  # 0.99
-        backup_entropy=True,        # default: False
-        critic_ensemble_size=10,
-        critic_subsample_size=2,
-        actor_optimizer_kwargs={
-            "learning_rate": 3e-3,  # 3e-4
-        },
-        critic_optimizer_kwargs={
-            "learning_rate": 3e-3,  # 3e-4
-        },
-    )
-    return agent
-
-
-def make_drq_agent_no_images(
-    seed, sample_obs, sample_action, image_keys=(), encoder_type="small"
-):
-    agent = DrQAgent.create_drq_no_images(
-        jax.random.PRNGKey(seed),
-        sample_obs,
-        sample_action,
-        image_keys=image_keys,
-        policy_kwargs={
-            "tanh_squash_distribution": True,
-            "std_parameterization": "exp",
-            "std_min": 1e-5,
-            "std_max": 5,
-        },
-        critic_network_kwargs={
-            "activations": nn.tanh,
-            "use_layer_norm": True,
-            "hidden_dims": [256, 256],
-        },
-        policy_network_kwargs={
-            "activations": nn.tanh,
-            "use_layer_norm": True,
-            "hidden_dims": [256, 256],
-        },
-        temperature_init=1e-2,
-        discount=0.99,  # 0.99
-        backup_entropy=True,        # default: False
+        backup_entropy=True,  # default: False
         critic_ensemble_size=10,
         critic_subsample_size=2,
         actor_optimizer_kwargs={
@@ -182,13 +144,13 @@ def make_drq_agent_no_images(
 
 
 def make_vice_agent(
-    seed,
-    sample_obs,
-    sample_action,
-    sample_vice_obs,
-    image_keys=("image",),
-    vice_image_keys=("image",),
-    encoder_type="small",
+        seed,
+        sample_obs,
+        sample_action,
+        sample_vice_obs,
+        image_keys=("image",),
+        vice_image_keys=("image",),
+        encoder_type="small",
 ):
     agent = VICEAgent.create_vice(
         jax.random.PRNGKey(seed),
@@ -241,9 +203,9 @@ def make_trainer_config(port_number: int = 5488, broadcast_port: int = 5489):
 
 
 def make_wandb_logger(
-    project: str = "agentlace",
-    description: str = "serl_launcher",
-    debug: bool = False,
+        project: str = "agentlace",
+        description: str = "serl_launcher",
+        debug: bool = False,
 ):
     wandb_config = WandBLogger.get_default_config()
     wandb_config.update(
@@ -262,12 +224,12 @@ def make_wandb_logger(
 
 
 def make_replay_buffer(
-    env,
-    capacity: int = 1000000,
-    rlds_logger_path: Optional[str] = None,
-    type: str = "replay_buffer",
-    image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
-    preload_rlds_path: Optional[str] = None,
+        env,
+        capacity: int = 1000000,
+        rlds_logger_path: Optional[str] = None,
+        type: str = "replay_buffer",
+        image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
+        preload_rlds_path: Optional[str] = None,
 ):
     """
     This is the high-level helper function to
