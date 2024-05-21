@@ -136,17 +136,18 @@ class RobotiqEnv(gym.Env):
             #             0, 255, shape=(128, 128, 3), dtype=np.uint8
             # )
             image_space_definition["wrist"] = gym.spaces.Box(
-                        0, 255, shape=(128, 128, 3), dtype=np.uint8
+                0, 255, shape=(128, 128, 3), dtype=np.uint8
             )
 
-        elif camera_mode in ["depth", "both"]:
-            image_space_definition["shoulder_depth"] = gym.spaces.Box(
-                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
-            )
+        if camera_mode in ["depth", "both"]:
+            # image_space_definition["shoulder_depth"] = gym.spaces.Box(
+            #     0, 255, shape=(128, 128, 1), dtype=np.uint8
+            # )
             image_space_definition["wrist_depth"] = gym.spaces.Box(
-                        0, 65535, shape=(128, 128, 1), dtype=np.uint16
+                0, 255, shape=(128, 128, 1), dtype=np.uint8
             )
-        elif camera_mode is not None:
+
+        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
         image_space = gym.spaces.Dict(
@@ -261,10 +262,11 @@ class RobotiqEnv(gym.Env):
 
         self._update_currpos()
         obs = self._get_obs()
+
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
 
-        reward = reward if not truncated else reward - 100.     # truncation penalty
+        reward = reward if not truncated else reward - 100.  # truncation penalty
 
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
         return obs, reward, done, truncated, {}
@@ -356,11 +358,12 @@ class RobotiqEnv(gym.Env):
         self.cap = OrderedDict()
         for cam_name, cam_serial in name_serial_dict.items():
             print(f"cam serial: {cam_serial}")
+            rgb = self.camera_mode in ["rgb", "both"]
+            depth = self.camera_mode in ["depth", "both"]
             cap = VideoCapture(
-                RSCapture(name=cam_name, serial_number=cam_serial, depth=False)
+                RSCapture(name=cam_name, serial_number=cam_serial, rgb=rgb, depth=depth)
             )
             self.cap[cam_name] = cap
-            # TODO make simultaneous depth capture
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
@@ -377,42 +380,42 @@ class RobotiqEnv(gym.Env):
         display_images = {}
         for key, cap in self.cap.items():
             try:
-                rgb = cap.read()
-                cropped_rgb = self.crop_image(key, rgb)
-                resized = cv2.resize(
-                    cropped_rgb, self.observation_space["images"][key].shape[:2][::-1]
-                )
-                images[key] = resized[..., ::-1]
-                display_images[key] = resized
-                display_images[key + "_full"] = cropped_rgb
+                image = cap.read()
+                if self.camera_mode in ["rgb", "both"]:
+                    rgb = image[..., :3].astype(np.uint8)
+                    cropped_rgb = self.crop_image(key, rgb)
+                    resized = cv2.resize(
+                        cropped_rgb, self.observation_space["images"][key].shape[:2][::-1]
+                    )
+                    images[key] = resized[..., ::-1]
+                    display_images[key] = resized
+                    display_images[key + "_full"] = cropped_rgb
+
+                if self.camera_mode in ["depth", "both"]:
+                    depth_key = key + "_depth"
+                    depth = image[..., -1:]
+                    cropped_depth = self.crop_image(key, depth)
+
+                    resized = cv2.resize(
+                        cropped_depth, self.observation_space["images"][depth_key].shape[:2]
+                    )[..., None]
+
+                    images[depth_key] = resized
+                    display_images[depth_key] = cv2.applyColorMap(resized, cv2.COLORMAP_JET)
+                    display_images[depth_key + "_full"] = cv2.applyColorMap(cropped_depth, cv2.COLORMAP_JET)
+
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
                 cap.close()
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
+
         self.recording_frames.append(
-            np.concatenate([display_images[f"{k}_full"] for k in self.cap], axis=0)
+            np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
         )
         self.img_queue.put(display_images)
         return images
-
-    def get_depth(self) -> Dict[str, np.ndarray]:
-        depth = {}
-        for key, cap in self.cap.items():
-            try:
-                depth = cap.read()
-                cropped_depth = self.crop_image(key, depth)
-                resized = cv2.resize(
-                    cropped_depth, self.observation_space["images"][key].shape[:2][::-1]
-                )
-                depth[key] = resized[..., ::-1]
-            except queue.Empty:
-                input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
-                cap.close()
-                self.init_cameras(self.config.REALSENSE_CAMERAS)
-                return self.get_depth()
-        return depth
 
     def close_cameras(self):
         """Close both wrist cameras."""
@@ -462,8 +465,8 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode is not None:
             images = self.get_image()
-            # TODO remove, temporarly set every image to black
-            # images = np.ones_like(images) * 255
+            # TODO remove, temporarily set every image to black
+            # images = np.ones_like(image) * 255
             return copy.deepcopy(dict(images=images, state=state_observation))
         else:
             return copy.deepcopy(dict(state=state_observation))

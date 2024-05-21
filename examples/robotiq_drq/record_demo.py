@@ -33,7 +33,7 @@ def on_esc(key):
 
 if __name__ == "__main__":
     env = gym.make("robotiq_camera_env",
-                   camera_mode="rgb",          # TODO save both modalities!
+                   camera_mode="both",
                    max_episode_length=100
                    )
     env = SpacemouseIntervention(env)

@@ -17,13 +17,21 @@ class RSCapture:
         self.pipe = rs.pipeline()
         self.cfg = rs.config()
         self.cfg.enable_device(self.serial_number)
+        self.colorizer = None
 
         assert self.rgb or self.depth
         if self.rgb:
             self.cfg.enable_stream(rs.stream.color, dim[0], dim[1], rs.format.bgr8, fps)
         if self.depth:
             self.cfg.enable_stream(rs.stream.depth, dim[0], dim[1], rs.format.z16, fps)
+
         self.profile = self.pipe.start(self.cfg)
+
+        if self.depth:
+            depth_sensor = self.profile.get_device().first_depth_sensor()
+            depth_scale = depth_sensor.get_depth_scale()
+            self.max_clipping_distance = 1. / depth_scale        # 1m max clipping distance
+            self.min_clipping_distance = 0.0 / depth_scale       # might mess things up
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
         for sensor in self.profile.get_device().query_sensors():
@@ -39,17 +47,27 @@ class RSCapture:
     def read(self):
         frames = self.pipe.wait_for_frames()
         aligned_frames = self.align.process(frames)
+        image, depth = None, None
+
         if self.rgb:
             color_frame = aligned_frames.get_color_frame()
+
+            if color_frame.is_video_frame():
+                image = np.asarray(color_frame.get_data())
+
         if self.depth:
             depth_frame = aligned_frames.get_depth_frame()
 
-        image, depth = None, None
-        if self.rgb and color_frame.is_video_frame():
-            image = np.asarray(color_frame.get_data())
+            if depth_frame.is_depth_frame():
+                depth = np.asanyarray(depth_frame.get_data())
+                # clip max
+                depth = np.where((depth > self.max_clipping_distance) | (depth < self.min_clipping_distance), 0., self.max_clipping_distance - depth)
+                # clip min
+                # scale = self.max_clipping_distance / (self.max_clipping_distance - self.min_clipping_distance)
+                # depth *= scale
 
-        if self.depth and depth_frame.is_depth_frame():
-            depth = np.expand_dims(np.asarray(depth_frame.get_data()), axis=2)
+                depth = (depth * (256. / self.max_clipping_distance)).astype(np.uint8)
+                depth = depth[..., None]
 
         if isinstance(image, np.ndarray) and isinstance(depth, np.ndarray):
             return True, np.concatenate((image, depth), axis=-1)
