@@ -15,14 +15,14 @@ class SERLObsWrapper(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Dict(
             {
                 "state": flatten_space(self.env.observation_space["state"]),
-                **(self.env.observation_space["images"]),
+                **(self.env.observation_space["images"] if "images" in self.env.observation_space else {}),
             }
         )
 
     def observation(self, obs):
         obs = {
             "state": flatten(self.env.observation_space["state"], obs["state"]),
-            **(obs["images"]),
+            **(obs["images"] if "images" in self.env.observation_space else {}),
         }
         return obs
 

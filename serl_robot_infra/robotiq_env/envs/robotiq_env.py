@@ -106,6 +106,7 @@ class RobotiqEnv(gym.Env):
         self.random_rz_range = config.RANDOM_RZ_RANGE
         self.hz = hz
 
+        camera_mode = None if camera_mode.lower() == "none" else camera_mode
         if camera_mode is not None and save_video:
             print("Saving videos!")
         self.save_video = save_video
@@ -150,10 +151,6 @@ class RobotiqEnv(gym.Env):
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
-        image_space = gym.spaces.Dict(
-            image_space_definition
-        )
-
         state_space = gym.spaces.Dict(
             {
                 "tcp_pose": gym.spaces.Box(
@@ -168,7 +165,9 @@ class RobotiqEnv(gym.Env):
 
         obs_space_definition = {"state": state_space}
         if self.camera_mode in ["rgb", "both", "depth"]:
-            obs_space_definition["images"] = image_space
+            obs_space_definition["images"] = gym.spaces.Dict(
+                image_space_definition
+            )
 
         self.observation_space = gym.spaces.Dict(obs_space_definition)
 
@@ -188,7 +187,7 @@ class RobotiqEnv(gym.Env):
             config=config,
             verbose=False,
             plot=False,
-            old_obs=camera_mode is None
+            # old_obs=camera_mode is None       # do not use anymore
         )
         self.controller.start()  # start Thread
 

@@ -162,7 +162,7 @@ def plot(demo_buffer):
     import sys
     sys.path.append("/home/nico/real-world-rl/spacemouse_tests")
     from spacemouse_tests.jax_feature_plotter import generate_and_save_images
-    feature_file = "/home/nico/real-world-rl/serl/examples/robotiq_drq/features_meanstd.npy"
+    feature_file = "/spacemouse_tests/feature_plots_meanstd/features_meanstd.npy"
 
     with open(feature_file, 'rb') as f:
         features = np.load(f)
@@ -173,13 +173,18 @@ def plot(demo_buffer):
 
     # get images here
     shoulder, wrist = [], []
+    s_next, w_next = [], []
     for i in range(len(demo_buffer) // 10):
         index = np.arange(10) + i * 10
         obs = demo_buffer.sample(batch_size=10, indx=index)
-
         wrist.append(obs["observations"]["wrist"])
         shoulder.append(obs["observations"]["shoulder"])
 
+        w_next.append(obs["next_observations"]["wrist"])
+        s_next.append(obs["next_observations"]["shoulder"])
+
+    w_next = np.array(w_next).reshape((800, 128, 128, 3))
+    s_next = np.array(s_next).reshape((800, 128, 128, 3))
     wrist = np.array(wrist).reshape((800, 128, 128, 3))
     shoulder = np.array(shoulder).reshape((800, 128, 128, 3))
 

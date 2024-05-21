@@ -341,7 +341,7 @@ class PreTrainedResNetEncoder(nn.Module):
 
         # use DDD instead of RGB and pass it through resnet
         if self.use_depth_only:
-            assert x.shape == (128, 128, 1)
+            assert x.shape[-3:] == (128, 128, 1)    # check shape
             x = jnp.repeat(x, 3, axis=-1)
 
         if encode:

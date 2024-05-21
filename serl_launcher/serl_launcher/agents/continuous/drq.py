@@ -11,7 +11,7 @@ from flax.core import frozen_dict
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
 from serl_launcher.common.encoding import EncodingWrapper
-from serl_launcher.common.optimizers import make_optimizer, make_adam_optimizer
+from serl_launcher.common.optimizers import make_optimizer
 from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
@@ -133,7 +133,7 @@ class DrQAgent(SACAgent):
         **kwargs,
     ):
         """
-        Create a new pixel-based agent, with no encoders.
+        Create a new pixel-based agent.
         """
 
         policy_network_kwargs["activate_final"] = True
@@ -178,7 +178,7 @@ class DrQAgent(SACAgent):
                 name="pretrained_encoder",
             )
 
-            use_depth_only = list(observations.values())[0].shape[-3:] == (128, 128, 1)        # only one channel means depth
+            use_depth_only = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
             print(f"use depth only: {use_depth_only}")
 
             encoders = {
@@ -192,6 +192,8 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
+        elif encoder_type == "None":
+            encoders = None
         else:
             raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
 
@@ -205,8 +207,8 @@ class DrQAgent(SACAgent):
         # print(f"encoder def: {encoder_def}")
 
         encoders = {
-            "critic": encoder_def,
-            "actor": encoder_def,
+                "critic": encoder_def,
+                "actor": encoder_def,
         }
 
         # Define networks
@@ -284,7 +286,7 @@ class DrQAgent(SACAgent):
         before updating the network.
         """
         new_agent = self
-        if self.config["image_keys"][0] not in batch["next_observations"]:
+        if len(self.config["image_keys"]) and self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
         rng = new_agent.state.rng
@@ -315,7 +317,7 @@ class DrQAgent(SACAgent):
         pmap_axis: Optional[str] = None,
     ) -> Tuple["DrQAgent", dict]:
         new_agent = self
-        if self.config["image_keys"][0] not in batch["next_observations"]:
+        if len(self.config["image_keys"]) and self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
         # TODO implement K=2 and M=2
