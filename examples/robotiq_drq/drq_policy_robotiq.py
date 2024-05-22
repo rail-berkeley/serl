@@ -19,7 +19,7 @@ from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
-from serl_launcher.utils.train_utils import concat_batches
+from serl_launcher.utils.train_utils import concat_batches, print_agent_params
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
@@ -420,6 +420,7 @@ def main(_):
     env = RecordEpisodeStatistics(env)
 
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
+    print(f"image keys: {image_keys}")
 
     rng, sampling_rng = jax.random.split(rng)
     agent: DrQAgent = make_drq_agent(
@@ -435,6 +436,9 @@ def main(_):
     agent: DrQAgent = jax.device_put(
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
+
+    # print useful info
+    print_agent_params(agent, image_keys)
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
@@ -475,12 +479,17 @@ def main(_):
 
         # learner loop
         print_green("starting learner loop")
-        learner(
-            sampling_rng,
-            agent,
-            replay_buffer=replay_buffer,
-            wandb_logger=wandb_logger,
-        )
+        try:
+            learner(
+                sampling_rng,
+                agent,
+                replay_buffer=replay_buffer,
+                wandb_logger=wandb_logger,
+            )
+        except KeyboardInterrupt:
+            print_green("leraner loop interrupted")
+        finally:
+            env.close()
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())

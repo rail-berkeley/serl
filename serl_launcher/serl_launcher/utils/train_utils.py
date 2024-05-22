@@ -32,7 +32,7 @@ def concat_batches(offline_batch, online_batch, axis=1):
 
 
 def load_recorded_video(
-    video_path: str,
+        video_path: str,
 ):
     with tf.io.gfile.GFile(video_path, "rb") as f:
         video = np.array(imageio.mimread(f, "MP4")).transpose((0, 3, 1, 2))
@@ -110,7 +110,7 @@ def load_resnet10_params(agent, image_keys=("image",), public=True):
 
     param_count = sum(x.size for x in jax.tree_leaves(encoder_params))
     print(
-        f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
+        f"Loaded {param_count / 1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
     )
 
     new_params = agent.state.params
@@ -128,3 +128,28 @@ def load_resnet10_params(agent, image_keys=("image",), public=True):
 
     agent = agent.replace(state=agent.state.replace(params=new_params))
     return agent
+
+
+def print_agent_params(agent, image_keys=("image",)):
+    """
+    helper function to print the parameter count of the actor and critic networks
+    """
+    def get_size(params):
+        return sum(x.size for x in jax.tree.leaves(params))
+
+    total_param_count = get_size(agent.state.params)
+    actor, critic = agent.state.params["modules_actor"], agent.state.params["modules_critic"]
+
+    # calculate encoder params
+    pretrained_encoder_count = get_size(actor["encoder"][f"encoder_{image_keys[0]}"]["pretrained_encoder"])
+    encoder_count = get_size(actor["encoder"])
+
+    actor_count = get_size(actor)
+    critic_count = get_size(critic)
+
+    print(f"\ntotal params: {total_param_count / 1e6:.3f}M")
+    print(
+        f"encoder params: {(encoder_count - pretrained_encoder_count) / 1e6:.3f}M    pretrained encoder params: {pretrained_encoder_count / 1e6:.3f}M")
+    print(f"actor params: {(actor_count - encoder_count)/ 1e6:.3f}M       critic_params: {critic_count / 1e6:.3f}M")
+    print(f"total parameters to train: {(total_param_count - pretrained_encoder_count) / 1e6:.3f}M\n")
+
