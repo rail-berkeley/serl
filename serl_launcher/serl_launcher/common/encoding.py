@@ -32,6 +32,22 @@ class EncodingWrapper(nn.Module):
         is_encoded=False,
     ) -> jnp.ndarray:
         # encode images with encoder
+        if self.encoder is None:
+            # project state to embeddings as well
+            state = observations["state"]
+            if self.enable_stacking:
+                # Combine stacking and channels into a single dimension
+                if len(state.shape) == 2:
+                    state = rearrange(state, "T C -> (T C)")
+                if len(state.shape) == 3:
+                    state = rearrange(state, "B T C -> B (T C)")
+            state = nn.Dense(
+                self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
+            )(state)
+            state = nn.LayerNorm()(state)
+            state = nn.tanh(state)
+            return state
+
         encoded = []
         for image_key in self.image_keys:
             image = observations[image_key]
