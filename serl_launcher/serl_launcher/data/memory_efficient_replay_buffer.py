@@ -123,6 +123,9 @@ class MemoryEfficientReplayBuffer(ReplayBuffer):
         else:
             # raise NotImplementedError()
             # print(f"indx is {indx}")
+            for i in range(batch_size):
+                if not self._is_correct_index[indx[i]]:
+                    print(f"index {indx[i]} is not correct!")
             assert type(indx) == np.ndarray
 
         if keys is None:
@@ -164,3 +167,14 @@ class MemoryEfficientReplayBuffer(ReplayBuffer):
                     batch["next_observations"][pixel_key] = obs_pixels[:, 1:, ...]
 
         return frozen_dict.freeze(batch)
+
+    def save_to_file(self, path):
+        import pickle as pkl
+        obj = {}
+        for attr, value in self.__dict__.items():
+            print(attr, type(value))
+            if "lock" not in attr:
+                obj[attr] = value
+
+        with open(path, "wb") as f:
+            pkl.dump(obj, f)

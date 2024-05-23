@@ -464,8 +464,7 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode is not None:
             images = self.get_image()
-            # TODO remove, temporarily set every image to black
-            # images = np.ones_like(image) * 255
+            # images = np.ones_like(images) * 255
             return copy.deepcopy(dict(images=images, state=state_observation))
         else:
             return copy.deepcopy(dict(state=state_observation))

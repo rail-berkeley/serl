@@ -313,7 +313,7 @@ def main(_):
         camera_mode=None,
     )
     if FLAGS.actor:
-        env = SpacemouseIntervention(env)       # TODO really needed?
+        env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SerlObsWrapperNoImages(env)
