@@ -4,11 +4,6 @@ from robotiq_env.envs.robotiq_env import RobotiqEnv
 from robotiq_env.envs.camera_env.config import RobotiqCameraConfig
 
 
-# used for float value comparisons (pressure of vacuum-gripper)
-def is_close(value, target):
-    return abs(value - target) < 1e-3
-
-
 class RobotiqCameraEnv(RobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=RobotiqCameraConfig)
@@ -49,17 +44,22 @@ class RobotiqCameraEnv(RobotiqEnv):
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.01
 
-        downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 5., 0.)
+        downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
         suction_reward = 0.5 * float(obs["state"]["gripper_state"][1] > 0.9)
+        suction_cost = 0.3 * float(np.isclose(obs["state"]["gripper_state"][0], 0.99))
 
-        # TODO make cost for being at orientation limit
-        # TODO make cost for being too far away from starting position
+        orientation_cost = 1. - sum(obs["state"]["tcp_pose"][3:] * self.curr_reset_pose[3:]) ** 2
+        orientation_cost *= 25.
+
+        max_pose_diff = 0.05  # set to 5cm
+        pos_diff = obs["state"]["tcp_pose"][:2] - self.curr_reset_pose[:2]
+        position_cost = 10. * np.sum(
+            np.where(np.abs(pos_diff) > max_pose_diff, np.abs(pos_diff - np.sign(pos_diff) * max_pose_diff), 0.0))
 
         if self.reached_goal_state(obs):
-            # TODO make offset end position cost with self.curr_reset_pose
-            return 100. - action_cost - step_cost - downward_force_cost
+            return 100. - action_cost - orientation_cost - position_cost
         else:
-            return 0. + suction_reward - action_cost - step_cost - downward_force_cost
+            return 0. + suction_reward - action_cost - downward_force_cost - orientation_cost - position_cost
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
