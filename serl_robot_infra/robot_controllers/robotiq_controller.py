@@ -255,7 +255,8 @@ class RobotiqImpedanceController(threading.Thread):
     async def send_gripper_command(self):
         timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout[
             "timeout"]
-        if self.target_grip[0] > 0.5 and timeout_exceeded:
+        # target grip above threshold and timeout exceeded and not gripping something already
+        if self.target_grip[0] > 0.5 and timeout_exceeded and self.gripper_state[1] < 0.5:
             await self.robotiq_gripper.automatic_grip()
             self.target_grip[0] = 0.0
             self.gripper_timeout["last_grip"] = time.monotonic()
