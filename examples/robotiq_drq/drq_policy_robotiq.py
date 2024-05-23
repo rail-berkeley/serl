@@ -19,7 +19,11 @@ from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
-from serl_launcher.utils.train_utils import concat_batches, print_agent_params
+from serl_launcher.utils.train_utils import (
+    print_agent_params,
+    parameter_overview,
+    plot_feature_kernel_histogram
+)
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
@@ -54,7 +58,8 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 5000, "Replay buffer capacity.")     # quite low to forget old ones
+flags.DEFINE_integer("replay_buffer_capacity", 10000,
+                     "Replay buffer capacity.")  # quite low to forget demo trajectories
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
@@ -134,6 +139,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         )
         agent = agent.replace(state=ckpt)
 
+        parameter_overview(agent)
+        plot_feature_kernel_histogram(agent)
+
         for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
             done = False
@@ -149,13 +157,12 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 obs = next_obs
 
                 if done:
-                    if reward:
+                    if reward > 50.:
                         dt = time.time() - start_time
                         time_list.append(dt)
-                        print(dt)
+                        print(f"time: {dt}")
 
-                    success_counter += reward
-                    print(reward)
+                    success_counter += (reward > 50.)
                     print(f"{success_counter}/{episode + 1}")
 
             # if pause event is requested, pause the actor
@@ -170,7 +177,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print("Stopping actor eval")
                     break
 
-        print(f"success rate: {success_counter / FLAGS.eval_n_trajs}")
+        print(f"success rate: {success_counter / FLAGS.eval_n_trajs if FLAGS.eval_n_trajs else 0.}")
         print(f"average time: {np.mean(time_list)}")
         return  # after done eval, return and exit
 
@@ -324,14 +331,6 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
     # wait till the replay buffer is filled with enough data
     timer = Timer()
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
-        # Train the networks
-        """with timer.context("sample_replay_buffer"):
-            batch = next(replay_iterator) if len(replay_buffer) > 0 else None
-            demo_batch = next(demo_iterator)
-            batch = concat_batches(batch, demo_batch, axis=0) if len(replay_buffer) > 0 else demo_batch
-
-        with timer.context("train"):
-            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)"""
 
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
@@ -340,7 +339,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 batch = next(replay_iterator)
 
             with timer.context("train_critics"):
-                agent, critics_info = agent.update_critics(batch,)
+                agent, critics_info = agent.update_critics(batch, )
 
         with timer.context("train"):
             batch = next(replay_iterator)
@@ -363,7 +362,6 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
             checkpoints.save_checkpoint(
                 FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
             )
-
 
         if PAUSE_EVENT_FLAG.is_set():
             print("Learner loop interrupted")
@@ -388,9 +386,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 print("Stopping learner client")
                 break
 
-    # Wrap up the learner loop
     server.stop()
-    print("Learner loop finished")
 
 
 ##############################################################################
@@ -398,7 +394,8 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
 
 def main(_):
     assert FLAGS.batch_size % num_devices == 0
-    FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + datetime.now().strftime("%m%d-%H:%M")
+    if FLAGS.checkpoint_path.split('/')[-1] == "checkpoints":
+        FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + datetime.now().strftime("%m%d-%H:%M")
 
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
@@ -414,7 +411,7 @@ def main(_):
     #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
-    env = ScaleObservationWrapper(env)      # scale obs space (after quat2euler, but before serlobswr)
+    env = ScaleObservationWrapper(env)  # scale obs space (after quat2euler, but before serlobswr)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -489,7 +486,9 @@ def main(_):
         except KeyboardInterrupt:
             print_green("leraner loop interrupted")
         finally:
+            # Wrap up the learner loop
             env.close()
+            print("Learner loop finished")
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
