@@ -139,8 +139,10 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         )
         agent = agent.replace(state=ckpt)
 
-        parameter_overview(agent)
-        plot_feature_kernel_histogram(agent)
+        # examine model parameters if trajs==0
+        if FLAGS.eval_n_trajs == 0:
+            parameter_overview(agent)
+            plot_feature_kernel_histogram(agent)
 
         for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
