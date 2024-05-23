@@ -187,8 +187,8 @@ class SACAgent(flax.struct.PyTreeNode):
             "critic_loss": critic_loss,
             "predicted_qs": jnp.mean(predicted_qs),
             "target_qs": jnp.mean(target_qs),
-            "log_probs": jnp.mean(next_actions_log_probs),
-            "temp_log_probs": jnp.mean(next_actions_log_probs * temperature * batch["masks"] * self.config["discount"]),
+            # "log_probs": jnp.mean(next_actions_log_probs),
+            # "temp_log_probs": jnp.mean(next_actions_log_probs * temperature * batch["masks"] * self.config["discount"]),
         }
 
         return critic_loss, info
