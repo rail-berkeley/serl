@@ -134,6 +134,7 @@ def print_agent_params(agent, image_keys=("image",)):
     """
     helper function to print the parameter count of the actor and critic networks
     """
+
     def get_size(params):
         return sum(x.size for x in jax.tree.leaves(params))
 
@@ -150,6 +151,30 @@ def print_agent_params(agent, image_keys=("image",)):
     print(f"\ntotal params: {total_param_count / 1e6:.3f}M")
     print(
         f"encoder params: {(encoder_count - pretrained_encoder_count) / 1e6:.3f}M    pretrained encoder params: {pretrained_encoder_count / 1e6:.3f}M")
-    print(f"actor params: {(actor_count - encoder_count)/ 1e6:.3f}M       critic_params: {critic_count / 1e6:.3f}M")
+    print(f"actor params: {(actor_count - encoder_count) / 1e6:.3f}M       critic_params: {critic_count / 1e6:.3f}M")
     print(f"total parameters to train: {(total_param_count - pretrained_encoder_count) / 1e6:.3f}M\n")
 
+
+def parameter_overview(agent):
+    from clu import parameter_overview
+    print(parameter_overview.get_parameter_overview(agent.state.params))
+
+
+def plot_feature_kernel_histogram(agent):
+    import matplotlib.pyplot as plt
+
+    feature_kernel = agent.state.params["modules_actor"]["network"]["Dense_0"]["kernel"]
+    feature_bias = agent.state.params["modules_actor"]["network"]["Dense_0"]["bias"]
+    print(f"kernel has shape: {feature_kernel.shape}")
+
+    plots = feature_kernel.shape[0] // 256 + 1
+    fig, axes = plt.subplots(nrows=plots, ncols=1, sharex=True, sharey=True, figsize=(5, 3*plots))
+
+    feature_kernel = feature_kernel.mean(axis=1)
+
+    for p in range(plots):
+        legend = f"image {p}" if p < plots-1 else "observations"
+        print(f"{legend} mean and std:   ", [feature_kernel[p*256:(p+1)*256].mean(), feature_kernel[p*256:(p+1)*256].std()])
+        axes[p].hist(feature_kernel[p*256:(p+1)*256], bins=50)
+        axes[p].set_title(legend)
+    plt.show()
