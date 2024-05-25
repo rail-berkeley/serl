@@ -12,6 +12,7 @@ from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEnc
 from serl_launcher.common.encoding import EncodingWrapper
 from flax.core.frozen_dict import freeze, unfreeze
 
+
 class BinaryClassifier(nn.Module):
     encoder_def: nn.Module
     hidden_dim: int = 256
