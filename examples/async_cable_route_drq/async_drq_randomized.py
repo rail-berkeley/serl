@@ -29,6 +29,7 @@ from serl_launcher.utils.launcher import (
     make_wandb_logger,
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.networks.reward_classifier import load_classifier_func
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
@@ -337,7 +338,6 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
     if FLAGS.actor:
         # initialize the classifier and wrap the env
-        from serl_launcher.networks.reward_classifier import load_classifier_func
 
         if FLAGS.reward_classifier_ckpt_path is None:
             raise ValueError("reward_classifier_ckpt_path must be specified for actor")

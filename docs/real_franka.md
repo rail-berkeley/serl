@@ -115,8 +115,12 @@ bash run_bc.sh
 In this cable routing task, we provided an example of an image-based reward classifier. This replaced the hardcoded reward classifier which depends on the known `TARGET_POSE` defined in the `config.py`. This image-based reward classifier is pretrained ResNet10, then trained to classify whether the cable is routed successfully or not. The reward classifier is trained with demo trajectories of successful and failed samples.
 
 ```bash
-# NOTE: custom paths are used in this script
-python train_reward_classifier.py
+# NOTE: populate the custom paths to train a reward classifier
+python train_reward_classifier.py \
+    --classifier_ckpt_path CHECKPOINT_OUTPUT_DIR \
+    --positive_demo_paths PATH_TO_POSITIVE_DEMO1.pkl \
+    --positive_demo_paths PATH_TO_POSITIVE_DEMO2.pkl \
+    --negative_demo_paths PATH_TO_NEGATIVE_DEMO1.pkl \
 ```
 
 The reward classifier is used as a gym wrapper `franka_env.envs.wrapper.BinaryRewardClassifier`. The wrapper classifies the current observation and returns a reward of 1 if the observation is classified as successful, and 0 otherwise.
@@ -138,11 +142,22 @@ This bin relocation example demonstrates the usage of forward and backward polic
 
 1. Record demo trajectories
 
-Multiple utility scripts have been provided to record demo trajectories. (e.g. `record_demo.py`: for RLPD, `record_transitions.py`: for reward classifier, `reward_bc_demos.py`: for bc policy). Note that both forward and backward trajectories require different demo trajectories.
+Multiple utility scripts have been provided to record demo trajectories. (e.g. `record_demo.py`: for RLPD, `record_transitions.py` for training the reward classifier, `reward_bc_demos.py`: for bc policy). Note that both forward and backward trajectories require different demo trajectories.
 
 2. Reward Classifier
 
-Similar to the cable routing example, we need to train two reward classifiers for both forward and backward policies, shown in `train_fwd_reward_classifier.sh` and `train_bwd_reward_classifier.sh`. The reward classifiers are then used in the BC and DRQ policy for the actor node, checkpoint path is provided as `--reward_classifier_ckpt_path` argument in `run_bc.sh` and `run_actor.sh`.
+Similar to the cable routing example, we need to train two reward classifiers for both forward and backward policies. Since the observations has both wrist camera and front camera, we use a `FrontCameraWrapper(env)` to only provide the front camera image to the reward classifier.
+
+```bash
+# NOTE: populate the custom paths to train reward classifiers for both forward and backward policies
+python train_reward_classifier.py \
+    --classifier_ckpt_path CHECKPOINT_OUTPUT_DIR \
+    --positive_demo_paths PATH_TO_POSITIVE_DEMO1.pkl \
+    --positive_demo_paths PATH_TO_POSITIVE_DEMO2.pkl \
+    --negative_demo_paths PATH_TO_NEGATIVE_DEMO1.pkl \
+```
+
+The reward classifiers are then used in the BC and DRQ policy for the actor node, checkpoint path is provided as `--fw_reward_classifier_ckpt_path` and `--bw_reward_classifier_ckpt_path` argument in `run_actor.sh`. To compare with BC as baseline, provide the classifier as `--reward_classifier_ckpt_path` for the `run_bc.sh` script.
 
 3. Run 2 learners and 1 actor with 2 policies
 

@@ -172,7 +172,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
         # Step environment
         with timer.context("step_env"):
-
             next_obs, reward, done, truncated, info = env.step(actions)
 
             # override the action with the intervention action
