@@ -17,7 +17,7 @@ class RSCapture:
         self.pipe = rs.pipeline()
         self.cfg = rs.config()
         self.cfg.enable_device(self.serial_number)
-        self.colorizer = None
+        self.camera_intrinsics = None
 
         assert self.rgb or self.depth
         if self.rgb:
@@ -32,6 +32,11 @@ class RSCapture:
             depth_scale = depth_sensor.get_depth_scale()
             self.max_clipping_distance = 1. / depth_scale        # 1m max clipping distance
             self.min_clipping_distance = 0.0 / depth_scale       # might mess things up
+
+            # get the camera intrinsics
+            profile = self.pipe.get_active_profile()
+            depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+            self.camera_intrinsics = depth_profile.get_intrinsics()
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
         for sensor in self.profile.get_device().query_sensors():
