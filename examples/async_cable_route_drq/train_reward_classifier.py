@@ -1,6 +1,7 @@
 import pickle as pkl
 import jax
 from jax import numpy as jnp
+import flax
 import flax.linen as nn
 from flax.training import checkpoints
 import optax
@@ -161,7 +162,8 @@ def train_reward_classifier(observation_space, action_space):
         print(
             f"Epoch: {epoch+1}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}"
         )
-
+    # this is used to save the without the orbax checkpointing
+    flax.config.update('flax_use_orbax_checkpointing', False)
     checkpoints.save_checkpoint(
         FLAGS.classifier_ckpt_path,
         classifier,
