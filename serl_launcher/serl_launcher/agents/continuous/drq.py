@@ -114,7 +114,6 @@ class DrQAgent(SACAgent):
         actions: jnp.ndarray,
         # Model architecture
         encoder_type: str = "small",
-        shared_encoder: bool = True,
         use_proprio: bool = False,
         critic_network_kwargs: dict = {
             "hidden_dims": [256, 256],
@@ -125,6 +124,11 @@ class DrQAgent(SACAgent):
         policy_kwargs: dict = {
             "tanh_squash_distribution": True,
             "std_parameterization": "uniform",
+        },
+        encoder_kwargs: dict = {
+            "pooling_method": "spatial_learned_embeddings",
+            "num_spatial_blocks" : 8,
+            "bottleneck_dim" : 256,
         },
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
@@ -160,10 +164,8 @@ class DrQAgent(SACAgent):
 
             encoders = {
                 image_key: resnetv1_configs["resnetv1-10"](
-                    pooling_method="spatial_learned_embeddings",
-                    num_spatial_blocks=8,
-                    bottleneck_dim=256,
                     name=f"encoder_{image_key}",
+                    **encoder_kwargs
                 )
                 for image_key in image_keys
             }
@@ -184,12 +186,10 @@ class DrQAgent(SACAgent):
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
-                    pooling_method="spatial_learned_embeddings",            # default was "spatial_learned_embeddings"
-                    num_spatial_blocks=8,
-                    bottleneck_dim=256,                                     # default was 256
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
                     use_depth_only=use_depth_only,
+                    **encoder_kwargs
                 )
                 for image_key in image_keys
             }
@@ -208,12 +208,10 @@ class DrQAgent(SACAgent):
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
-                    pooling_method="spatial_learned_embeddings",
-                    num_spatial_blocks=8,
-                    bottleneck_dim=256,             # default was 256
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
                     use_depth_only=use_depth_only,
+                    **encoder_kwargs
                 )
                 for image_key in image_keys
             }

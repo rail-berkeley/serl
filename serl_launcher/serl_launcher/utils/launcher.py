@@ -112,27 +112,32 @@ def make_drq_agent(
         encoder_type=encoder_type,
         use_proprio=True,
         image_keys=image_keys,
-        policy_kwargs={
-            "tanh_squash_distribution": True,
-            "std_parameterization": "exp",
-            "std_min": 1e-5,
-            "std_max": 5,
-        },
-        critic_network_kwargs={
-            "activations": nn.tanh,
-            "use_layer_norm": True,
-            "hidden_dims": [256, 256],
-        },
-        policy_network_kwargs={
-            "activations": nn.tanh,
-            "use_layer_norm": True,
-            "hidden_dims": [256, 256],
-        },
+        policy_kwargs=dict(
+            tanh_squash_distribution=True,
+            std_parameterization="exp",
+            std_min=1e-5,
+            std_max=5,
+        ),
+        critic_network_kwargs=dict(
+            activations=nn.tanh,
+            use_layer_norm=True,
+            hidden_dims=[256, 256],
+        ),
+        policy_network_kwargs=dict(
+            activations=nn.tanh,
+            use_layer_norm=True,
+            hidden_dims=[256, 256],
+        ),
         temperature_init=1e-2,
         discount=0.99,  # 0.99
         backup_entropy=True,  # default: False
         critic_ensemble_size=10,
         critic_subsample_size=2,
+        encoder_kwargs=dict(
+            pooling_method="spatial_learned_embeddings",        # default "spatial_learned_embeddings"
+            num_spatial_blocks=8,
+            bottleneck_dim=256,
+        ),
         actor_optimizer_kwargs={
             "learning_rate": 3e-3,  # 3e-4
         },
