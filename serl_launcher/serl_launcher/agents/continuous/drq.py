@@ -91,7 +91,7 @@ class DrQAgent(SACAgent):
             target_entropy = -prod(actions.shape)
 
         print(f"config: discount: {discount}, target_entropy: {target_entropy}")
-        print(f"actor_optimizer {actor_optimizer_kwargs} critic_optimizer {critic_optimizer_kwargs} temperature {temperature_optimizer_kwargs}")
+        # print(f"actor_optimizer {actor_optimizer_kwargs} critic_optimizer {critic_optimizer_kwargs} temperature {temperature_optimizer_kwargs}")
 
         return cls(
             state=state,
@@ -183,16 +183,41 @@ class DrQAgent(SACAgent):
 
             encoders = {
                 image_key: PreTrainedResNetEncoder(
-                    pooling_method="spatial_learned_embeddings",
+                    rng=rng,
+                    pooling_method="spatial_learned_embeddings",            # default was "spatial_learned_embeddings"
                     num_spatial_blocks=8,
-                    bottleneck_dim=256,
+                    bottleneck_dim=256,                                     # default was 256
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
                     use_depth_only=use_depth_only,
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "None":
+        elif encoder_type == "resnet-pretrained-18":
+            # pretrained ResNet18 from microsoft
+            from serl_launcher.vision.resnet_v1_18 import resnetv1_18_configs
+            from serl_launcher.vision.resnet_v1 import PreTrainedResNetEncoder
+
+            pretrained_encoder = resnetv1_18_configs["resnetv1-18-frozen"](
+                name="pretrained_encoder",
+            )
+
+            use_depth_only = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
+            print(f"use depth only: {use_depth_only}")
+
+            encoders = {
+                image_key: PreTrainedResNetEncoder(
+                    rng=rng,
+                    pooling_method="spatial_learned_embeddings",
+                    num_spatial_blocks=8,
+                    bottleneck_dim=256,             # default was 256
+                    pretrained_encoder=pretrained_encoder,
+                    name=f"encoder_{image_key}",
+                    use_depth_only=use_depth_only,
+                )
+                for image_key in image_keys
+            }
+        elif encoder_type.lower() == "none":
             encoders = None
         else:
             raise NotImplementedError(f"Unknown encoder type: {encoder_type}")

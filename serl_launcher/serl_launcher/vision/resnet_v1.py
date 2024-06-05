@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from serl_launcher.vision.film_conditioning_layer import FilmConditioning
+from serl_launcher.common.typing import PRNGKey
 
 ModuleDef = Any
 
@@ -324,6 +325,7 @@ class ResNetEncoder(nn.Module):
 
 
 class PreTrainedResNetEncoder(nn.Module):
+    rng: PRNGKey = None
     pooling_method: str = "avg"
     # use_spatial_softmax: bool = False
     softmax_temperature: float = 1.0
@@ -357,7 +359,7 @@ class PreTrainedResNetEncoder(nn.Module):
                 channel=channel,
                 num_features=self.num_spatial_blocks,
             )(x)
-            x = nn.Dropout(0.1, deterministic=not train)(x)
+            x = nn.Dropout(0.1, deterministic=not train)(x, rng=self.rng)
         elif self.pooling_method == "spatial_softmax":
             height, width, channel = x.shape[-3:]
             pos_x, pos_y = jnp.meshgrid(
