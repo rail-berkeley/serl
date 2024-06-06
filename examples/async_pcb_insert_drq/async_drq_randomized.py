@@ -57,7 +57,7 @@ flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity."
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 50, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")

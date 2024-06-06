@@ -47,7 +47,7 @@ def make_bc_agent(
     )
 
 
-def make_sac_agent(seed, sample_obs, sample_action):
+def make_sac_agent(seed, sample_obs, sample_action, discount=0.99):
     return SACAgent.create_states(
         jax.random.PRNGKey(seed),
         sample_obs,
@@ -69,7 +69,7 @@ def make_sac_agent(seed, sample_obs, sample_action):
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.99,
+        discount=discount,
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
@@ -77,7 +77,12 @@ def make_sac_agent(seed, sample_obs, sample_action):
 
 
 def make_drq_agent(
-    seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
+    seed,
+    sample_obs,
+    sample_action,
+    image_keys=("image",),
+    encoder_type="small",
+    discount=0.96,
 ):
     agent = DrQAgent.create_drq(
         jax.random.PRNGKey(seed),
@@ -103,7 +108,7 @@ def make_drq_agent(
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.96,  # 0.99
+        discount=discount,
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
@@ -119,6 +124,7 @@ def make_vice_agent(
     image_keys=("image",),
     vice_image_keys=("image",),
     encoder_type="small",
+    discount=0.96,
 ):
     agent = VICEAgent.create_vice(
         jax.random.PRNGKey(seed),
@@ -154,7 +160,7 @@ def make_vice_agent(
             "hidden_dims": [256, 256],
         },
         temperature_init=1e-2,
-        discount=0.96,  # 0.99
+        discount=discount,
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
