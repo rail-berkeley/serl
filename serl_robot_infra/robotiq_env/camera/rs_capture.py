@@ -39,9 +39,10 @@ class RSCapture:
             self.camera_intrinsics = depth_profile.get_intrinsics()
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
+        # for firmware >5.13, auto_exposure False & auto_white_balance True, below only auto_exposure True
         for sensor in self.profile.get_device().query_sensors():
-            sensor.set_option(rs.option.enable_auto_exposure, False)
-            sensor.set_option(rs.option.enable_auto_white_balance, True)
+            sensor.set_option(rs.option.enable_auto_exposure, True)
+            # sensor.set_option(rs.option.enable_auto_white_balance, True)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
