@@ -5,7 +5,7 @@ import flax.linen as nn
 from flax.training.train_state import TrainState
 from flax.training import checkpoints
 import optax
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 
 from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
@@ -94,6 +94,7 @@ def load_classifier_func(
     sample: Dict,
     image_keys: List[str],
     checkpoint_path: str,
+    step: Optional[int] = None,
 ) -> Callable[[Dict], jnp.ndarray]:
     """
     Return: a function that takes in an observation
@@ -103,7 +104,7 @@ def load_classifier_func(
     classifier = checkpoints.restore_checkpoint(
         checkpoint_path,
         target=classifier,
-        step=100,
+        step=step,
     )
     func = lambda obs: classifier.apply_fn(
         {"params": classifier.params}, obs, train=False

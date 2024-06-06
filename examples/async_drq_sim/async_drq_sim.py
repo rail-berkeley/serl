@@ -52,7 +52,7 @@ flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity."
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 50, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
@@ -225,11 +225,18 @@ def learner(
 
     # 50/50 sampling from RLPD, half from demo and half from online experience if
     # demo_buffer is provided
-    demo_iterator = None
     if demo_buffer is None:
         single_buffer_batch_size = FLAGS.batch_size
+        demo_iterator = None
     else:
         single_buffer_batch_size = FLAGS.batch_size // 2
+        demo_iterator = demo_buffer.get_iterator(
+            sample_args={
+                "batch_size": single_buffer_batch_size,
+                "pack_obs_and_next_obs": True,
+            },
+            device=sharding.replicate(),
+        )
 
     # create replay buffer iterator
     replay_iterator = replay_buffer.get_iterator(
@@ -239,16 +246,6 @@ def learner(
         },
         device=sharding.replicate(),
     )
-
-    # if demo_buffer is provided, create demo buffer iterator
-    if demo_buffer is not None:
-        demo_iterator = demo_buffer.get_iterator(
-            sample_args={
-                "batch_size": single_buffer_batch_size,
-                "pack_obs_and_next_obs": True,
-            },
-            device=sharding.replicate(),
-        )
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
@@ -336,12 +333,6 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def preload_data_transform(data, metadata) -> Optional[Dict[str, Any]]:
-        # NOTE: Create your own custom data transform function here if you
-        # are loading this via with --preload_rlds_path with tf rlds data
-        # This default does nothing
-        return data
-
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = make_replay_buffer(
             env,
@@ -349,8 +340,6 @@ def main(_):
             rlds_logger_path=FLAGS.log_rlds_path,
             type="memory_efficient_replay_buffer",
             image_keys=image_keys,
-            preload_rlds_path=FLAGS.preload_rlds_path,
-            preload_data_transform=preload_data_transform,
         )
 
         # set up wandb and logging
@@ -369,22 +358,35 @@ def main(_):
         print_green(f"replay_buffer size: {len(replay_buffer)}")
 
         # if demo data is provided, load it into the demo buffer
-        # in the learner node
-        if FLAGS.demo_path:
-            # Check if the file exists
-            if not os.path.exists(FLAGS.demo_path):
-                raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+        # in the learner node, we support 2 ways to load demo data:
+        # 1. load from pickle file; 2. load from tf rlds data
+        if FLAGS.demo_path or FLAGS.preload_rlds_path:
+
+            def preload_data_transform(data, metadata) -> Optional[Dict[str, Any]]:
+                # NOTE: Create your own custom data transform function here if you
+                # are loading this via with --preload_rlds_path with tf rlds data
+                # This default does nothing
+                return data
 
             demo_buffer = MemoryEfficientReplayBufferDataStore(
                 env.observation_space,
                 env.action_space,
                 capacity=10000,
                 image_keys=image_keys,
+                preload_rlds_path=FLAGS.preload_rlds_path,
+                preload_data_transform=preload_data_transform,
             )
-            with open(FLAGS.demo_path, "rb") as f:
-                trajs = pkl.load(f)
-                for traj in trajs:
-                    demo_buffer.insert(traj)
+
+            if FLAGS.demo_path:
+                # Check if the file exists
+                if not os.path.exists(FLAGS.demo_path):
+                    raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+
+                with open(FLAGS.demo_path, "rb") as f:
+                    trajs = pkl.load(f)
+                    for traj in trajs:
+                        demo_buffer.insert(traj)
+
             print(f"demo buffer size: {len(demo_buffer)}")
         else:
             demo_buffer = None
