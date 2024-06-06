@@ -94,7 +94,7 @@ def load_classifier_func(
     sample: Dict,
     image_keys: List[str],
     checkpoint_path: str,
-    step: Optional[int] = None
+    step: Optional[int] = None,
 ) -> Callable[[Dict], jnp.ndarray]:
     """
     Return: a function that takes in an observation

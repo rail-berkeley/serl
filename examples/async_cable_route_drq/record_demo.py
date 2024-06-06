@@ -17,8 +17,9 @@ from franka_env.envs.wrappers import (
 )
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-
 from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.networks.reward_classifier import load_classifier_func
+import jax
 
 if __name__ == "__main__":
     env = gym.make("FrankaCableRoute-Vision-v0", save_video=False)
@@ -29,9 +30,6 @@ if __name__ == "__main__":
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     image_keys = [k for k in env.observation_space.keys() if "state" not in k]
-
-    from serl_launcher.networks.reward_classifier import load_classifier_func
-    import jax
 
     rng = jax.random.PRNGKey(0)
     rng, key = jax.random.split(rng)
@@ -80,7 +78,6 @@ if __name__ == "__main__":
             )
         )
         transitions.append(transition)
-
         obs = next_obs
 
         if done:

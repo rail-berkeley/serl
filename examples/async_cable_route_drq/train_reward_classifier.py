@@ -163,7 +163,7 @@ def train_reward_classifier(observation_space, action_space):
             f"Epoch: {epoch+1}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}"
         )
     # this is used to save the without the orbax checkpointing
-    flax.config.update('flax_use_orbax_checkpointing', False)
+    flax.config.update("flax_use_orbax_checkpointing", False)
     checkpoints.save_checkpoint(
         FLAGS.classifier_ckpt_path,
         classifier,
