@@ -194,7 +194,7 @@ class DrQAgent(SACAgent):
                 for image_key in image_keys
             }
         elif encoder_type == "resnet-pretrained-18":
-            # pretrained ResNet18 from microsoft
+            # pretrained ResNet18 from pytorch
             from serl_launcher.vision.resnet_v1_18 import resnetv1_18_configs
             from serl_launcher.vision.resnet_v1 import PreTrainedResNetEncoder
 
