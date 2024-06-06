@@ -95,8 +95,6 @@ class BatchNorm(nn.Module):
         to exist.
         Args:
             x: the input to be normalized.
-            use_running_average: if true, the statistics stored in batch_stats
-                                 will be used instead of computing the batch statistics on the input.
         Returns:
             Normalized inputs (the same shape as inputs).
         """
@@ -112,30 +110,18 @@ class BatchNorm(nn.Module):
         # see NOTE above on initialization behavior
         initializing = self.is_mutable_collection('params')
 
-        ra_mean = self.variable('batch_stats', 'mean',
-                                self.mean_init,
-                                reduced_feature_shape)
-        ra_var = self.variable('batch_stats', 'var',
-                               self.var_init,
-                               reduced_feature_shape)
+        # use_running_average is not used, calculate the batch norm on each batch
 
-        if use_running_average:
-            mean, var = ra_mean.value, ra_var.value
-        else:
-            mean = jnp.mean(x, axis=reduction_axis, keepdims=False)
-            mean2 = jnp.mean(lax.square(x), axis=reduction_axis, keepdims=False)
-            if self.axis_name is not None and not initializing:
-                concatenated_mean = jnp.concatenate([mean, mean2])
-                mean, mean2 = jnp.split(
-                    lax.pmean(
-                        concatenated_mean,
-                        axis_name=self.axis_name,
-                        axis_index_groups=self.axis_index_groups), 2)
-            var = mean2 - lax.square(mean)
-
-            if not initializing:
-                ra_mean.value = self.momentum * ra_mean.value + (1 - self.momentum) * mean
-                ra_var.value = self.momentum * ra_var.value + (1 - self.momentum) * var
+        mean = jnp.mean(x, axis=reduction_axis, keepdims=False)
+        mean2 = jnp.mean(lax.square(x), axis=reduction_axis, keepdims=False)
+        if self.axis_name is not None and not initializing:
+            concatenated_mean = jnp.concatenate([mean, mean2])
+            mean, mean2 = jnp.split(
+                lax.pmean(
+                    concatenated_mean,
+                    axis_name=self.axis_name,
+                    axis_index_groups=self.axis_index_groups), 2)
+        var = mean2 - lax.square(mean)
 
         y = x - mean.reshape(feature_shape)
         mul = lax.rsqrt(var + self.epsilon)
@@ -304,7 +290,7 @@ class ResNet(nn.Module):
         if self.pretrained == 'imagenet':
             # ckpt_file = utils.download(self.ckpt_dir, URLS[self.architecture])
             self.param_dict = h5py.File(self.ckpt_dir, 'r')
-            print(f"loaded pretrained weights from {self.ckpt_dir}")
+            # print(f"loaded pretrained weights from {self.ckpt_dir}")
 
     @nn.compact
     def __call__(self, observations, train=False):
@@ -398,7 +384,7 @@ class ResNet(nn.Module):
 
         # if we want the pre_pooling output, return here
         if self.pre_pooling:
-            return jax.lax.stop_gradient(x)     # shape (b, 7, 7, 512)
+            return jax.lax.stop_gradient(x)  # shape (b, 7, 7, 512)
 
         # Classifier
         x = jnp.mean(x, axis=(1, 2))
