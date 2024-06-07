@@ -185,11 +185,17 @@ def learner(
     agent: DrQAgent,
     replay_buffer: MemoryEfficientReplayBufferDataStore,
     demo_buffer: Optional[MemoryEfficientReplayBufferDataStore] = None,
-    wandb_logger=None,
 ):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
 
@@ -333,7 +339,8 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = make_replay_buffer(
             env,
             capacity=FLAGS.replay_buffer_capacity,
@@ -341,18 +348,6 @@ def main(_):
             type="memory_efficient_replay_buffer",
             image_keys=image_keys,
         )
-
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
 
         print_green("replay buffer created")
         print_green(f"replay_buffer size: {len(replay_buffer)}")
@@ -368,10 +363,10 @@ def main(_):
                 # This default does nothing
                 return data
 
-            demo_buffer = MemoryEfficientReplayBufferDataStore(
-                env.observation_space,
-                env.action_space,
-                capacity=10000,
+            demo_buffer = make_replay_buffer(
+                env,
+                capacity=FLAGS.replay_buffer_capacity,
+                type="memory_efficient_replay_buffer",
                 image_keys=image_keys,
                 preload_rlds_path=FLAGS.preload_rlds_path,
                 preload_data_transform=preload_data_transform,
@@ -398,7 +393,6 @@ def main(_):
             agent,
             replay_buffer,
             demo_buffer=demo_buffer,  # None if no demo data is provided
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:
