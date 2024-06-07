@@ -220,10 +220,17 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None):
+def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
 
@@ -366,24 +373,14 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
         demo_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
@@ -409,7 +406,6 @@ def main(_):
             agent,
             replay_buffer,
             demo_buffer=demo_buffer,
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:

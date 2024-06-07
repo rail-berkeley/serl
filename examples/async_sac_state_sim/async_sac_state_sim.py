@@ -168,10 +168,17 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=None):
+def learner(rng, agent: SACAgent, replay_buffer, replay_iterator):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
 
@@ -266,7 +273,8 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = make_replay_buffer(
             env,
             capacity=FLAGS.replay_buffer_capacity,
@@ -274,18 +282,6 @@ def main(_):
             type="replay_buffer",
             preload_rlds_path=FLAGS.preload_rlds_path,
         )
-
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
                 "batch_size": FLAGS.batch_size * FLAGS.utd_ratio,
@@ -299,7 +295,6 @@ def main(_):
             agent,
             replay_buffer,
             replay_iterator=replay_iterator,
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:
