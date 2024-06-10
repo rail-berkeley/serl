@@ -332,7 +332,7 @@ class PreTrainedResNetEncoder(nn.Module):
     num_spatial_blocks: int = 8
     bottleneck_dim: Optional[int] = None
     pretrained_encoder: nn.module = None
-    use_depth_only: bool = False
+    use_single_channel: bool = False
 
     @nn.compact
     def __call__(
@@ -343,8 +343,8 @@ class PreTrainedResNetEncoder(nn.Module):
     ):
         x = observations
 
-        # use DDD instead of RGB and pass it through resnet
-        if self.use_depth_only:
+        # if we want to use single channel image data (grayscale)
+        if self.use_single_channel:
             assert x.shape[-3:] == (128, 128, 1)    # check shape
             x = jnp.repeat(x, 3, axis=-1)
 

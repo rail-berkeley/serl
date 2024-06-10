@@ -180,15 +180,15 @@ class DrQAgent(SACAgent):
                 name="pretrained_encoder",
             )
 
-            use_depth_only = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
-            print(f"use depth only: {use_depth_only}")
+            use_single_channel = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
+            print(f"use single channel only: {use_single_channel}")
 
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
-                    use_depth_only=use_depth_only,
+                    use_single_channel=use_single_channel,
                     **encoder_kwargs
                 )
                 for image_key in image_keys
@@ -202,15 +202,15 @@ class DrQAgent(SACAgent):
                 name="pretrained_encoder",
             )
 
-            use_depth_only = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
-            print(f"use depth only: {use_depth_only}")
+            use_single_channel = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
+            print(f"use single channel only: {use_single_channel}")
 
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
-                    use_depth_only=use_depth_only,
+                    use_single_channel=use_single_channel,
                     **encoder_kwargs
                 )
                 for image_key in image_keys
