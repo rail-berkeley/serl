@@ -22,10 +22,11 @@ Dtype = Any
 # Normalization
 # ---------------------------------------------------------------#
 def batch_norm(x, train, epsilon=1e-05, momentum=0.99, params=None, dtype='float32'):
+    # we do not use running average in the implementation (set to False)
     if params is None:
         x = BatchNorm(epsilon=epsilon,
                       momentum=momentum,
-                      use_running_average=not train,
+                      use_running_average=False,        # was not train
                       dtype=dtype)(x)
     else:
         x = BatchNorm(epsilon=epsilon,
@@ -34,7 +35,7 @@ def batch_norm(x, train, epsilon=1e-05, momentum=0.99, params=None, dtype='float
                       scale_init=lambda *_: jnp.array(params['scale']),
                       mean_init=lambda *_: jnp.array(params['mean']),
                       var_init=lambda *_: jnp.array(params['var']),
-                      use_running_average=not train,
+                      use_running_average=False,        # was not train
                       dtype=dtype)(x)
     return x
 
@@ -95,6 +96,8 @@ class BatchNorm(nn.Module):
         to exist.
         Args:
             x: the input to be normalized.
+            use_running_average: if true, the statistics stored in batch_stats
+                                 will be used instead of computing the batch statistics on the input.
         Returns:
             Normalized inputs (the same shape as inputs).
         """
@@ -110,18 +113,25 @@ class BatchNorm(nn.Module):
         # see NOTE above on initialization behavior
         initializing = self.is_mutable_collection('params')
 
-        # use_running_average is not used, calculate the batch norm on each batch
-
-        mean = jnp.mean(x, axis=reduction_axis, keepdims=False)
-        mean2 = jnp.mean(lax.square(x), axis=reduction_axis, keepdims=False)
-        if self.axis_name is not None and not initializing:
-            concatenated_mean = jnp.concatenate([mean, mean2])
-            mean, mean2 = jnp.split(
-                lax.pmean(
-                    concatenated_mean,
-                    axis_name=self.axis_name,
-                    axis_index_groups=self.axis_index_groups), 2)
-        var = mean2 - lax.square(mean)
+        if use_running_average:
+            ra_mean = self.variable('batch_stats', 'mean',
+                                    self.mean_init,
+                                    reduced_feature_shape)
+            ra_var = self.variable('batch_stats', 'var',
+                                   self.var_init,
+                                   reduced_feature_shape)
+            mean, var = ra_mean.value, ra_var.value
+        else:
+            mean = jnp.mean(x, axis=reduction_axis, keepdims=False)
+            mean2 = jnp.mean(lax.square(x), axis=reduction_axis, keepdims=False)
+            if self.axis_name is not None and not initializing:
+                concatenated_mean = jnp.concatenate([mean, mean2])
+                mean, mean2 = jnp.split(
+                    lax.pmean(
+                        concatenated_mean,
+                        axis_name=self.axis_name,
+                        axis_index_groups=self.axis_index_groups), 2)
+            var = mean2 - lax.square(mean)
 
         y = x - mean.reshape(feature_shape)
         mul = lax.rsqrt(var + self.epsilon)

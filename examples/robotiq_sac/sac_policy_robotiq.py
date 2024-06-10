@@ -310,7 +310,7 @@ def main(_):
         FLAGS.env,
         fake_env=FLAGS.learner,
         max_episode_length=FLAGS.max_traj_length,
-        camera_mode=None,
+        camera_mode="none",
     )
     if FLAGS.actor:
         env = SpacemouseIntervention(env)
