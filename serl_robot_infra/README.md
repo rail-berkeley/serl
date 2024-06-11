@@ -58,7 +58,7 @@ The HTTP server is used to communicate between the ROS controller and gym enviro
 | getjacobian | Return current zero-jacobian |
 | getstate | Return all robot states |
 | jointreset | Perform joint reset |
-| activate_gripper | Activate the gripper (Robotiq only) |
+| activate_gripper | Activate the gripper (Robotiq only). This needs to be run after starting franka_server to control the Robotiq gripper. |
 | reset_gripper | Reset the gripper (Robotiq only) |
 | get_gripper | Return current gripper position |
 | close_gripper | Close the gripper completely |
