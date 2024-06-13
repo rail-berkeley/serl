@@ -8,7 +8,7 @@ python async_drq_randomized.py "$@" \
     --seed 0 \
     --random_steps 200 \
     --training_starts 200 \
-    --utd_ratio 4 \
+    --critic_actor_ratio 4 \
     --batch_size 256 \
     --eval_period 2000 \
     --encoder_type resnet-pretrained \

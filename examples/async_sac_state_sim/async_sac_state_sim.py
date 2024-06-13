@@ -36,7 +36,7 @@ flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
+flags.DEFINE_integer("critic_actor_ratio", 8, "critic to actor update ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
@@ -284,7 +284,7 @@ def main(_):
         )
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
-                "batch_size": FLAGS.batch_size * FLAGS.utd_ratio,
+                "batch_size": FLAGS.batch_size * FLAGS.critic_actor_ratio,
             },
             device=sharding.replicate(),
         )
