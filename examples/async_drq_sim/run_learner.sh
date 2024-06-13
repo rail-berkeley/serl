@@ -6,7 +6,7 @@ python async_drq_sim.py "$@" \
     --seed 0 \
     --random_steps 1000 \
     --training_starts 1000 \
-    --utd_ratio 4 \
+    --critic_actor_ratio 4 \
     --eval_period 2000 \
     --encoder_type resnet-pretrained \
     # --demo_path franka_lift_cube_image_20_trajs.pkl \

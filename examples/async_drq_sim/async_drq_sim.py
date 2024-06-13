@@ -45,7 +45,7 @@ flags.DEFINE_integer("max_traj_length", 1000, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
+flags.DEFINE_integer("critic_actor_ratio", 4, "critic to actor update ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
@@ -258,7 +258,7 @@ def learner(
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
-        for critic_step in range(FLAGS.utd_ratio - 1):
+        for critic_step in range(FLAGS.critic_actor_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
 
