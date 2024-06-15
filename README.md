@@ -39,7 +39,8 @@ We fixed a major issue in the intervention action frame. See release [v0.1.1](ht
 
     - For GPU:
         ```bash
-        pip install -U "jax[cuda12]"
+        pip install --upgrade "jax[cuda12_pip]==0.4.25" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+        pip install --upgrade nvidia-cudnn-cu12==8.9.6.50
         ```
 
     - For TPU
