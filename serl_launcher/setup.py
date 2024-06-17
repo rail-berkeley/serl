@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="serl_launcher",
-    version="0.1.2",
+    version="0.1.3",
     description="library for rl experiments",
     url="https://github.com/rail-berkeley/serl",
     author="auth",
