@@ -52,7 +52,7 @@ flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity."
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 50, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 30, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
@@ -255,6 +255,14 @@ def learner(
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
+
+    # show replay buffer progress bar during training
+    pbar = tqdm.tqdm(
+        total=FLAGS.replay_buffer_capacity,
+        initial=len(replay_buffer),
+        desc="replay buffer",
+    )
+
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
@@ -298,6 +306,7 @@ def learner(
                 FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
             )
 
+        pbar.update(len(replay_buffer) - pbar.n)  # update replay buffer bar
         update_steps += 1
 
 
@@ -397,7 +406,7 @@ def main(_):
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
-        data_store = QueuedDataStore(50000)  # the queue size on the actor
+        data_store = QueuedDataStore(2000)  # the queue size on the actor
 
         # actor loop
         print_green("starting actor loop")
