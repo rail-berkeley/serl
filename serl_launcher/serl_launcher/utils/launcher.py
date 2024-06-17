@@ -173,6 +173,7 @@ def make_trainer_config(port_number: int = 5488, broadcast_port: int = 5489):
         port_number=port_number,
         broadcast_port=broadcast_port,
         request_types=["send-stats"],
+        # experimental_pipeline_url="tcp://127.0.0.1:5547", # experimental ds update
     )
 
 
