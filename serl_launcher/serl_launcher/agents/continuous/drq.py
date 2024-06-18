@@ -215,6 +215,24 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
+        elif encoder_type == "distance-sensor":
+            from serl_launcher.vision.range_sensor import RangeSensorEncoder
+            # use depth image as range-like sensor
+            assert [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
+            import numpy as np
+
+            # 3x3 points centered in the middle
+            keypoints = [tuple(k) for k in np.stack(np.meshgrid([32, 64, 96], [32, 64, 96])).reshape((-1, 2))]
+            keypoint_size = (5, 5)
+
+            encoders = {
+                image_key: RangeSensorEncoder(
+                    name=f"encoder_{image_key}",
+                    keypoints=keypoints,
+                    keypoint_size=keypoint_size,
+                )
+                for image_key in image_keys
+            }
         elif encoder_type.lower() == "none":
             encoders = None
         else:
