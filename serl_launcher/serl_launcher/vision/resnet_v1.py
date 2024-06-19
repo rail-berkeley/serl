@@ -368,8 +368,6 @@ class PreTrainedResNetEncoder(nn.Module):
             provide num_kp != None to control the number of keypoints. This is achieved by a first applying a learnable
             linear mapping (in_channels, H, W) -> (num_kp, H, W).
             """
-
-            print(f"before {x.shape}")
             x = nn.Conv(
                 features=self.num_kp,
                 kernel_size=1,
@@ -378,7 +376,6 @@ class PreTrainedResNetEncoder(nn.Module):
                 kernel_init=nn.initializers.kaiming_normal(),
                 name="spatial_softmax_conv",
             )(x)
-            print(f"after {x.shape}")
             height, width, channel = x.shape[-3:]
             pos_x, pos_y = jnp.meshgrid(
                 jnp.linspace(-1.0, 1.0, height), jnp.linspace(-1.0, 1.0, width)

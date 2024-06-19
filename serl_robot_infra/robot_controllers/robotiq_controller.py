@@ -303,7 +303,7 @@ class RobotiqImpedanceController(threading.Thread):
         if self.robotiq_gripper:
             self.target_grip[0] = -1.
             await self.send_gripper_command()
-            time.sleep(0.2)
+            time.sleep(0.1)
 
         # then move up (so no boxes are moved)
         success = True
@@ -345,6 +345,7 @@ class RobotiqImpedanceController(threading.Thread):
 
             while not self.stopped():
                 if self._reset.is_set():
+                    await self._update_robot_state()
                     await self._go_to_reset_pose()
 
                 t_now = time.monotonic()
