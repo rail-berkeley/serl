@@ -15,6 +15,8 @@ from scipy.spatial.transform import Rotation as R
 from robotiq_env.camera.video_capture import VideoCapture
 from robotiq_env.camera.rs_capture import RSCapture
 
+from robotiq_env.camera.utils import PointCloudFusion
+
 from robotiq_env.utils.real_time_plotter import DataClient
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
@@ -94,7 +96,7 @@ class RobotiqEnv(gym.Env):
 
         self.curr_pos = np.zeros((7,), dtype=np.float32)
         self.curr_vel = np.zeros((6,), dtype=np.float32)
-        self.curr_Q = np.zeros((6,), dtype=np.float32)  # TODO is (7,) for some reason in franka?? same in dq
+        self.curr_Q = np.zeros((6,), dtype=np.float32)
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((3,), dtype=np.float32)
         self.curr_torque = np.zeros((3,), dtype=np.float32)
@@ -133,7 +135,7 @@ class RobotiqEnv(gym.Env):
 
         image_space_definition = {}
         if camera_mode in ["rgb", "both"]:
-            # image_space_definition["shoulder"] = gym.spaces.Box(      # TODO only temporary with one image
+            # image_space_definition["shoulder"] = gym.spaces.Box(
             #             0, 255, shape=(128, 128, 3), dtype=np.uint8
             # )
             image_space_definition["wrist"] = gym.spaces.Box(
@@ -148,7 +150,12 @@ class RobotiqEnv(gym.Env):
                 0, 255, shape=(128, 128, 1), dtype=np.uint8
             )
 
-        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth"]:
+        if camera_mode in ["pointcloud"]:
+            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
+                -np.inf, np.inf, shape=(10000, 3), dtype=np.float32
+            )
+
+        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
         state_space = gym.spaces.Dict(
@@ -164,7 +171,7 @@ class RobotiqEnv(gym.Env):
         )
 
         obs_space_definition = {"state": state_space}
-        if self.camera_mode in ["rgb", "both", "depth"]:
+        if self.camera_mode in ["rgb", "both", "depth", "pointcloud"]:
             obs_space_definition["images"] = gym.spaces.Dict(
                 image_space_definition
             )
@@ -197,6 +204,9 @@ class RobotiqEnv(gym.Env):
             self.displayer = ImageDisplayer(self.img_queue)
             self.displayer.start()
             print("[CAM] Cameras are ready!")
+
+        if self.camera_mode in ["pointcloud"]:
+            self.pointcloud_fusion = PointCloudFusion(angle=31., x_distance=0.196)
 
         if self.realtime_plot:
             try:
@@ -256,16 +266,16 @@ class RobotiqEnv(gym.Env):
 
         self.curr_path_length += 1
 
-        dt = time.time() - start_time
-        time.sleep(max(0, (1.0 / self.hz) - dt))
-
         self._update_currpos()
         obs = self._get_obs()
+
+        dt = time.time() - start_time
+        time.sleep(max(0, (1.0 / self.hz) - dt))
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
 
-        reward = reward if not truncated else reward - 100.  # truncation penalty
+        reward = reward if not truncated else reward - 10.  # truncation penalty
 
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
         return obs, reward, done, truncated, {}
@@ -305,12 +315,12 @@ class RobotiqEnv(gym.Env):
             # reset_pose = self.resetpos.copy()
             reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
             reset_pose[:2] += reset_shift
+
+            random_rz_rot = np.random.uniform(np.negative(self.random_rz_range), self.random_rz_range)[0]
+            reset_pose[3:][:] = (R.from_quat(reset_pose[3:]) * R.from_euler("xyz", [0., 0., random_rz_rot])).as_quat()
+
             self.curr_reset_pose[:] = reset_pose
 
-            # euler_random = reset_pose[3:]
-            # euler_random[-1] += np.random.uniform(
-            #     np.negative(self.random_rz_range), self.random_rz_range
-            # )
             self.controller.set_target_pos(reset_pose)  # random movement after resetting
             time.sleep(0.1)
             while self.controller.is_moving():
@@ -359,17 +369,18 @@ class RobotiqEnv(gym.Env):
             print(f"cam serial: {cam_serial}")
             rgb = self.camera_mode in ["rgb", "both"]
             depth = self.camera_mode in ["depth", "both"]
+            pointcloud = self.camera_mode in ["pointcloud"]
             cap = VideoCapture(
-                RSCapture(name=cam_name, serial_number=cam_serial, rgb=rgb, depth=depth)
+                RSCapture(name=cam_name, serial_number=cam_serial, rgb=rgb, depth=depth, pointcloud=pointcloud)
             )
             self.cap[cam_name] = cap
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
         if name == "wrist":
-            return image[:, 80:560, :]
+            return image[:, 124:604, :]
         elif name == "shoulder":
-            return image[:, 80:560, :]
+            raise NotImplementedError("shoulder needs to be implemented")
         else:
             raise ValueError(f"Camera {name} not recognized in cropping")
 
@@ -377,6 +388,7 @@ class RobotiqEnv(gym.Env):
         """Get images from the realsense cameras."""
         images = {}
         display_images = {}
+        self.pointcloud_fusion.clear()
         for key, cap in self.cap.items():
             try:
                 image = cap.read()
@@ -384,10 +396,15 @@ class RobotiqEnv(gym.Env):
                     rgb = image[..., :3].astype(np.uint8)
                     cropped_rgb = self.crop_image(key, rgb)
                     resized = cv2.resize(
-                        cropped_rgb, self.observation_space["images"][key].shape[:2][::-1]
+                        cropped_rgb, self.observation_space["images"][key].shape[:2][::-1],
                     )
+                    # convert to grayscale here
+                    # gray = np.array([0.2989, 0.5870, 0.1140])
+                    # resized = np.dot(resized, gray)[..., None]
+                    # resized = resized.astype(np.uint8)
+
                     images[key] = resized[..., ::-1]
-                    display_images[key] = resized
+                    # display_images[key] = np.repeat(resized, 3, axis=-1)
                     display_images[key + "_full"] = cropped_rgb
 
                 if self.camera_mode in ["depth", "both"]:
@@ -396,12 +413,20 @@ class RobotiqEnv(gym.Env):
                     cropped_depth = self.crop_image(key, depth)
 
                     resized = cv2.resize(
-                        cropped_depth, self.observation_space["images"][depth_key].shape[:2]
+                        cropped_depth, np.array(self.observation_space["images"][depth_key].shape[:2]) * 3,
+                        # (128 * 3, 128 * 3) image
                     )[..., None]
+
+                    resized = resized.reshape((128, 3, 128, 3, 1)).max((1, 3))  # max pool with 3x3
+                    # TODO check if better!
 
                     images[depth_key] = resized
                     display_images[depth_key] = cv2.applyColorMap(resized, cv2.COLORMAP_JET)
                     display_images[depth_key + "_full"] = cv2.applyColorMap(cropped_depth, cv2.COLORMAP_JET)
+
+                if self.camera_mode in ["pointcloud"]:
+                    pointcloud = image
+                    self.pointcloud_fusion.append(pointcloud)
 
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
@@ -409,12 +434,61 @@ class RobotiqEnv(gym.Env):
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
+        # self.recording_frames.append(
+        #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
+        # )
+        # self.img_queue.put(display_images)
 
-        self.recording_frames.append(
-            np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
-        )
-        self.img_queue.put(display_images)
+        if self.camera_mode in ["pointcloud"]:
+            images["wrist_pointcloud"] = np.zeros((10000, 3))
+
+            if self.pointcloud_fusion.is_complete():
+                # fused = np.asarray(self.pointcloud_fusion.fuse_pointclouds().points)
+                # images["wrist_pointcloud"][:fused.shape[0], :] = fused
+                pass
+            elif not self.pointcloud_fusion.is_empty():
+                pc = np.asarray(self.pointcloud_fusion.get_first().points)
+                # images["wrist_pointcloud"][:pc.shape[0], :] = pc
+
         return images
+
+    def calibrate_pointcloud_fusion(self):
+        assert self.camera_mode in ["pointcloud"]
+        print("calibrating pointcloud fusion...")
+        # calibrate pc fusion here
+        p_backlog = []
+        t_hist = []
+
+        # get samples
+        for i in range(20):
+            action = [np.sin(i * np.pi / 10.), np.cos(i * np.pi / 10.), 0., -.3 * np.sin(i * np.pi / 10.),
+                      -.3 * np.cos(i * np.pi / 10.), 0., 0.]
+
+            obs, reward, done, truncated, _ = self.step(np.array(action))
+
+            p_backlog += [*self.pointcloud_fusion.get_both()]
+
+        # stop for now
+        self.controller.stop()
+
+        # do the calibration
+        import open3d as o3d
+        for i in range(20):
+            self.pointcloud_fusion.clear()
+            self.pointcloud_fusion.append(p_backlog[i * 2])
+            self.pointcloud_fusion.append(p_backlog[i * 2 + 1])
+
+            t = self.pointcloud_fusion.calibrate_fusion()
+            t_hist.append(t)
+            self.pointcloud_fusion.set_fine_tuned_transformation(t)
+            pcd = self.pointcloud_fusion.fuse_pointclouds()
+            o3d.visualization.draw_geometries([pcd])
+
+        t_hist = np.array(t_hist)
+        print(np.mean(t_hist, axis=0))
+        print(np.max(t_hist, axis=0))
+        print(np.min(t_hist, axis=0))
+        self.pointcloud_fusion.set_fine_tuned_transformation(np.mean(t_hist, axis=0))
 
     def close_cameras(self):
         """Close both wrist cameras."""

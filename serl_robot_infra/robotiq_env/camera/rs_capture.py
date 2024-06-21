@@ -1,5 +1,6 @@
 import numpy as np
 import pyrealsense2 as rs  # Intel RealSense cross-platform open-source API
+import time
 
 
 class RSCapture:
@@ -7,22 +8,24 @@ class RSCapture:
         devices = rs.context().devices
         return [d.get_info(rs.camera_info.serial_number) for d in devices]
 
-    def __init__(self, name, serial_number, dim=(640, 480), fps=15, rgb=True, depth=False):
+    def __init__(self, name, serial_number, dim=(640, 480), fps=15, rgb=True, depth=False, pointcloud=False):
         self.name = name
         # print(self.get_device_serial_numbers())
         assert serial_number in self.get_device_serial_numbers()
         self.serial_number = serial_number
         self.rgb = rgb
         self.depth = depth
+        self.pointcloud = pointcloud
         self.pipe = rs.pipeline()
         self.cfg = rs.config()
         self.cfg.enable_device(self.serial_number)
-        self.camera_intrinsics = None
 
-        assert self.rgb or self.depth
+        assert self.rgb or self.depth or self.pointcloud
         if self.rgb:
             self.cfg.enable_stream(rs.stream.color, dim[0], dim[1], rs.format.bgr8, fps)
         if self.depth:
+            self.cfg.enable_stream(rs.stream.depth, dim[0], dim[1], rs.format.z16, fps)
+        if self.pointcloud:
             self.cfg.enable_stream(rs.stream.depth, dim[0], dim[1], rs.format.z16, fps)
 
         self.profile = self.pipe.start(self.cfg)
@@ -33,10 +36,12 @@ class RSCapture:
             self.max_clipping_distance = 1. / depth_scale        # 1m max clipping distance
             self.min_clipping_distance = 0.0 / depth_scale       # might mess things up
 
-            # get the camera intrinsics
-            profile = self.pipe.get_active_profile()
-            depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
-            self.camera_intrinsics = depth_profile.get_intrinsics()
+        if self.pointcloud:
+            self.pc = rs.pointcloud()
+            self.threshold_filter = rs.threshold_filter()
+            self.threshold_filter.set_option(rs.option.max_distance, 0.3)    # in [m]
+            self.threshold_filter.set_option(rs.option.min_distance, 0.)    # in [m]
+            self.decimation_filter = rs.decimation_filter(magnitude=2.)
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
         # for firmware >5.13, auto_exposure False & auto_white_balance True, below only auto_exposure True
@@ -52,16 +57,17 @@ class RSCapture:
 
     def read(self):
         frames = self.pipe.wait_for_frames()
-        aligned_frames = self.align.process(frames)
-        image, depth = None, None
+        image, depth, pointcloud = None, None, None
 
         if self.rgb:
+            aligned_frames = self.align.process(frames)
             color_frame = aligned_frames.get_color_frame()
 
             if color_frame.is_video_frame():
                 image = np.asarray(color_frame.get_data())
 
         if self.depth:
+            aligned_frames = self.align.process(frames)
             depth_frame = aligned_frames.get_depth_frame()
 
             if depth_frame.is_depth_frame():
@@ -75,12 +81,21 @@ class RSCapture:
                 depth = (depth * (256. / self.max_clipping_distance)).astype(np.uint8)
                 depth = depth[..., None]
 
+        if self.pointcloud:
+            depth_frame = self.threshold_filter.process(frames.get_depth_frame())
+            depth_frame = self.decimation_filter.process(depth_frame)
+            if depth_frame.is_depth_frame():
+                points = self.pc.calculate(depth_frame)
+                pointcloud = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+
         if isinstance(image, np.ndarray) and isinstance(depth, np.ndarray):
             return True, np.concatenate((image, depth), axis=-1)
         elif isinstance(image, np.ndarray):
             return True, image
         elif isinstance(depth, np.ndarray):
-            return True, depth  # maybe invert depth and convert it to uint8 (maybe also filter for far away objects)
+            return True, depth
+        elif isinstance(pointcloud, np.ndarray):
+            return True, pointcloud
         else:
             return False, None
 
