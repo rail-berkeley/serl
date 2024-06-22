@@ -140,13 +140,6 @@ def main(_):
         Training Mode
         """
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        # load demos
-        replay_buffer = MemoryEfficientReplayBufferDataStore(
-            env.observation_space,
-            env.action_space,
-            FLAGS.replay_buffer_capacity,
-            image_keys=image_keys,
-        )
         # load demos and populate to current replay buffer
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
