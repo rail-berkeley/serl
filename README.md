@@ -21,7 +21,15 @@ SERL provides a set of libraries, env wrappers, and examples to train RL policie
   - [Contribution](#contribution)
   - [Citation](#citation)
 
-## Major bug fix
+## Major updates
+#### June 24, 2024
+For people who use SERL for tasks involving controlling the gripper (e.g.,pick up objects), we strong recommend adding a small penalty to the gripper action change, as it will greatly improves the training speed.
+For detail, please refer to: [PR #65](https://github.com/rail-berkeley/serl/pull/65).
+
+
+Further, we also recommend  providing interventions online during training in addition to loading the offline demos. If you have a Franka robot and SpaceMouse, this can be as easy as just touching the SpaceMouse during training.
+
+#### April 25, 2024
 We fixed a major issue in the intervention action frame. See release [v0.1.1](https://github.com/rail-berkeley/serl/releases/tag/v0.1.1) Please update your code with the main branch.
 
 ## Installation
