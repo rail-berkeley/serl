@@ -392,6 +392,7 @@ class FrankaEnv(gym.Env):
                 and self.gripper_binary_state == 0
             ):  # close gripper
                 requests.post(self.url + "close_gripper")
+                time.sleep(0.6)
                 self.gripper_binary_state = 1
                 return True
             elif (
@@ -399,6 +400,7 @@ class FrankaEnv(gym.Env):
                 and self.gripper_binary_state == 1
             ):  # open gripper
                 requests.post(self.url + "open_gripper")
+                time.sleep(0.6)
                 self.gripper_binary_state = 0
                 return True
             else:  # do nothing to the gripper
