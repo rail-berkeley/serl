@@ -22,6 +22,7 @@ class CableEnvConfig(DefaultEnvConfig):
     )
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
     REWARD_THRESHOLD: np.ndarray = np.zeros(6)
+    GRIPPER_PENALTY = 0.0
     ACTION_SCALE = np.array([0.05, 0.3, 1])
     RANDOM_RESET = True
     RANDOM_XY_RANGE = 0.1

@@ -22,6 +22,7 @@ class PegEnvConfig(DefaultEnvConfig):
     )
     RESET_POSE = TARGET_POSE + np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
     REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
+    GRIPPER_PENALTY = 0.0
     ACTION_SCALE = np.array([0.02, 0.1, 1])
     RANDOM_RESET = True
     RANDOM_XY_RANGE = 0.05
