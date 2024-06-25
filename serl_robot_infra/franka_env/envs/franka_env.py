@@ -214,7 +214,7 @@ class FrankaEnv(gym.Env):
         self._update_currpos()
         ob = self._get_obs()
         reward = self.compute_reward(ob, gripper_action_effective)
-        done = self.curr_path_length >= self.max_episode_length or reward
+        done = self.curr_path_length >= self.max_episode_length or reward == 1
         return ob, reward, done, False, {}
 
     def compute_reward(self, obs, gripper_action_effective) -> bool:
