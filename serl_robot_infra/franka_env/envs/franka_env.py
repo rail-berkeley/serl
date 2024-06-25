@@ -60,6 +60,7 @@ class DefaultEnvConfig:
     COMPLIANCE_PARAM: Dict[str, float] = {}
     PRECISION_PARAM: Dict[str, float] = {}
     BINARY_GRIPPER_THREASHOLD: float = 0.5
+    APPLY_GRIPPER_PENALTY: bool = True
     GRIPPER_PENALTY: float = 0.1
 
 
@@ -231,7 +232,7 @@ class FrankaEnv(gym.Env):
             # print(f'Goal not reached, the difference is {delta}, the desired threshold is {_REWARD_THRESHOLD}')
             reward = 0
 
-        if gripper_action_effective:
+        if self.config.APPLY_GRIPPER_PENALTY and gripper_action_effective:
             reward -= self.config.GRIPPER_PENALTY
 
         return reward
