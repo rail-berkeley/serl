@@ -7,6 +7,7 @@ import numpy as np
 import gymnasium as gym
 import cv2
 import queue
+import warnings
 from typing import Dict
 from datetime import datetime
 from collections import OrderedDict
@@ -15,7 +16,7 @@ from scipy.spatial.transform import Rotation as R
 from robotiq_env.camera.video_capture import VideoCapture
 from robotiq_env.camera.rs_capture import RSCapture
 
-from robotiq_env.camera.utils import PointCloudFusion
+from robotiq_env.camera.utils import PointCloudFusion, CalibrationTread
 
 from robotiq_env.utils.real_time_plotter import DataClient
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
@@ -41,6 +42,31 @@ class ImageDisplayer(threading.Thread):
             cv2.resizeWindow("RealSense Cameras", 300, 700)
             cv2.imshow("RealSense Cameras", frame)
             cv2.waitKey(1)
+
+
+class PointCloudDisplayer:
+    def __init__(self):
+        import open3d as o3d
+        self.window = o3d.visualization.Visualizer()
+        self.window.create_window(height=400, width=400, visible=True)
+
+        self.window.get_render_option().load_from_json(
+            "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/render_options.json")
+
+        self.param = o3d.io.read_pinhole_camera_parameters(
+            "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/camera_parameters.json")
+        self.ctr = self.window.get_view_control()
+
+    def display(self, voxelgrid):
+        self.window.clear_geometries()
+        self.window.add_geometry(voxelgrid)
+        self.ctr.convert_from_pinhole_camera_parameters(self.param, True)
+
+        self.window.poll_events()
+        # self.window.update_renderer()
+
+    def close(self):
+        self.window.destroy_window()
 
 
 ##############################################################################
@@ -201,12 +227,20 @@ class RobotiqEnv(gym.Env):
         if self.camera_mode is not None:
             self.init_cameras(config.REALSENSE_CAMERAS)
             self.img_queue = queue.Queue()
-            self.displayer = ImageDisplayer(self.img_queue)
-            self.displayer.start()
+            if self.camera_mode in ["pointcloud"]:
+                self.displayer = PointCloudDisplayer()
+            else:
+                self.displayer = ImageDisplayer(self.img_queue)
+                self.displayer.start()
             print("[CAM] Cameras are ready!")
 
         if self.camera_mode in ["pointcloud"]:
-            self.pointcloud_fusion = PointCloudFusion(angle=31., x_distance=0.196)
+            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196)
+
+            # load pre calibrated, else calibrate
+            if not self.pointcloud_fusion.load_finetuned():
+                self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
+                self.calibration_thread.start()
 
         if self.realtime_plot:
             try:
@@ -270,7 +304,10 @@ class RobotiqEnv(gym.Env):
         obs = self._get_obs()
 
         dt = time.time() - start_time
-        time.sleep(max(0, (1.0 / self.hz) - dt))
+        to_sleep = max(0, (1.0 / self.hz) - dt)
+        if to_sleep == 0:
+            warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
+        time.sleep(to_sleep)
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
@@ -434,61 +471,73 @@ class RobotiqEnv(gym.Env):
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
-        # self.recording_frames.append(
-        #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
-        # )
-        # self.img_queue.put(display_images)
-
         if self.camera_mode in ["pointcloud"]:
             images["wrist_pointcloud"] = np.zeros((10000, 3))
 
             if self.pointcloud_fusion.is_complete():
-                # fused = np.asarray(self.pointcloud_fusion.fuse_pointclouds().points)
-                # images["wrist_pointcloud"][:fused.shape[0], :] = fused
+                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
+                self.displayer.display(fused)
+                # images["wrist_pointcloud"][:fused.shape[0], :] = np.asarray(fused.points)
                 pass
             elif not self.pointcloud_fusion.is_empty():
                 pc = np.asarray(self.pointcloud_fusion.get_first().points)
                 # images["wrist_pointcloud"][:pc.shape[0], :] = pc
 
+        # self.recording_frames.append(
+        #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
+        # )
+        self.img_queue.put(display_images)
+
         return images
 
-    def calibrate_pointcloud_fusion(self):
+    def temporary_pointcloud_visualization(self):
+        obs, reward, done, truncated, _ = self.step(np.zeros(7))
+        fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
+        print("what")
+
+        self.controller.robotiq_control.forceModeStop()
+        self.controller.stop()
+        input("stopped!")
+
+        import open3d as o3d
+        o3d.visualization.draw_geometries([fused])
+        self.close()
+
+    def calibrate_pointcloud_fusion(self, save=True, visualize=False):
         assert self.camera_mode in ["pointcloud"]
         print("calibrating pointcloud fusion...")
         # calibrate pc fusion here
-        p_backlog = []
-        t_hist = []
 
         # get samples
         for i in range(20):
-            action = [np.sin(i * np.pi / 10.), np.cos(i * np.pi / 10.), 0., -.3 * np.sin(i * np.pi / 10.),
-                      -.3 * np.cos(i * np.pi / 10.), 0., 0.]
+            # action = [np.sin(i * np.pi / 10.), np.cos(i * np.pi / 10.), 0., -.3 * np.sin(i * np.pi / 10.),
+            #           -.3 * np.cos(i * np.pi / 10.), 0., 0.]
+            # action = [0., 0., 0., 0., 0., 1., 0.]
+            action = [-1. if i % 4 < 2 else 1, -1. if i % 4 in [1, 2] else 1, 0., 0., 0., 1., 0.]
 
+            print(action)
             obs, reward, done, truncated, _ = self.step(np.array(action))
 
-            p_backlog += [*self.pointcloud_fusion.get_both()]
+            self.calibration_thread.append_backlog(*self.pointcloud_fusion.get_both())
 
-        # stop for now
+        # calibrate()
         self.controller.stop()
+        self.calibration_thread.calibrate()
 
-        # do the calibration
-        import open3d as o3d
-        for i in range(20):
-            self.pointcloud_fusion.clear()
-            self.pointcloud_fusion.append(p_backlog[i * 2])
-            self.pointcloud_fusion.append(p_backlog[i * 2 + 1])
+        if save:
+            self.pointcloud_fusion.save_finetuned()
 
-            t = self.pointcloud_fusion.calibrate_fusion()
-            t_hist.append(t)
-            self.pointcloud_fusion.set_fine_tuned_transformation(t)
-            pcd = self.pointcloud_fusion.fuse_pointclouds()
-            o3d.visualization.draw_geometries([pcd])
+        if visualize:
+            import open3d as o3d
+            for i in range(20):
+                pcs = self.calibration_thread.pc_backlog[i]
+                self.pointcloud_fusion.clear()
+                self.pointcloud_fusion.append(pcs[0])
+                self.pointcloud_fusion.append(pcs[1])
+                fused = self.pointcloud_fusion.fuse_pointclouds()
+                o3d.visualization.draw_geometries([fused])
 
-        t_hist = np.array(t_hist)
-        print(np.mean(t_hist, axis=0))
-        print(np.max(t_hist, axis=0))
-        print(np.min(t_hist, axis=0))
-        self.pointcloud_fusion.set_fine_tuned_transformation(np.mean(t_hist, axis=0))
+        self.calibration_thread.join()
 
     def close_cameras(self):
         """Close both wrist cameras."""

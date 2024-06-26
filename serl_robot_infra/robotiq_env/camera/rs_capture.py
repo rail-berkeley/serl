@@ -1,6 +1,7 @@
 import numpy as np
 import pyrealsense2 as rs  # Intel RealSense cross-platform open-source API
 import time
+import open3d as o3d
 
 
 class RSCapture:
@@ -38,10 +39,9 @@ class RSCapture:
 
         if self.pointcloud:
             self.pc = rs.pointcloud()
-            self.threshold_filter = rs.threshold_filter()
-            self.threshold_filter.set_option(rs.option.max_distance, 0.3)    # in [m]
-            self.threshold_filter.set_option(rs.option.min_distance, 0.)    # in [m]
-            self.decimation_filter = rs.decimation_filter(magnitude=2.)
+            self.threshold_filter = rs.threshold_filter(min_dist=0., max_dist=0.25)
+            self.decimation_filter = rs.decimation_filter(magnitude=2.)     # 2 or 4
+            self.temporal_filter = rs.temporal_filter(smooth_alpha=0.53, smooth_delta=24., persistence_control=2) # standard values
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
         # for firmware >5.13, auto_exposure False & auto_white_balance True, below only auto_exposure True
@@ -82,8 +82,9 @@ class RSCapture:
                 depth = depth[..., None]
 
         if self.pointcloud:
-            depth_frame = self.threshold_filter.process(frames.get_depth_frame())
-            depth_frame = self.decimation_filter.process(depth_frame)
+            depth_frame = self.decimation_filter.process(frames.get_depth_frame())
+            depth_frame = self.threshold_filter.process(depth_frame)
+            depth_frame = self.temporal_filter.process(depth_frame)
             if depth_frame.is_depth_frame():
                 points = self.pc.calculate(depth_frame)
                 pointcloud = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
