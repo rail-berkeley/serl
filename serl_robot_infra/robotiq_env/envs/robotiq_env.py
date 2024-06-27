@@ -110,7 +110,7 @@ class RobotiqEnv(gym.Env):
             max_episode_length: int = 100,
             save_video: bool = False,
             realtime_plot: bool = False,
-            camera_mode: str = "rgb",  # one of (rgb, depth, both, None)
+            camera_mode: str = "rgb",  # one of (rgb, depth, both, pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
         self.action_scale = config.ACTION_SCALE
@@ -335,8 +335,8 @@ class RobotiqEnv(gym.Env):
         if self.resetQ.shape == (1, 6):
             reset_Q[:] = self.resetQ.copy()
         elif self.resetQ.shape[1] == 6 and self.resetQ.shape[0] > 1:
-            choice = np.random.randint(self.resetQ.shape[0])
-            reset_Q[:] = self.resetQ[choice, :].copy()  # make random guess
+            reset_Q[:] = self.resetQ[0, :].copy()  # make random guess
+            self.resetQ[:] = np.roll(self.resetQ, 1, axis=0)        # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
