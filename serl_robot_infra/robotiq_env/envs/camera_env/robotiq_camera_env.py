@@ -1,12 +1,12 @@
 import numpy as np
 
 from robotiq_env.envs.robotiq_env import RobotiqEnv
-from robotiq_env.envs.camera_env.config import RobotiqCameraConfig, RobotiqCameraConfigBox5
+from robotiq_env.envs.camera_env.config import RobotiqCameraConfig, RobotiqCameraConfigBox5, RobotiqCameraConfigFinal
 
 
 class RobotiqCameraEnv(RobotiqEnv):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, config=RobotiqCameraConfigBox5)
+        super().__init__(**kwargs, config=RobotiqCameraConfigFinal)
         self.plot_costs_yes = False
         if self.plot_costs_yes:
             self.reward_hist = dict(action_cost=[], suction_cost=[], non_central_cost=[], suction_reward=[],
@@ -46,12 +46,12 @@ class RobotiqCameraEnv(RobotiqEnv):
 
         downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
         suction_reward = 0.5 * float(obs["state"]["gripper_state"][1] > 0.9)
-        suction_cost = 0.5 * float(np.isclose(obs["state"]["gripper_state"][0], 0.99))
+        suction_cost = 0.5 * float(np.isclose(obs["state"]["gripper_state"][0], 0.99, atol=1e-3))
 
         orientation_cost = 1. - sum(obs["state"]["tcp_pose"][3:] * self.curr_reset_pose[3:]) ** 2
         orientation_cost *= 25.
 
-        max_pose_diff = 0.05  # set to 5cm
+        max_pose_diff = 0.03  # set to 3cm
         pos_diff = obs["state"]["tcp_pose"][:2] - self.curr_reset_pose[:2]
         position_cost = 10. * np.sum(
             np.where(np.abs(pos_diff) > max_pose_diff, np.abs(pos_diff - np.sign(pos_diff) * max_pose_diff), 0.0))
@@ -64,7 +64,7 @@ class RobotiqCameraEnv(RobotiqEnv):
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
         state = obs["state"]
-        return 0.1 < state['gripper_state'][0] < 0.85 and state['tcp_pose'][2] > 0.10  # new min height with box
+        return 0.1 < state['gripper_state'][0] < 0.85 and state['tcp_pose'][2] > self.curr_reset_pose[2] + 0.02  # +2cm
 
     def close(self):
         if self.plot_costs_yes:

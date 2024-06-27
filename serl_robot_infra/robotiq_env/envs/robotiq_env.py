@@ -81,6 +81,7 @@ class DefaultEnvConfig:
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
+    ABS_POSE_RANGE_LIMITS = np.zeros((2,))
     ACTION_SCALE = np.zeros((3,), dtype=np.float32)
 
     ROBOT_IP: str = "localhost"
@@ -147,6 +148,11 @@ class RobotiqEnv(gym.Env):
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
             config.ABS_POSE_LIMIT_HIGH[:3],
+            dtype=np.float64,
+        )
+        self.xy_range = gym.spaces.Box(
+            config.ABS_POSE_RANGE_LIMITS[0],
+            config.ABS_POSE_RANGE_LIMITS[1],
             dtype=np.float64,
         )
         self.rpy_bounding_box = gym.spaces.Box(
@@ -262,6 +268,9 @@ class RobotiqEnv(gym.Env):
         next_pos[:3] = np.clip(
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
+        xy_range = np.clip(np.linalg.norm(next_pos[:2], 2), self.xy_range.low, self.xy_range.high)
+        next_pos[:2] = next_pos[:2] / np.linalg.norm(next_pos[:2]) * xy_range
+
         euler = R.from_quat(next_pos[3:]).as_euler("xyz")
 
         # Clip first euler angle separately due to discontinuity from pi to -pi
