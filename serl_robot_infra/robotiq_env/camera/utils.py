@@ -2,6 +2,7 @@ import numpy as np
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 import threading
+from typing import Any
 
 
 def finetune_pointcloud_fusion(pcd1: o3d.geometry.PointCloud, pcd2: o3d.geometry.PointCloud):
@@ -34,6 +35,7 @@ class PointCloudFusion:
     def __init__(self, angle=30., x_distance=0.195):
         self.pcd1 = o3d.geometry.PointCloud()
         self.pcd2 = o3d.geometry.PointCloud()
+        self.original_pcds = []
         self._is_transformed = False
         self.fine_transformed = False
         # 14cm width and 12.5 height for the box
@@ -70,12 +72,16 @@ class PointCloudFusion:
         print(f"loaded finetuned Point Cloud fusion parameters!")
         return True
 
-    def append(self, pcd: np.ndarray):
+    def append(self, pcd: np.ndarray | o3d.utility.Vector3dVector):
+        assert type(pcd) == np.ndarray or type(pcd) == o3d.utility.Vector3dVector
         # MASSIVE! speed up if float64 is used, see: https://github.com/isl-org/Open3D/issues/1045
+        func = lambda x: o3d.utility.Vector3dVector(x.astype(np.float64)) if isinstance(pcd, np.ndarray) else x
         if self.pcd1.is_empty():
-            self.pcd1.points = o3d.utility.Vector3dVector(pcd.astype(np.float64))
+            self.original_pcds.append(func(pcd))
+            self.pcd1.points = func(pcd)
         elif self.pcd2.is_empty():
-            self.pcd2.points = o3d.utility.Vector3dVector(pcd.astype(np.float64))
+            self.original_pcds.append(func(pcd))
+            self.pcd2.points = func(pcd)
         else:
             raise NotImplementedError("3 pointclouds not supported")
 
@@ -114,6 +120,7 @@ class PointCloudFusion:
         self.pcd1.clear()
         self.pcd2.clear()
         self._is_transformed = False
+        self.original_pcds = []
 
     def _transform(self):
         self.pcd1.transform(self.t1)
@@ -132,14 +139,18 @@ class PointCloudFusion:
             return self.pcd1.crop(self.crop_volume)
 
     def get_first(self, cropped=True):
-        self.pcd1.transform(self.t1)
+        if not self._is_transformed:
+            self.pcd1.transform(self.t1)
         if cropped:
             return self.pcd1.crop(self.crop_volume)
         else:
             return self.pcd1
 
-    def get_both(self):
-        return self.pcd1.__copy__(), self.pcd2.__copy__()
+    def get_original_pcds(self):
+        if len(self.original_pcds) == 1:
+            return self.original_pcds[0]
+        else:
+            return self.original_pcds
 
     def is_complete(self):
         return not self.pcd1.is_empty() and not self.pcd2.is_empty()

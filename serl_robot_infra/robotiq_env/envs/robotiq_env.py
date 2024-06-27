@@ -113,6 +113,7 @@ class RobotiqEnv(gym.Env):
             camera_mode: str = "rgb",  # one of (rgb, depth, both, pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
+        self.curr_path_length = 0
         self.action_scale = config.ACTION_SCALE
 
         self.config = config
@@ -234,14 +235,6 @@ class RobotiqEnv(gym.Env):
                 self.displayer.start()
             print("[CAM] Cameras are ready!")
 
-        if self.camera_mode in ["pointcloud"]:
-            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196)
-
-            # load pre calibrated, else calibrate
-            if not self.pointcloud_fusion.load_finetuned():
-                self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
-                self.calibration_thread.start()
-
         if self.realtime_plot:
             try:
                 self.plotting_client = DataClient()
@@ -252,6 +245,16 @@ class RobotiqEnv(gym.Env):
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
         print("[RIC] Controller has started and is ready!")
+
+        if self.camera_mode in ["pointcloud"]:
+            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196)
+
+            # load pre calibrated, else calibrate
+            if not self.pointcloud_fusion.load_finetuned():
+                self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
+                self.calibration_thread.start()
+
+                self.calibrate_pointcloud_fusion(visualize=True)
 
     def clip_safety_box(self,
                         next_pos: np.ndarray) -> np.ndarray:  # TODO make better, no euler -> quat -> euler -> quat
@@ -336,7 +339,7 @@ class RobotiqEnv(gym.Env):
             reset_Q[:] = self.resetQ.copy()
         elif self.resetQ.shape[1] == 6 and self.resetQ.shape[0] > 1:
             reset_Q[:] = self.resetQ[0, :].copy()  # make random guess
-            self.resetQ[:] = np.roll(self.resetQ, 1, axis=0)        # roll one (not random)
+            self.resetQ[:] = np.roll(self.resetQ, 1, axis=0)  # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
@@ -349,7 +352,6 @@ class RobotiqEnv(gym.Env):
         reset_pose = self.controller.get_target_pos()
 
         if self.random_reset:  # randomize reset position in xy plane
-            # reset_pose = self.resetpos.copy()
             reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
             reset_pose[:2] += reset_shift
 
@@ -472,7 +474,7 @@ class RobotiqEnv(gym.Env):
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            images["wrist_pointcloud"] = np.zeros((10000, 3))
+            images["wrist_pointcloud"] = np.zeros((10000, 3))       # TODO make clean
 
             if self.pointcloud_fusion.is_complete():
                 fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
@@ -490,38 +492,27 @@ class RobotiqEnv(gym.Env):
 
         return images
 
-    def temporary_pointcloud_visualization(self):
-        obs, reward, done, truncated, _ = self.step(np.zeros(7))
-        fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
-        print("what")
+    def calibrate_pointcloud_fusion(self, save=True, visualize=False, num_samples=20):
+        self.reset()
 
-        self.controller.robotiq_control.forceModeStop()
-        self.controller.stop()
-        input("stopped!")
-
-        import open3d as o3d
-        o3d.visualization.draw_geometries([fused])
-        self.close()
-
-    def calibrate_pointcloud_fusion(self, save=True, visualize=False):
         assert self.camera_mode in ["pointcloud"]
         print("calibrating pointcloud fusion...")
         # calibrate pc fusion here
 
         # get samples
-        for i in range(20):
+        for i in range(num_samples):
             # action = [np.sin(i * np.pi / 10.), np.cos(i * np.pi / 10.), 0., -.3 * np.sin(i * np.pi / 10.),
             #           -.3 * np.cos(i * np.pi / 10.), 0., 0.]
-            # action = [0., 0., 0., 0., 0., 1., 0.]
             action = [-1. if i % 4 < 2 else 1, -1. if i % 4 in [1, 2] else 1, 0., 0., 0., 1., 0.]
 
             print(action)
             obs, reward, done, truncated, _ = self.step(np.array(action))
 
-            self.calibration_thread.append_backlog(*self.pointcloud_fusion.get_both())
+            self.calibration_thread.append_backlog(*self.pointcloud_fusion.get_original_pcds())
 
         # calibrate()
         self.controller.stop()
+        time.sleep(1)
         self.calibration_thread.calibrate()
 
         if save:
@@ -529,7 +520,7 @@ class RobotiqEnv(gym.Env):
 
         if visualize:
             import open3d as o3d
-            for i in range(20):
+            for i in range(num_samples):
                 pcs = self.calibration_thread.pc_backlog[i]
                 self.pointcloud_fusion.clear()
                 self.pointcloud_fusion.append(pcs[0])
@@ -538,6 +529,7 @@ class RobotiqEnv(gym.Env):
                 o3d.visualization.draw_geometries([fused])
 
         self.calibration_thread.join()
+        exit(f"restart the program to use the calibrated values")
 
     def close_cameras(self):
         """Close both wrist cameras."""
