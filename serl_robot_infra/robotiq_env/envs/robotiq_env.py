@@ -235,7 +235,7 @@ class RobotiqEnv(gym.Env):
             self.init_cameras(config.REALSENSE_CAMERAS)
             self.img_queue = queue.Queue()
             if self.camera_mode in ["pointcloud"]:
-                self.displayer = PointCloudDisplayer()
+                self.displayer = PointCloudDisplayer()      # o3d displayer cannot be threaded :/
             else:
                 self.displayer = ImageDisplayer(self.img_queue)
                 self.displayer.start()
@@ -483,15 +483,16 @@ class RobotiqEnv(gym.Env):
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            images["wrist_pointcloud"] = np.zeros((10000, 3))       # TODO make clean
+            images["wrist_pointcloud"] = np.zeros((10000, 3), dtype=np.float32)       # TODO make clean
 
             if self.pointcloud_fusion.is_complete():
                 fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
                 self.displayer.display(fused)
+
                 # images["wrist_pointcloud"][:fused.shape[0], :] = np.asarray(fused.points)
-                pass
             elif not self.pointcloud_fusion.is_empty():
-                pc = np.asarray(self.pointcloud_fusion.get_first().points)
+                pc = self.pointcloud_fusion.get_first(cropped=True, voxelize=True)
+                self.displayer.display(pc)
                 # images["wrist_pointcloud"][:pc.shape[0], :] = pc
 
         # self.recording_frames.append(

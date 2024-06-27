@@ -32,15 +32,17 @@ def pairwise_registration(source, target, max_correspondence_distance):
 
 
 class PointCloudFusion:
-    def __init__(self, angle=30., x_distance=0.195):
+    def __init__(self, angle=30., x_distance=0.195, voxel_size=1):
         self.pcd1 = o3d.geometry.PointCloud()
         self.pcd2 = o3d.geometry.PointCloud()
-        self.original_pcds = []
-        self._is_transformed = False
-        self.fine_transformed = False
+        self.voxel_size = 1e-3 * voxel_size     # in mm
+
         # 14cm width and 12.5 height for the box
         self.crop_volume = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-0.07, -0.07, 0.075),
                                                                max_bound=(0.07, 0.07, 0.2))
+        self.original_pcds = []
+        self._is_transformed = False
+        self.fine_transformed = False
 
         t1 = np.eye(4)
         t1[:3, :3] = R.from_euler("xyz", [angle, 0., 0.], degrees=True).as_matrix()
@@ -132,17 +134,18 @@ class PointCloudFusion:
             self._transform()
 
         self.pcd1 += self.pcd2
-        mm = 1e-3
         if voxelize:
-            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1.crop(self.crop_volume), voxel_size=1 * mm)
+            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1.crop(self.crop_volume), voxel_size=self.voxel_size)
         else:
             return self.pcd1.crop(self.crop_volume)
 
-    def get_first(self, cropped=True):
+    def get_first(self, cropped=True, voxelize=False):
         if not self._is_transformed:
             self.pcd1.transform(self.t1)
         if cropped:
-            return self.pcd1.crop(self.crop_volume)
+            self.pcd1 = self.pcd1.crop(self.crop_volume)
+        if voxelize:
+            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1, voxel_size=self.voxel_size)
         else:
             return self.pcd1
 
