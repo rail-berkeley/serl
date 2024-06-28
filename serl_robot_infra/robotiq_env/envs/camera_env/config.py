@@ -94,5 +94,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
 
 class RobotiqCameraConfigFinalTests(RobotiqCameraConfigFinal):
     RESET_Q = np.array([
-        [0.1815, - 1.2945, 1.8964, - 2.1719, - 1.5658, - 1.3841],
+        [ 0.0421, -1.3161,  1.9649, -2.2358, -1.3221, -1.5237],
     ])
+    ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.3, 3.2])
+    ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.6, -0.3, -3.2])
