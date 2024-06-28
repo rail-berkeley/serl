@@ -233,6 +233,16 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
+        elif encoder_type == "voxel_mlp":
+            encoders = {
+                image_key: MLP(
+                    hidden_dims=[128, 128],
+                    activations=nn.relu,
+                    activate_final=True,
+                    use_layer_norm=True,
+                )
+                for image_key in image_keys
+            }       # TODO check if stop_gradient has to be removed
         elif encoder_type.lower() == "none":
             encoders = None
         else:

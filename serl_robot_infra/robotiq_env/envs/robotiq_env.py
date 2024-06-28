@@ -185,7 +185,7 @@ class RobotiqEnv(gym.Env):
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
-                -np.inf, np.inf, shape=(10000, 3), dtype=np.float32
+                0, 1, shape=(140, 140, 125), dtype=np.bool_
             )
 
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud"]:
@@ -348,7 +348,7 @@ class RobotiqEnv(gym.Env):
             reset_Q[:] = self.resetQ.copy()
         elif self.resetQ.shape[1] == 6 and self.resetQ.shape[0] > 1:
             reset_Q[:] = self.resetQ[0, :].copy()  # make random guess
-            self.resetQ[:] = np.roll(self.resetQ, 1, axis=0)  # roll one (not random)
+            self.resetQ[:] = np.roll(self.resetQ, -1, axis=0)  # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
@@ -483,17 +483,22 @@ class RobotiqEnv(gym.Env):
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            images["wrist_pointcloud"] = np.zeros((10000, 3), dtype=np.float32)       # TODO make clean
+            voxel_grid = np.zeros(self.pointcloud_fusion.get_voxelgrid_shape(), dtype=np.bool_)
 
             if self.pointcloud_fusion.is_complete():
-                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
-                self.displayer.display(fused)
-
-                # images["wrist_pointcloud"][:fused.shape[0], :] = np.asarray(fused.points)
+                pc = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
             elif not self.pointcloud_fusion.is_empty():
                 pc = self.pointcloud_fusion.get_first(cropped=True, voxelize=True)
-                self.displayer.display(pc)
-                # images["wrist_pointcloud"][:pc.shape[0], :] = pc
+
+            self.displayer.display(pc)
+            # TODO takes too long to calculate, do it with numba or otherwise faster
+            # t = time.time()
+            # indices = np.stack(list(vx.grid_index for vx in pc.get_voxels()))
+            # x, y, z = np.moveaxis(indices, -1, 0)
+            # voxel_grid[x, y, z] = True      # fill voxel grid
+            # images["wrist_pointcloud"] = voxel_grid
+            # print(f"took {time.time() - t:.4f}s")
+            images["wrist_pointcloud"] = voxel_grid
 
         # self.recording_frames.append(
         #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
