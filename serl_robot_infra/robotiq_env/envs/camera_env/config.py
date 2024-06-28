@@ -74,7 +74,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.18, 3.2])
     ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.8, -0.18, -3.2])
-    ABS_POSE_RANGE_LIMITS = np.array([0.35, 0.85])
+    ABS_POSE_RANGE_LIMITS = np.array([0.36, 0.83])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.2"
@@ -88,5 +88,11 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
 
     REALSENSE_CAMERAS = {
         "wrist": "218622277164",
-        "wrist_2": "218622279756"
+        # "wrist_2": "218622279756"
     }
+
+
+class RobotiqCameraConfigFinalTests(RobotiqCameraConfigFinal):
+    RESET_Q = np.array([
+        [0.1815, - 1.2945, 1.8964, - 2.1719, - 1.5658, - 1.3841],
+    ])

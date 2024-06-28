@@ -1,12 +1,15 @@
 import numpy as np
 
 from robotiq_env.envs.robotiq_env import RobotiqEnv
-from robotiq_env.envs.camera_env.config import RobotiqCameraConfig, RobotiqCameraConfigBox5, RobotiqCameraConfigFinal
+from robotiq_env.envs.camera_env.config import RobotiqCameraConfigFinal, RobotiqCameraConfigFinalTests
 
 
 class RobotiqCameraEnv(RobotiqEnv):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, config=RobotiqCameraConfigFinal)
+    def __init__(self, load_config=True, **kwargs):
+        if load_config:
+            super().__init__(**kwargs, config=RobotiqCameraConfigFinal)
+        else:
+            super().__init__(**kwargs)
         self.plot_costs_yes = False
         if self.plot_costs_yes:
             self.reward_hist = dict(action_cost=[], suction_cost=[], non_central_cost=[], suction_reward=[],
@@ -44,7 +47,7 @@ class RobotiqCameraEnv(RobotiqEnv):
             self.plot_costs()
         super().close()
 
-    def plot_costs(self):       # not used anymore
+    def plot_costs(self):  # not used anymore
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(6, 1, figsize=(12, 10), sharey=True, sharex=True)
         y = np.arange(len(self.reward_hist["action_cost"]))
@@ -66,3 +69,8 @@ class RobotiqCameraEnv(RobotiqEnv):
         ax6.legend()
 
         plt.show()
+
+
+class RobotiqCameraEnvTest(RobotiqCameraEnv):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs, load_config=False, config=RobotiqCameraConfigFinalTests)
