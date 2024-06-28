@@ -22,7 +22,7 @@ class RobotiqCameraConfig(DefaultEnvConfig):
 
     REALSENSE_CAMERAS = {
         "wrist": "218622277164",
-        "wrist2": "218622279756"
+        "wrist_2": "218622279756"
     }
 
 
@@ -88,5 +88,5 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
 
     REALSENSE_CAMERAS = {
         "wrist": "218622277164",
-        "wrist2": "218622279756"
+        "wrist_2": "218622279756"
     }
