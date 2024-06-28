@@ -5,6 +5,7 @@ from gym import Env
 from franka_env.utils.transformations import (
     construct_adjoint_matrix,
     construct_homogeneous_matrix,
+    construct_rotation_matrix
 )
 
 
@@ -29,6 +30,7 @@ class RelativeFrame(gym.Wrapper):
     def __init__(self, env: Env, include_relative_pose=True):
         super().__init__(env)
         self.adjoint_matrix = np.zeros((6, 6))
+        self.rotation_matrix = np.eye((3))
 
         self.include_relative_pose = include_relative_pose
         if self.include_relative_pose:
@@ -46,8 +48,9 @@ class RelativeFrame(gym.Wrapper):
         if "intervene_action" in info:
             info["intervene_action"] = self.transform_action_inv(info["intervene_action"])
 
-        # Update adjoint matrix
+        # Update adjoint and rotation matrix
         self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
+        self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
 
         # Transform observation to spatial frame
         transformed_obs = self.transform_observation(obs)
@@ -58,8 +61,9 @@ class RelativeFrame(gym.Wrapper):
 
         # obs['state']['tcp_pose'][:2] -= info['reset_shift']  # set rel pose to original reset pose (no random)
 
-        # Update adjoint matrix
+        # Update adjoint and rotation matrix
         self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
+        self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
         if self.include_relative_pose:
             # Update transformation matrix from the reset pose's relative frame to base frame
             self.T_r_o_inv = np.linalg.inv(
@@ -90,11 +94,11 @@ class RelativeFrame(gym.Wrapper):
 
     def transform_action(self, action: np.ndarray):
         """
-        Transform action from body(end-effector) frame into into spatial(base) frame
+        Transform action from body(end-effector) frame into spatial(base) frame
         using the adjoint matrix
         """
         action = np.array(action)  # in case action is a jax read-only array
-        action[:6] = self.adjoint_matrix @ action[:6]
+        action[:3] = self.rotation_matrix @ action[:3]
         return action
 
     def transform_action_inv(self, action: np.ndarray):
@@ -103,5 +107,5 @@ class RelativeFrame(gym.Wrapper):
         using the adjoint matrix.
         """
         action = np.array(action)
-        action[:6] = np.linalg.inv(self.adjoint_matrix) @ action[:6]
+        action[:3] = np.linalg.inv(self.rotation_matrix) @ action[:3]
         return action
