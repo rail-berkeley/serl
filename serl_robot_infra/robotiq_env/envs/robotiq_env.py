@@ -168,20 +168,24 @@ class RobotiqEnv(gym.Env):
 
         image_space_definition = {}
         if camera_mode in ["rgb", "both"]:
-            # image_space_definition["shoulder"] = gym.spaces.Box(
-            #             0, 255, shape=(128, 128, 3), dtype=np.uint8
-            # )
-            image_space_definition["wrist"] = gym.spaces.Box(
-                0, 255, shape=(128, 128, 3), dtype=np.uint8
-            )
+            if "wrist" in config.REALSENSE_CAMERAS.keys():
+                image_space_definition["wrist"] = gym.spaces.Box(
+                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                )
+            if "wrist_2" in config.REALSENSE_CAMERAS.keys():
+                image_space_definition["wrist_2"] = gym.spaces.Box(
+                    0, 255, shape=(128, 128, 3), dtype=np.uint8
+                )
 
         if camera_mode in ["depth", "both"]:
-            # image_space_definition["shoulder_depth"] = gym.spaces.Box(
-            #     0, 255, shape=(128, 128, 1), dtype=np.uint8
-            # )
-            image_space_definition["wrist_depth"] = gym.spaces.Box(
-                0, 255, shape=(128, 128, 1), dtype=np.uint8
-            )
+            if "wrist" in config.REALSENSE_CAMERAS.keys():
+                image_space_definition["wrist_depth"] = gym.spaces.Box(
+                    0, 255, shape=(128, 128, 1), dtype=np.uint8
+                )
+            if "wrist_2" in config.REALSENSE_CAMERAS.keys():
+                image_space_definition["wrist_2_depth"] = gym.spaces.Box(
+                    0, 255, shape=(128, 128, 1), dtype=np.uint8
+                )
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
@@ -427,8 +431,8 @@ class RobotiqEnv(gym.Env):
         """Crop realsense images to be a square."""
         if name == "wrist":
             return image[:, 124:604, :]
-        elif name == "shoulder":
-            raise NotImplementedError("shoulder needs to be implemented")
+        elif name == "wrist_2":
+            return image[:, 124:604, :]
         else:
             raise ValueError(f"Camera {name} not recognized in cropping")
 
@@ -436,7 +440,8 @@ class RobotiqEnv(gym.Env):
         """Get images from the realsense cameras."""
         images = {}
         display_images = {}
-        self.pointcloud_fusion.clear()
+        if self.camera_mode == "pointcloud":
+            self.pointcloud_fusion.clear()
         for key, cap in self.cap.items():
             try:
                 image = cap.read()
@@ -452,6 +457,7 @@ class RobotiqEnv(gym.Env):
                     # resized = resized.astype(np.uint8)
 
                     images[key] = resized[..., ::-1]
+                    display_images[key] = resized
                     # display_images[key] = np.repeat(resized, 3, axis=-1)
                     display_images[key + "_full"] = cropped_rgb
 
