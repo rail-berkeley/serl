@@ -32,14 +32,16 @@ def pairwise_registration(source, target, max_correspondence_distance):
 
 
 class PointCloudFusion:
-    def __init__(self, angle=30., x_distance=0.195, voxel_size=1):
+    def __init__(self, angle=30., x_distance=0.195, voxel_size: int = 1):
         self.pcd1 = o3d.geometry.PointCloud()
         self.pcd2 = o3d.geometry.PointCloud()
-        self.voxel_size = 1e-3 * voxel_size     # in mm
+        self.voxel_size = 1e-3 * voxel_size  # in mm
 
         # 14cm width and 12.5 height for the box
         self.crop_volume = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-0.07, -0.07, 0.075),
-                                                               max_bound=(0.07, 0.07, 0.2))
+                                                               max_bound=(
+                                                               0.07 - self.voxel_size, 0.07 - self.voxel_size,
+                                                               0.2 - self.voxel_size))
         self.original_pcds = []
         self._is_transformed = False
         self.fine_transformed = False
@@ -61,6 +63,10 @@ class PointCloudFusion:
         t_finetuned[1, ...] = self.t2
         with open("PointCloudFusionFinetuned.npy", "wb") as f:
             np.save(f, t_finetuned)
+
+    def get_voxelgrid_shape(self):
+        return ((np.asarray(self.crop_volume.get_max_bound()) - np.asarray(
+            self.crop_volume.get_min_bound())) / self.voxel_size).astype(np.int16) + 1
 
     def load_finetuned(self):
         from os.path import exists
@@ -135,7 +141,8 @@ class PointCloudFusion:
 
         self.pcd1 += self.pcd2
         if voxelize:
-            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1.crop(self.crop_volume), voxel_size=self.voxel_size)
+            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1.crop(self.crop_volume),
+                                                                  voxel_size=self.voxel_size)
         else:
             return self.pcd1.crop(self.crop_volume)
 
