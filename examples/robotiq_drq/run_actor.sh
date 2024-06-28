@@ -5,7 +5,7 @@ python drq_policy_robotiq.py "$@" \
     --actor \
     --env robotiq_camera_env \
     --max_traj_length 100 \
-    --exp_name=drq_rgb_5box \
+    --exp_name=drq_10box \
     --camera_mode rgb \
     --seed 1 \
     --max_steps 30000 \

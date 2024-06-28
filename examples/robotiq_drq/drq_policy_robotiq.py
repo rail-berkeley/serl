@@ -58,7 +58,7 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 10000,
+flags.DEFINE_integer("replay_buffer_capacity", 15000,
                      "Replay buffer capacity.")  # quite low to forget demo trajectories
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
@@ -72,7 +72,6 @@ flags.DEFINE_integer("eval_period", 1000, "Evaluation period.")
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
-# "small" is a 4 layer convnet, "resnet" and "mobilenet" are frozen with pretrained weights
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
@@ -473,6 +472,12 @@ def main(_):
                 for obs_name in to_pop:
                     traj["observations"].pop(obs_name)
                     traj["next_observations"].pop(obs_name)
+
+                # TODO remove afterwards, set all images to grayscale
+                # gray = np.array([0.2989, 0.5870, 0.1140])
+                # traj["observations"]["wrist"] = np.dot(traj["observations"]["wrist"], gray)[..., None]
+                # traj["next_observations"]["wrist"] = np.dot(traj["next_observations"]["wrist"], gray)[..., None]
+
                 replay_buffer.insert(traj)
         print(f"replay buffer size: {len(replay_buffer)}")
 
@@ -501,8 +506,8 @@ def main(_):
         try:
             actor(agent, data_store, env, sampling_rng)
             print_green("actor loop finished")
-        except KeyboardInterrupt:
-            print_green("actor loop interrupted")
+        except (KeyboardInterrupt, RuntimeError) as e:
+            print_green("actor loop interrupted: " + str(e))
         finally:
             env.close()
 
