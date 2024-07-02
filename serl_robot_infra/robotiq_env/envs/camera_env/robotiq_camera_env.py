@@ -12,7 +12,7 @@ class RobotiqCameraEnv(RobotiqEnv):
         else:
             super().__init__(**kwargs)
 
-    def compute_reward(self, obs, action) -> Tuple[float, dict]:
+    def compute_reward(self, obs, action) -> float:
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.05
 
@@ -40,10 +40,10 @@ class RobotiqCameraEnv(RobotiqEnv):
             self.cost_infos[key] = info + (0. if key not in self.cost_infos else self.cost_infos[key])
 
         if self.reached_goal_state(obs):
-            return 100. - action_cost - orientation_cost - position_cost, self.cost_infos.copy()
+            return 100. - action_cost - orientation_cost - position_cost
         else:
             return 0. + suction_reward - action_cost - downward_force_cost - orientation_cost - position_cost - \
-                   suction_cost - step_cost, self.cost_infos.copy()
+                   suction_cost - step_cost
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis

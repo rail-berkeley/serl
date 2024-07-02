@@ -295,7 +295,7 @@ class RobotiqEnv(gym.Env):
 
         return next_pos
 
-    def get_cost_infos(self, done=False):
+    def get_cost_infos(self, done):
         if not done:
             return {}
         cost_infos = self.cost_infos.copy()
@@ -333,7 +333,7 @@ class RobotiqEnv(gym.Env):
             warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         time.sleep(to_sleep)
 
-        reward, infos = self.compute_reward(obs, action)
+        reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
 
         reward = reward if not truncated else reward - 10.  # truncation penalty
@@ -341,8 +341,8 @@ class RobotiqEnv(gym.Env):
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
         return obs, reward, done, truncated, self.get_cost_infos(done)
 
-    def compute_reward(self, obs, action) -> Tuple[float, dict]:
-        return 0., {}  # overwrite for each task
+    def compute_reward(self, obs, action) -> float:
+        return 0.   # overwrite for each task
 
     def reached_goal_state(self, obs) -> bool:
         return False  # overwrite for each task

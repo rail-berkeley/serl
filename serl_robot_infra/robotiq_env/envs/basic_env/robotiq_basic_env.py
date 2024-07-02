@@ -14,7 +14,7 @@ class RobotiqBasicEnv(RobotiqEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=RobotiqCornerConfig)
 
-    def compute_reward(self, obs, action) -> Tuple[float, dict]:
+    def compute_reward(self, obs, action) -> float:
         # huge action gives negative reward (like in mountain car)
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.01
@@ -28,9 +28,9 @@ class RobotiqBasicEnv(RobotiqEnv):
 
         # print(f"action_cost: {action_cost}, xy_cost: {xy_cost}")
         if self.reached_goal_state(obs):
-            return 10. - action_cost - step_cost - suck_cost, {}
+            return 10. - action_cost - step_cost - suck_cost
         else:
-            return 0.0 - action_cost - step_cost - suck_cost, {}
+            return 0.0 - action_cost - step_cost - suck_cost
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
