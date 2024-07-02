@@ -115,6 +115,7 @@ class RobotiqImpedanceController(threading.Thread):
         # disconnect and reconnect, otherwise the controller won't take any commands
         self.robotiq_control.disconnect()
         try:
+            print(f"[RTDE] trying to reconnect")
             self.robotiq_control.reconnect()
         except RuntimeError:
             self.robotiq_receive.disconnect()
@@ -123,6 +124,7 @@ class RobotiqImpedanceController(threading.Thread):
                     self.robotiq_control.disconnect()
                     self.robotiq_receive.disconnect()
                     await self.start_robotiq_interfaces(gripper=False)
+                    return
                 except Exception as e:
                     print(e)
                     time.sleep(0.2)
@@ -374,6 +376,7 @@ class RobotiqImpedanceController(threading.Thread):
                 )
                 if not fm_successful:  # truncate if the robot ends up in a singularity
                     await self.restart_robotiq_interface()
+                    self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.8)
 
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
