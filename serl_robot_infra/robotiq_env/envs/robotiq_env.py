@@ -8,7 +8,7 @@ import gymnasium as gym
 import cv2
 import queue
 import warnings
-from typing import Dict
+from typing import Dict, Tuple
 from datetime import datetime
 from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
@@ -144,6 +144,7 @@ class RobotiqEnv(gym.Env):
         self.camera_mode = camera_mode
 
         self.realtime_plot = realtime_plot
+        self.cost_infos = {}
 
         self.xyz_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[:3],
@@ -170,7 +171,7 @@ class RobotiqEnv(gym.Env):
         if camera_mode in ["rgb", "both"]:
             if "wrist" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["wrist"] = gym.spaces.Box(
-                            0, 255, shape=(128, 128, 3), dtype=np.uint8
+                    0, 255, shape=(128, 128, 3), dtype=np.uint8
                 )
             if "wrist_2" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["wrist_2"] = gym.spaces.Box(
@@ -239,7 +240,7 @@ class RobotiqEnv(gym.Env):
             self.init_cameras(config.REALSENSE_CAMERAS)
             self.img_queue = queue.Queue()
             if self.camera_mode in ["pointcloud"]:
-                self.displayer = PointCloudDisplayer()      # o3d displayer cannot be threaded :/
+                self.displayer = PointCloudDisplayer()  # o3d displayer cannot be threaded :/
             else:
                 self.displayer = ImageDisplayer(self.img_queue)
                 self.displayer.start()
@@ -294,6 +295,13 @@ class RobotiqEnv(gym.Env):
 
         return next_pos
 
+    def get_cost_infos(self, done=False):
+        if not done:
+            return {}
+        cost_infos = self.cost_infos.copy()
+        self.cost_infos = {}
+        return cost_infos
+
     def step(self, action: np.ndarray) -> tuple:
         """standard gym step function."""
         start_time = time.time()
@@ -325,16 +333,16 @@ class RobotiqEnv(gym.Env):
             warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         time.sleep(to_sleep)
 
-        reward = self.compute_reward(obs, action)
+        reward, infos = self.compute_reward(obs, action)
         truncated = self._is_truncated()
 
         reward = reward if not truncated else reward - 10.  # truncation penalty
 
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
-        return obs, reward, done, truncated, {}
+        return obs, reward, done, truncated, self.get_cost_infos(done)
 
-    def compute_reward(self, obs, action) -> float:
-        return 0.  # overwrite for each task
+    def compute_reward(self, obs, action) -> Tuple[float, dict]:
+        return 0., {}  # overwrite for each task
 
     def reached_goal_state(self, obs) -> bool:
         return False  # overwrite for each task
@@ -484,7 +492,7 @@ class RobotiqEnv(gym.Env):
 
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
-                cap.close()
+                # cap.close()
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
@@ -498,12 +506,15 @@ class RobotiqEnv(gym.Env):
 
             self.displayer.display(pc)
             # TODO takes too long to calculate, do it with numba or otherwise faster
-            # t = time.time()
-            # indices = np.stack(list(vx.grid_index for vx in pc.get_voxels()))
-            # x, y, z = np.moveaxis(indices, -1, 0)
-            # voxel_grid[x, y, z] = True      # fill voxel grid
-            # images["wrist_pointcloud"] = voxel_grid
-            # print(f"took {time.time() - t:.4f}s")
+            t = time.time()
+            a = []
+            voxels = pc.get_voxels()
+            indices = np.stack(list(vx.grid_index for vx in voxels))
+
+            t2 = time.time()
+            voxel_grid[indices[:, 0], indices[:, 1], indices[:, 2]] = True  # fill voxel grid
+            images["wrist_pointcloud"] = voxel_grid
+            print(f"took {time.time() - t2:.4f}s   and {t2 - t:.4f}s")
             images["wrist_pointcloud"] = voxel_grid
 
         # self.recording_frames.append(

@@ -12,15 +12,13 @@ class RobotiqCameraEnv(RobotiqEnv):
         else:
             super().__init__(**kwargs)
 
-        self.cost_infos = {}
-
     def compute_reward(self, obs, action) -> Tuple[float, dict]:
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.05
 
         downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
         suction_reward = 0.3 * float(obs["state"]["gripper_state"][1] > 0.9)
-        suction_cost = 2. * float(np.isclose(obs["state"]["gripper_state"][0], 0.99, atol=1e-3))
+        suction_cost = 5. * float(np.isclose(obs["state"]["gripper_state"][0], 0.99, atol=1e-3))
 
         orientation_cost = 1. - sum(obs["state"]["tcp_pose"][3:] * self.curr_reset_pose[3:]) ** 2
         orientation_cost *= 25.
@@ -39,15 +37,13 @@ class RobotiqCameraEnv(RobotiqEnv):
             orientation_cost=-orientation_cost,
         )
         for key, info in cost_info.items():
-            self.cost_infos[key] = info + 0. if key not in self.cost_infos else self.cost_infos[key]
+            self.cost_infos[key] = info + (0. if key not in self.cost_infos else self.cost_infos[key])
 
         if self.reached_goal_state(obs):
-            cost_infos = self.cost_infos.copy()
-            self.cost_infos = {}
-            return 100. - action_cost - orientation_cost - position_cost, cost_infos
+            return 100. - action_cost - orientation_cost - position_cost, self.cost_infos.copy()
         else:
             return 0. + suction_reward - action_cost - downward_force_cost - orientation_cost - position_cost - \
-                   suction_cost - step_cost, {}
+                   suction_cost - step_cost, self.cost_infos.copy()
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
@@ -55,8 +51,6 @@ class RobotiqCameraEnv(RobotiqEnv):
         return 0.1 < state['gripper_state'][0] < 0.85 and state['tcp_pose'][2] > self.curr_reset_pose[2] + 0.02  # +2cm
 
     def close(self):
-        if self.plot_costs_yes:
-            self.plot_costs()
         super().close()
 
 
