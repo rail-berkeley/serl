@@ -5,9 +5,24 @@ import threading
 from typing import Any
 
 
-def finetune_pointcloud_fusion(pcd1: o3d.geometry.PointCloud, pcd2: o3d.geometry.PointCloud):
+def finetune_pointcloud_fusion(pc1: np.ndarray, pc2: np.ndarray):
+    pcd1, pcd2 = o3d.geometry.PointCloud(), o3d.geometry.PointCloud()
+    pcd1.points = o3d.utility.Vector3dVector(pc1)
+    pcd2.points = o3d.utility.Vector3dVector(pc2)
     pcd1.estimate_normals()
     pcd2.estimate_normals()
+
+    def pairwise_registration(source, target, max_correspondence_distance):
+        # see https://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html
+        icp = o3d.pipelines.registration.registration_icp(
+            source, target, max_correspondence_distance,
+            np.eye(4),
+            o3d.pipelines.registration.TransformationEstimationPointToPlane())
+        transformation_icp = icp.transformation
+        information_icp = o3d.pipelines.registration.get_information_matrix_from_point_clouds(
+            source, target, max_correspondence_distance,
+            icp.transformation)
+        return transformation_icp, information_icp
 
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Error) as cm:
         transformation, info = pairwise_registration(pcd1, pcd2, max_correspondence_distance=1e-3)
@@ -18,30 +33,43 @@ def finetune_pointcloud_fusion(pcd1: o3d.geometry.PointCloud, pcd2: o3d.geometry
     return transformation
 
 
-def pairwise_registration(source, target, max_correspondence_distance):
-    # see https://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html
-    icp = o3d.pipelines.registration.registration_icp(
-        source, target, max_correspondence_distance,
-        np.eye(4),
-        o3d.pipelines.registration.TransformationEstimationPointToPlane())
-    transformation_icp = icp.transformation
-    information_icp = o3d.pipelines.registration.get_information_matrix_from_point_clouds(
-        source, target, max_correspondence_distance,
-        icp.transformation)
-    return transformation_icp, information_icp
+def pointcloud_to_voxel_grid(points: np.ndarray, voxel_size: float, min_bounds: np.ndarray, max_bounds: np.ndarray):
+    points_filtered = crop_pointcloud(points, min_bounds=min_bounds, max_bounds=max_bounds)
+    dimensions = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
+    voxel_indices = ((points_filtered - min_bounds) / voxel_size).astype(int)
+
+    voxel_grid = np.zeros(dimensions, dtype=bool)
+    valid_indices = np.all((voxel_indices >= 0) & (voxel_indices < dimensions), axis=1)
+    voxel_grid[voxel_indices[valid_indices, 0], voxel_indices[valid_indices, 1], voxel_indices[valid_indices, 2]] = True
+    return voxel_grid
+
+
+def crop_pointcloud(points: np.ndarray, min_bounds: np.ndarray, max_bounds: np.ndarray):
+    within_bounds = np.all((points >= min_bounds) & (points <= max_bounds), axis=1)
+    return points[within_bounds]
+
+
+def transform_point_cloud(points, transform_matrix):
+    if points.shape[1] == 3:
+        points = np.hstack([points, np.ones((points.shape[0], 1))])
+
+    transformed_points = np.dot(points, transform_matrix.T)
+
+    if transformed_points.shape[1] == 4:
+        transformed_points = transformed_points[:, :3]
+
+    return transformed_points
 
 
 class PointCloudFusion:
     def __init__(self, angle=30., x_distance=0.195, voxel_size: int = 1):
-        self.pcd1 = o3d.geometry.PointCloud()
-        self.pcd2 = o3d.geometry.PointCloud()
+        self.pcd1, self.pcd2 = None, None
         self.voxel_size = 1e-3 * voxel_size  # in mm
 
         # 14cm width and 12.5 height for the box
-        self.crop_volume = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-0.07, -0.07, 0.075),
-                                                               max_bound=(
-                                                               0.07 - self.voxel_size, 0.07 - self.voxel_size,
-                                                               0.2 - self.voxel_size))
+        self.min_bounds = np.array([-0.07, -0.07, 0.075])
+        self.max_bounds = np.array([0.07, 0.07, 0.2]) - self.voxel_size
+
         self.original_pcds = []
         self._is_transformed = False
         self.fine_transformed = False
@@ -65,8 +93,7 @@ class PointCloudFusion:
             np.save(f, t_finetuned)
 
     def get_voxelgrid_shape(self):
-        return ((np.asarray(self.crop_volume.get_max_bound()) - np.asarray(
-            self.crop_volume.get_min_bound())) / self.voxel_size).astype(np.int16) + 1
+        return np.ceil((self.max_bounds - self.min_bounds) / self.voxel_size).astype(int)
 
     def load_finetuned(self):
         from os.path import exists
@@ -80,16 +107,13 @@ class PointCloudFusion:
         print(f"loaded finetuned Point Cloud fusion parameters!")
         return True
 
-    def append(self, pcd: np.ndarray | o3d.utility.Vector3dVector):
-        assert type(pcd) == np.ndarray or type(pcd) == o3d.utility.Vector3dVector
-        # MASSIVE! speed up if float64 is used, see: https://github.com/isl-org/Open3D/issues/1045
-        func = lambda x: o3d.utility.Vector3dVector(x.astype(np.float64)) if isinstance(pcd, np.ndarray) else x
-        if self.pcd1.is_empty():
-            self.original_pcds.append(func(pcd))
-            self.pcd1.points = func(pcd)
-        elif self.pcd2.is_empty():
-            self.original_pcds.append(func(pcd))
-            self.pcd2.points = func(pcd)
+    def append(self, pcd: np.ndarray):
+        if self.pcd1 is None:
+            self.original_pcds.append(pcd)
+            self.pcd1 = pcd
+        elif self.pcd2 is None:
+            self.original_pcds.append(pcd)
+            self.pcd2 = pcd
         else:
             raise NotImplementedError("3 pointclouds not supported")
 
@@ -125,36 +149,38 @@ class PointCloudFusion:
         self.fine_transformed = True
 
     def clear(self):
-        self.pcd1.clear()
-        self.pcd2.clear()
+        self.pcd1, self.pcd2 = None, None
         self._is_transformed = False
         self.original_pcds = []
 
     def _transform(self):
-        self.pcd1.transform(self.t1)
-        self.pcd2.transform(self.t2)
+        assert not self.is_empty()
+        self.pcd1 = transform_point_cloud(points=self.pcd1, transform_matrix=self.t1)
+        if self.pcd2 is not None:
+            self.pcd2 = transform_point_cloud(points=self.pcd2, transform_matrix=self.t2)
         self._is_transformed = True
 
-    def fuse_pointclouds(self, voxelize=False):
+    def voxelize(self, points: np.ndarray):
+        return pointcloud_to_voxel_grid(points, voxel_size=self.voxel_size, min_bounds=self.min_bounds,
+                                        max_bounds=self.max_bounds)
+
+    def get_pointcloud_representation(self, voxelize=True):
+        if self.is_complete():
+            return self.fuse_pointclouds(voxelize=voxelize)
+        elif not self.is_empty():
+            return self.get_first(voxelize=voxelize)
+
+    def fuse_pointclouds(self, voxelize=True):
         if not self._is_transformed:
             self._transform()
+        swap = lambda x: np.moveaxis(x, 0,  1)
+        fused = swap(np.hstack([swap(self.pcd1), swap(self.pcd2)]))
+        return self.voxelize(fused) if voxelize else fused
 
-        self.pcd1 += self.pcd2
-        if voxelize:
-            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1.crop(self.crop_volume),
-                                                                  voxel_size=self.voxel_size)
-        else:
-            return self.pcd1.crop(self.crop_volume)
-
-    def get_first(self, cropped=True, voxelize=False):
+    def get_first(self, voxelize=True):
         if not self._is_transformed:
-            self.pcd1.transform(self.t1)
-        if cropped:
-            self.pcd1 = self.pcd1.crop(self.crop_volume)
-        if voxelize:
-            return o3d.geometry.VoxelGrid.create_from_point_cloud(input=self.pcd1, voxel_size=self.voxel_size)
-        else:
-            return self.pcd1
+            self.pcd1 = transform_point_cloud(self.pcd1, transform_matrix=self.t1)
+        return self.voxelize(self.pcd1) if voxelize else self.pcd1
 
     def get_original_pcds(self):
         if len(self.original_pcds) == 1:
@@ -163,10 +189,10 @@ class PointCloudFusion:
             return self.original_pcds
 
     def is_complete(self):
-        return not self.pcd1.is_empty() and not self.pcd2.is_empty()
+        return self.pcd1 is not None and self.pcd2 is not None
 
     def is_empty(self):
-        return self.pcd1.is_empty() and self.pcd2.is_empty()
+        return self.pcd1 is None and self.pcd2 is None
 
 
 class CalibrationTread(threading.Thread):

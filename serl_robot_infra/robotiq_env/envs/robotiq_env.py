@@ -12,6 +12,7 @@ from typing import Dict, Tuple
 from datetime import datetime
 from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
+import open3d as o3d
 
 from robotiq_env.camera.video_capture import VideoCapture
 from robotiq_env.camera.rs_capture import RSCapture
@@ -46,10 +47,10 @@ class ImageDisplayer(threading.Thread):
 
 class PointCloudDisplayer:
     def __init__(self):
-        import open3d as o3d
         self.window = o3d.visualization.Visualizer()
         self.window.create_window(height=400, width=400, visible=True)
 
+        self.pc = o3d.geometry.PointCloud()
         self.window.get_render_option().load_from_json(
             "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/render_options.json")
 
@@ -57,9 +58,12 @@ class PointCloudDisplayer:
             "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/camera_parameters.json")
         self.ctr = self.window.get_view_control()
 
-    def display(self, voxelgrid):
+    def display(self, points):
+        self.pc.clear()
+        # MASSIVE! speed up if float64 is used, see: https://github.com/isl-org/Open3D/issues/1045
+        self.pc.points = o3d.utility.Vector3dVector(points.astype(np.float64))
         self.window.clear_geometries()
-        self.window.add_geometry(voxelgrid)
+        self.window.add_geometry(self.pc)
         self.ctr.convert_from_pinhole_camera_parameters(self.param, True)
 
         self.window.poll_events()
@@ -495,30 +499,14 @@ class RobotiqEnv(gym.Env):
 
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
-                # cap.close()
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            voxel_grid = np.zeros(self.pointcloud_fusion.get_voxelgrid_shape(), dtype=np.bool_)
+            pc = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
 
-            if self.pointcloud_fusion.is_complete():
-                pc = self.pointcloud_fusion.fuse_pointclouds(voxelize=True)
-            elif not self.pointcloud_fusion.is_empty():
-                pc = self.pointcloud_fusion.get_first(cropped=True, voxelize=True)
-
-            self.displayer.display(pc)
-            # TODO takes too long to calculate, do it with numba or otherwise faster
-            t = time.time()
-            a = []
-            voxels = pc.get_voxels()
-            indices = np.stack(list(vx.grid_index for vx in voxels))
-
-            t2 = time.time()
-            voxel_grid[indices[:, 0], indices[:, 1], indices[:, 2]] = True  # fill voxel grid
-            images["wrist_pointcloud"] = voxel_grid
-            print(f"took {time.time() - t2:.4f}s   and {t2 - t:.4f}s")
-            images["wrist_pointcloud"] = voxel_grid
+            self.displayer.display(self.pointcloud_fusion.get_pointcloud_representation(voxelize=False))
+            images["wrist_pointcloud"] = pc
 
         # self.recording_frames.append(
         #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
