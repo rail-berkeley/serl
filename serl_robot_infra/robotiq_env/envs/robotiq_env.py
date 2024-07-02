@@ -111,7 +111,7 @@ class RobotiqEnv(gym.Env):
             max_episode_length: int = 100,
             save_video: bool = False,
             realtime_plot: bool = False,
-            camera_mode: str = "rgb",  # one of (rgb, depth, both, pointcloud, none)
+            camera_mode: str = "rgb",  # one of (rgb, grey, depth, both, pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
         self.curr_path_length = 0
@@ -168,14 +168,15 @@ class RobotiqEnv(gym.Env):
         )
 
         image_space_definition = {}
-        if camera_mode in ["rgb", "both"]:
+        if camera_mode in ["rgb", "grey", "both"]:
+            channel = 1 if camera_mode == "grey" else 3
             if "wrist" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["wrist"] = gym.spaces.Box(
-                    0, 255, shape=(128, 128, 3), dtype=np.uint8
+                    0, 255, shape=(128, 128, channel), dtype=np.uint8
                 )
             if "wrist_2" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["wrist_2"] = gym.spaces.Box(
-                    0, 255, shape=(128, 128, 3), dtype=np.uint8
+                    0, 255, shape=(128, 128, channel), dtype=np.uint8
                 )
 
         if camera_mode in ["depth", "both"]:
@@ -193,7 +194,7 @@ class RobotiqEnv(gym.Env):
                 0, 1, shape=(140, 140, 125), dtype=np.bool_
             )
 
-        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud"]:
+        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
         state_space = gym.spaces.Dict(
@@ -209,7 +210,7 @@ class RobotiqEnv(gym.Env):
         )
 
         obs_space_definition = {"state": state_space}
-        if self.camera_mode in ["rgb", "both", "depth", "pointcloud"]:
+        if self.camera_mode in ["rgb", "both", "depth", "pointcloud", "grey"]:
             obs_space_definition["images"] = gym.spaces.Dict(
                 image_space_definition
             )
@@ -453,20 +454,21 @@ class RobotiqEnv(gym.Env):
         for key, cap in self.cap.items():
             try:
                 image = cap.read()
-                if self.camera_mode in ["rgb", "both"]:
+                if self.camera_mode in ["rgb", "both", "grey"]:
                     rgb = image[..., :3].astype(np.uint8)
                     cropped_rgb = self.crop_image(key, rgb)
                     resized = cv2.resize(
                         cropped_rgb, self.observation_space["images"][key].shape[:2][::-1],
                     )
                     # convert to grayscale here
-                    # gray = np.array([0.2989, 0.5870, 0.1140])
-                    # resized = np.dot(resized, gray)[..., None]
-                    # resized = resized.astype(np.uint8)
+                    if self.camera_mode == "grey":
+                        grey = np.array([0.2989, 0.5870, 0.1140])
+                        resized = np.dot(resized, grey)[..., None]
+                        resized = np.repeat(resized.astype(np.uint8), 3, axis=-1)
 
                     images[key] = resized[..., ::-1]
                     display_images[key] = resized
-                    # display_images[key] = np.repeat(resized, 3, axis=-1)
+                    # display_images[key] =
                     display_images[key + "_full"] = cropped_rgb
 
                 if self.camera_mode in ["depth", "both"]:

@@ -35,6 +35,7 @@ from serl_launcher.utils.launcher import (
 )
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
+from serl_launcher.wrappers.observation_statistics_wrapper import ObservationStatisticsWrapper
 from robotiq_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
 
@@ -58,7 +59,7 @@ flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 15000,
+flags.DEFINE_integer("replay_buffer_capacity", 10000,
                      "Replay buffer capacity.")  # quite low to forget demo trajectories
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
@@ -413,6 +414,7 @@ def main(_):
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = ScaleObservationWrapper(env)  # scale obs space (after quat2euler, but before serlobswr)
+    env = ObservationStatisticsWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -473,10 +475,11 @@ def main(_):
                     traj["observations"].pop(obs_name)
                     traj["next_observations"].pop(obs_name)
 
-                # TODO remove afterwards, set all images to grayscale
-                # gray = np.array([0.2989, 0.5870, 0.1140])
-                # traj["observations"]["wrist"] = np.dot(traj["observations"]["wrist"], gray)[..., None]
-                # traj["next_observations"]["wrist"] = np.dot(traj["next_observations"]["wrist"], gray)[..., None]
+                # convert to grey here
+                if FLAGS.camera_mode == "grey":
+                    gray = np.array([0.2989, 0.5870, 0.1140])
+                    traj["observations"]["wrist"] = np.dot(traj["observations"]["wrist"], gray)[..., None]
+                    traj["next_observations"]["wrist"] = np.dot(traj["next_observations"]["wrist"], gray)[..., None]
 
                 replay_buffer.insert(traj)
         print(f"replay buffer size: {len(replay_buffer)}")
