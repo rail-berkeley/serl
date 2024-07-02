@@ -464,11 +464,12 @@ class RobotiqEnv(gym.Env):
                     if self.camera_mode == "grey":
                         grey = np.array([0.2989, 0.5870, 0.1140])
                         resized = np.dot(resized, grey)[..., None]
-                        resized = np.repeat(resized.astype(np.uint8), 3, axis=-1)
+                        resized = resized.astype(np.uint8)
+                        display_images[key] = np.repeat(resized, 3, axis=-1)
+                    else:
+                        display_images[key] = resized
 
                     images[key] = resized[..., ::-1]
-                    display_images[key] = resized
-                    # display_images[key] =
                     display_images[key + "_full"] = cropped_rgb
 
                 if self.camera_mode in ["depth", "both"]:
