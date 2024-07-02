@@ -2,6 +2,7 @@ from typing import Any, Callable, Optional, Sequence, Tuple, Optional
 
 import flax.linen as nn
 import jax.numpy as jnp
+import jax
 
 
 class RangeSensorEncoder(nn.Module):
@@ -15,20 +16,23 @@ class RangeSensorEncoder(nn.Module):
 
     @nn.compact
     def __call__(self, observations: jnp.ndarray, train: bool = False, encode: bool = True):
-        x = observations / 255  # convert to float and within [0, 1]
+        x = observations / 255.  # convert to float and within [0, 1]
+
         assert x.shape[-1] == 1
         assert self.keypoint_size[0] % 2 == 1 and self.keypoint_size[1] % 2 == 1
 
         # add batch dim if missing
         if len(x.shape) < 4:
             x = x[None]
-        points = jnp.zeros((x.shape[0], len(self.keypoints)))
 
+        points = []
         for i, keypoint in enumerate(self.keypoints):
             k_x, k_y = keypoint
             s_x, s_y = self.keypoint_size[0] // 2, self.keypoint_size[1] // 2
-            points.at[:, i].set(self.pool_func(x[:, k_x - s_x:k_x + s_x + 1, k_y - s_y:k_y + s_y + 1, 0], axis=(1, 2)))
+            points.append(self.pool_func(x[:, k_x - s_x:k_x + s_x + 1, k_y - s_y:k_y + s_y + 1, 0], axis=(1, 2)))
+        points = jnp.stack(points, axis=-1)
 
         if points.shape[0] == 1:
             points = points[0]
+
         return points
