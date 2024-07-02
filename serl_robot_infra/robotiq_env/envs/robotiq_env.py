@@ -428,7 +428,7 @@ class RobotiqEnv(gym.Env):
         self.cap = OrderedDict()
         for cam_name, cam_serial in name_serial_dict.items():
             print(f"cam serial: {cam_serial}")
-            rgb = self.camera_mode in ["rgb", "both"]
+            rgb = self.camera_mode in ["rgb", "both", "grey"]
             depth = self.camera_mode in ["depth", "both"]
             pointcloud = self.camera_mode in ["pointcloud"]
             cap = VideoCapture(
