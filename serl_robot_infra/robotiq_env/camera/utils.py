@@ -62,13 +62,16 @@ def transform_point_cloud(points, transform_matrix):
 
 
 class PointCloudFusion:
-    def __init__(self, angle=30., x_distance=0.195, voxel_size: int = 1):
+    def __init__(self, angle=30., x_distance=0.195, voxel_grid_shape=(100, 100, 80)):
         self.pcd1, self.pcd2 = None, None
-        self.voxel_size = 1e-3 * voxel_size  # in mm
 
-        # 14cm width and 12.5 height for the box
-        self.min_bounds = np.array([-0.07, -0.07, 0.075])
-        self.max_bounds = np.array([0.07, 0.07, 0.2]) - self.voxel_size
+        # 10cm width and 8cm height for the box
+        self.min_bounds = np.array([-0.05, -0.05, 0.075])
+        self.max_bounds = np.array([0.05, 0.05, 0.155])
+
+        vox_size = (self.max_bounds - self.min_bounds) / voxel_grid_shape
+        assert np.all(np.isclose(vox_size, vox_size[0]))
+        self.voxel_size: float = float(vox_size[0])
 
         self.original_pcds = []
         self._is_transformed = False
@@ -124,7 +127,7 @@ class PointCloudFusion:
             self._transform()
 
         # then calibrate
-        t = finetune_pointcloud_fusion(pcd1=self.pcd1, pcd2=self.pcd2)
+        t = finetune_pointcloud_fusion(pc1=self.pcd1, pc2=self.pcd2)
         return t
 
     def set_fine_tuned_transformation(self, transformation):
@@ -164,6 +167,9 @@ class PointCloudFusion:
         return pointcloud_to_voxel_grid(points, voxel_size=self.voxel_size, min_bounds=self.min_bounds,
                                         max_bounds=self.max_bounds)
 
+    def crop(self, points: np.ndarray):
+        return crop_pointcloud(points=points, min_bounds=self.min_bounds, max_bounds=self.max_bounds)
+
     def get_pointcloud_representation(self, voxelize=True):
         if self.is_complete():
             return self.fuse_pointclouds(voxelize=voxelize)
@@ -173,14 +179,14 @@ class PointCloudFusion:
     def fuse_pointclouds(self, voxelize=True):
         if not self._is_transformed:
             self._transform()
-        swap = lambda x: np.moveaxis(x, 0,  1)
+        swap = lambda x: np.moveaxis(x, 0, 1)
         fused = swap(np.hstack([swap(self.pcd1), swap(self.pcd2)]))
-        return self.voxelize(fused) if voxelize else fused
+        return self.voxelize(fused) if voxelize else self.crop(fused)
 
     def get_first(self, voxelize=True):
         if not self._is_transformed:
             self.pcd1 = transform_point_cloud(self.pcd1, transform_matrix=self.t1)
-        return self.voxelize(self.pcd1) if voxelize else self.pcd1
+        return self.voxelize(self.pcd1) if voxelize else self.crop(self.pcd1)
 
     def get_original_pcds(self):
         if len(self.original_pcds) == 1:

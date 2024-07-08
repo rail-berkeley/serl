@@ -16,6 +16,7 @@ from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
+from serl_launcher.vision.voxel_grid_encoders import MLPEncoder, VoxNet
 from serl_launcher.utils.train_utils import _unpack, concat_batches
 from serl_launcher.vision.data_augmentations import batched_random_crop
 
@@ -233,16 +234,27 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "voxel_mlp":
+        elif encoder_type == "voxel-mlp":
             encoders = {
-                image_key: MLP(
-                    hidden_dims=[128, 128],
-                    activations=nn.relu,
-                    activate_final=True,
-                    use_layer_norm=True,
+                image_key: MLPEncoder(
+                    mlp=MLP(
+                        hidden_dims=[64],
+                        activations=nn.relu,
+                        activate_final=True,
+                        use_layer_norm=True,
+                    ),
+                    bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                 )
                 for image_key in image_keys
-            }       # TODO check if stop_gradient has to be removed
+            }
+        elif encoder_type == "voxnet":
+            encoders = {
+                image_key: VoxNet(
+                    bottleneck_dim=encoder_kwargs["bottleneck_dim"],
+                    use_conv_bias=False,
+                )
+                for image_key in image_keys
+            }       # TODO check weights
         elif encoder_type.lower() == "none":
             encoders = None
         else:

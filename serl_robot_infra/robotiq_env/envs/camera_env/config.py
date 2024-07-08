@@ -56,7 +56,7 @@ class RobotiqCameraConfigBox5(DefaultEnvConfig):
     }
 
 
-class RobotiqCameraConfigFinal(DefaultEnvConfig):
+class RobotiqCameraConfigFinal(DefaultEnvConfig):       # config for 10 boxes
     RESET_Q = np.array([
         [2.6259, - 1.5196, 2.1287, - 2.1784, - 1.5665, - 0.4741],
         [2.0131, - 1.271, 1.9316, - 2.2306, - 1.566, 0.4537],
@@ -70,7 +70,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
         [0.1815, - 1.2945, 1.8964, - 2.1719, - 1.5658, - 1.3841],
     ])
     RANDOM_RESET = False
-    RANDOM_XY_RANGE = (0.00,)
+    RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.18, 3.2])
     ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.8, -0.18, -3.2])
@@ -88,7 +88,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):
 
     REALSENSE_CAMERAS = {
         "wrist": "218622277164",
-        # "wrist_2": "218622279756"
+        "wrist_2": "218622279756"
     }
 
 

@@ -195,7 +195,7 @@ class RobotiqEnv(gym.Env):
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
-                0, 1, shape=(140, 140, 125), dtype=np.bool_
+                0, 1, shape=(50, 50, 40), dtype=np.uint8
             )
 
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
@@ -503,10 +503,10 @@ class RobotiqEnv(gym.Env):
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            pc = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
-
+            voxel_grid = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
+            voxel_grid = np.sum(np.reshape(voxel_grid, (50, 2, 50, 2, 40, 2)), axis=(1, 3, 5))
+            images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
             self.displayer.display(self.pointcloud_fusion.get_pointcloud_representation(voxelize=False))
-            images["wrist_pointcloud"] = pc
 
         # self.recording_frames.append(
         #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
@@ -543,13 +543,16 @@ class RobotiqEnv(gym.Env):
 
         if visualize:
             import open3d as o3d
+            pc = o3d.geometry.PointCloud()
             for i in range(num_samples):
+                pc.clear()
                 pcs = self.calibration_thread.pc_backlog[i]
                 self.pointcloud_fusion.clear()
                 self.pointcloud_fusion.append(pcs[0])
                 self.pointcloud_fusion.append(pcs[1])
-                fused = self.pointcloud_fusion.fuse_pointclouds()
-                o3d.visualization.draw_geometries([fused])
+                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False)
+                pc.points = o3d.utility.Vector3dVector(fused)
+                o3d.visualization.draw_geometries([pc])
 
         self.calibration_thread.join()
         exit(f"restart the program to use the calibrated values")
@@ -602,7 +605,6 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode is not None:
             images = self.get_image()
-            # images = np.ones_like(images) * 255
             return copy.deepcopy(dict(images=images, state=state_observation))
         else:
             return copy.deepcopy(dict(state=state_observation))
