@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf
 import wandb
 from flax.core import frozen_dict
+from jaxlib.xla_extension import ArrayImpl
 
 
 def concat_batches(offline_batch, online_batch, axis=1):
@@ -178,3 +179,14 @@ def plot_feature_kernel_histogram(agent):
         axes[p].hist(feature_kernel[p*256:(p+1)*256], bins=50)
         axes[p].set_title(legend)
     plt.show()
+
+
+def find_zero_weights(params, print_str=""):
+    if isinstance(params, dict):
+        for key in params.keys():
+            find_zero_weights(params[key], print_str=print_str + " " + key)
+    else:
+        if abs(params.mean()) < 1e-5:
+            print(f" zero weights--> {print_str}    std: {params.std()}")
+        else:
+            print(".", end='')

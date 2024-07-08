@@ -353,6 +353,7 @@ class PreTrainedResNetEncoder(nn.Module):
             x = self.pretrained_encoder(x, train=train)
 
         if self.pooling_method == "spatial_learned_embeddings":
+            # TODO maybe make the same as in spatial softmax
             height, width, channel = x.shape[-3:]
             x = SpatialLearnedEmbeddings(
                 height=height,

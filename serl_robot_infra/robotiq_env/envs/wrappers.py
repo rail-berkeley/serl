@@ -22,7 +22,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
         self.right = self.left.copy()
 
-        self.invert_axes = [1, 1, 1, 1, 1, -1]
+        self.invert_axes = [-1, -1, 1, 1, 1, -1]
         self.deadspace = 0.15
 
     def action(self, action: np.ndarray) -> np.ndarray:
