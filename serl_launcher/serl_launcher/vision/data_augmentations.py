@@ -236,7 +236,7 @@ def color_transform(
     apply_prob,
     shuffle
 ):
-    """Applies color jittering to a single image."""
+    """Applies color jittering to a single image. Assume image is in [0, 1]."""
     apply_rng, transform_rng = jax.random.split(rng)
     perm_rng, b_rng, c_rng, s_rng, h_rng, cj_rng, gs_rng = jax.random.split(
         transform_rng, 7
@@ -296,6 +296,51 @@ def color_transform(
         should_apply & should_apply_gs, out_apply, _to_grayscale, out_apply, lambda x: x
     )
     return jnp.clip(out_apply, 0.0, 1.0)
+
+
+@partial(jax.jit, static_argnames=(
+    "brightness", "contrast", "saturation", "hue", "to_grayscale_prob",
+    "color_jitter_prob", "apply_prob", "shuffle", "num_batch_dims")
+)
+def batched_color_transform(
+    image,
+    rng,
+    *,
+    brightness,
+    contrast,
+    saturation,
+    hue,
+    to_grayscale_prob,
+    color_jitter_prob,
+    apply_prob,
+    shuffle,
+    num_batch_dims: int = 1
+):
+    # Flatten batch dims
+    original_shape = image.shape
+    image = jnp.reshape(image, (-1, *image.shape[num_batch_dims:]))
+    rngs = jax.random.split(rng, image.shape[0])
+
+    image = jax.vmap(
+        lambda i, r: color_transform(
+            i,
+            r,
+            brightness=brightness,
+            contrast=contrast,
+            saturation=saturation,
+            hue=hue,
+            to_grayscale_prob=to_grayscale_prob,
+            color_jitter_prob=color_jitter_prob,
+            apply_prob=apply_prob,
+            shuffle=shuffle,
+        ),
+        in_axes=(0, 0),
+        out_axes=0,
+    )(image, rngs)
+
+    # Restore batch dims
+    image = jnp.reshape(image, original_shape)
+    return image
 
 
 def random_flip(image, rng):

@@ -17,7 +17,10 @@ from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
 from serl_launcher.utils.train_utils import _unpack, concat_batches
-from serl_launcher.vision.data_augmentations import batched_random_crop
+from serl_launcher.vision.data_augmentations import (
+    batched_random_crop,
+    batched_color_transform,
+)
 
 
 class DrQAgent(SACAgent):
@@ -50,6 +53,7 @@ class DrQAgent(SACAgent):
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
         image_keys: Iterable[str] = ("image",),
+        image_augmentation: Iterable[str] = (),
     ):
         networks = {
             "actor": actor_def,
@@ -98,6 +102,8 @@ class DrQAgent(SACAgent):
                 target_entropy=target_entropy,
                 backup_entropy=backup_entropy,
                 image_keys=image_keys,
+                image_aug_random_crop=("random_crop" in image_augmentation),
+                image_aug_color_transform=("color_transform" in image_augmentation),
             ),
         )
 
@@ -125,6 +131,7 @@ class DrQAgent(SACAgent):
         critic_subsample_size: Optional[int] = None,
         temperature_init: float = 1.0,
         image_keys: Iterable[str] = ("image",),
+        image_augmentation: Iterable[str] = (),
         **kwargs,
     ):
         """
@@ -231,6 +238,7 @@ class DrQAgent(SACAgent):
             critic_ensemble_size=critic_ensemble_size,
             critic_subsample_size=critic_subsample_size,
             image_keys=image_keys,
+            image_augmentation=image_augmentation,
             **kwargs,
         )
 
@@ -243,13 +251,48 @@ class DrQAgent(SACAgent):
 
     def data_augmentation_fn(self, rng, observations):
         for pixel_key in self.config["image_keys"]:
-            observations = observations.copy(
-                add_or_replace={
-                    pixel_key: batched_random_crop(
-                        observations[pixel_key], rng, padding=4, num_batch_dims=2
-                    )
-                }
-            )
+            if self.config.get("image_aug_random_crop", False):
+                # apply random crop to the img observations
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_crop(
+                            observations[pixel_key], rng, padding=4, num_batch_dims=2
+                        )
+                    }
+                )
+
+            if self.config.get("image_aug_color_transform", False):
+                # NOTE: the original image is in uint8, and the color_transform function
+                # requires float32, thus we need to convert the image to float32 first
+                # then convert it back to uint8 after the color transformation
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32) / 255.0,
+                    }
+                )
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32),
+                        pixel_key: batched_color_transform(
+                            observations[pixel_key],
+                            rng,
+                            brightness=0.1,
+                            contrast=0.1,
+                            saturation=0.1,
+                            hue=0.1,
+                            apply_prob=1.0,
+                            to_grayscale_prob=0.0,  # don't convert to grayscale
+                            color_jitter_prob=0.5,
+                            shuffle=False,          # wont shuffle the color channels
+                            num_batch_dims=2,       # 2 images observations
+                        ),
+                    }
+                )
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key] * 255.0, dtype=jnp.uint8),
+                    }
+                )
         return observations
 
     @partial(jax.jit, static_argnames=("utd_ratio", "pmap_axis"))

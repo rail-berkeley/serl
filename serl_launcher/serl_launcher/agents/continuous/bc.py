@@ -15,7 +15,10 @@ from serl_launcher.common.typing import Batch, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Policy
 from serl_launcher.networks.mlp import MLP
 from serl_launcher.utils.train_utils import _unpack
-from serl_launcher.vision.data_augmentations import batched_random_crop
+from serl_launcher.vision.data_augmentations import (
+    batched_random_crop,
+    batched_color_transform,
+)
 
 
 class BCAgent(flax.struct.PyTreeNode):
@@ -24,13 +27,48 @@ class BCAgent(flax.struct.PyTreeNode):
 
     def data_augmentation_fn(self, rng, observations):
         for pixel_key in self.config["image_keys"]:
-            observations = observations.copy(
-                add_or_replace={
-                    pixel_key: batched_random_crop(
-                        observations[pixel_key], rng, padding=4, num_batch_dims=2
-                    )
-                }
-            )
+            if self.config.get("image_aug_random_crop", False):
+                # apply random crop to the img observations
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_crop(
+                            observations[pixel_key], rng, padding=4, num_batch_dims=2
+                        )
+                    }
+                )
+
+            if self.config.get("image_aug_color_transform", False):
+                # NOTE: the original image is in uint8, and the color_transform function
+                # requires float32, thus we need to convert the image to float32 first
+                # then convert it back to uint8 after the color transformation
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32) / 255.0,
+                    }
+                )
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32),
+                        pixel_key: batched_color_transform(
+                            observations[pixel_key],
+                            rng,
+                            brightness=0.1,
+                            contrast=0.1,
+                            saturation=0.1,
+                            hue=0.1,
+                            apply_prob=1.0,
+                            to_grayscale_prob=0.0,  # don't convert to grayscale
+                            color_jitter_prob=0.5,
+                            shuffle=False,          # wont shuffle the color channels
+                            num_batch_dims=2,       # 2 images observations
+                        ),
+                    }
+                )
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: jnp.array(observations[pixel_key] * 255.0, dtype=jnp.uint8),
+                    }
+                )
         return observations
 
     @partial(jax.jit, static_argnames="pmap_axis")
@@ -38,10 +76,10 @@ class BCAgent(flax.struct.PyTreeNode):
         if self.config["image_keys"][0] not in batch["next_observations"]:
             batch = _unpack(batch)
 
-        # rng = self.state.rng
-        # rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
-        # obs = self.data_augmentation_fn(obs_rng, batch["observations"])
-        # batch = batch.copy(add_or_replace={"observations": obs})
+        rng = self.state.rng
+        rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
+        obs = self.data_augmentation_fn(obs_rng, batch["observations"])
+        batch = batch.copy(add_or_replace={"observations": obs})
 
         def loss_fn(params, rng):
             rng, key = jax.random.split(rng)
@@ -98,6 +136,9 @@ class BCAgent(flax.struct.PyTreeNode):
 
     @jax.jit
     def get_debug_metrics(self, batch, **kwargs):
+        if self.config["image_keys"][0] not in batch["next_observations"]:
+            batch = _unpack(batch)
+
         dist = self.state.apply_fn(
             {"params": self.state.params},
             batch["observations"],
@@ -109,9 +150,9 @@ class BCAgent(flax.struct.PyTreeNode):
         mse = ((pi_actions - batch["actions"]) ** 2).sum(-1)
 
         return {
-            "mse": mse,
-            "log_probs": log_probs,
-            "pi_actions": pi_actions,
+            "eval/mse": mse.mean(),
+            "eval/log_probs": log_probs.mean(),
+            "eval/pi_actions": pi_actions.mean(),
         }
 
     @classmethod
@@ -132,6 +173,8 @@ class BCAgent(flax.struct.PyTreeNode):
         },
         # Optimizer
         learning_rate: float = 3e-4,
+        image_augmentation: Iterable[str] = (),
+        # image_augmentation: Iterable[str] = ("random_crop", "color_transform"),
     ):
         if encoder_type == "small":
             from serl_launcher.vision.small_encoders import SmallEncoder
@@ -167,6 +210,12 @@ class BCAgent(flax.struct.PyTreeNode):
                 resnetv1_configs,
             )
 
+            # NOTE: commented code enables gradient flow for the pretrained encoder
+            # pretrained_encoder = resnetv1_configs["resnetv1-10-frozen"](
+            #     pre_pooling=False,
+            #     name="pretrained_encoder",
+            #     pooling_method="none",
+            # )
             pretrained_encoder = resnetv1_configs["resnetv1-10-frozen"](
                 pre_pooling=True,
                 name="pretrained_encoder",
@@ -218,6 +267,8 @@ class BCAgent(flax.struct.PyTreeNode):
         )
         config = dict(
             image_keys=image_keys,
+            image_aug_random_crop=("random_crop" in image_augmentation),
+            image_aug_color_transform=("color_transform" in image_augmentation),
         )
 
         agent = cls(state, config)
