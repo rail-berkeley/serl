@@ -43,12 +43,12 @@ class BCAgent(flax.struct.PyTreeNode):
                 # then convert it back to uint8 after the color transformation
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32) / 255.0,
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32)
+                        / 255.0,
                     }
                 )
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32),
                         pixel_key: batched_color_transform(
                             observations[pixel_key],
                             rng,
@@ -59,14 +59,16 @@ class BCAgent(flax.struct.PyTreeNode):
                             apply_prob=1.0,
                             to_grayscale_prob=0.0,  # don't convert to grayscale
                             color_jitter_prob=0.5,
-                            shuffle=False,          # wont shuffle the color channels
-                            num_batch_dims=2,       # 2 images observations
+                            shuffle=False,  # wont shuffle the color channels
+                            num_batch_dims=2,  # 2 images observations
                         ),
                     }
                 )
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key] * 255.0, dtype=jnp.uint8),
+                        pixel_key: jnp.array(
+                            observations[pixel_key] * 255.0, dtype=jnp.uint8
+                        ),
                     }
                 )
         return observations

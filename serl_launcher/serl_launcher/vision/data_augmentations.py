@@ -298,9 +298,19 @@ def color_transform(
     return jnp.clip(out_apply, 0.0, 1.0)
 
 
-@partial(jax.jit, static_argnames=(
-    "brightness", "contrast", "saturation", "hue", "to_grayscale_prob",
-    "color_jitter_prob", "apply_prob", "shuffle", "num_batch_dims")
+@partial(
+    jax.jit,
+    static_argnames=(
+        "brightness",
+        "contrast",
+        "saturation",
+        "hue",
+        "to_grayscale_prob",
+        "color_jitter_prob",
+        "apply_prob",
+        "shuffle",
+        "num_batch_dims",
+    ),
 )
 def batched_color_transform(
     image,

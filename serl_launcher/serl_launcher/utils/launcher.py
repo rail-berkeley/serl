@@ -29,7 +29,7 @@ def make_bc_agent(
     sample_action,
     image_keys=("image",),
     encoder_type="small",
-    image_augmentation=[],
+    image_augmentation=(),
 ):
     return BCAgent.create(
         jax.random.PRNGKey(seed),
@@ -118,6 +118,7 @@ def make_drq_agent(
         backup_entropy=False,
         critic_ensemble_size=10,
         critic_subsample_size=2,
+        image_augmentation=("random_crop"),
     )
     return agent
 

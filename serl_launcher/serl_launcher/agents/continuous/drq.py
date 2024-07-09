@@ -53,7 +53,7 @@ class DrQAgent(SACAgent):
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
         image_keys: Iterable[str] = ("image",),
-        image_augmentation: Iterable[str] = (),
+        image_augmentation: Iterable[str] = ("random_crop"),
     ):
         networks = {
             "actor": actor_def,
@@ -131,7 +131,7 @@ class DrQAgent(SACAgent):
         critic_subsample_size: Optional[int] = None,
         temperature_init: float = 1.0,
         image_keys: Iterable[str] = ("image",),
-        image_augmentation: Iterable[str] = (),
+        image_augmentation: Iterable[str] = ("random_crop"),
         **kwargs,
     ):
         """
@@ -267,12 +267,12 @@ class DrQAgent(SACAgent):
                 # then convert it back to uint8 after the color transformation
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32) / 255.0,
+                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32)
+                        / 255.0,
                     }
                 )
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key], dtype=jnp.float32),
                         pixel_key: batched_color_transform(
                             observations[pixel_key],
                             rng,
@@ -283,14 +283,16 @@ class DrQAgent(SACAgent):
                             apply_prob=1.0,
                             to_grayscale_prob=0.0,  # don't convert to grayscale
                             color_jitter_prob=0.5,
-                            shuffle=False,          # wont shuffle the color channels
-                            num_batch_dims=2,       # 2 images observations
+                            shuffle=False,  # wont shuffle the color channels
+                            num_batch_dims=2,  # 2 images observations
                         ),
                     }
                 )
                 observations = observations.copy(
                     add_or_replace={
-                        pixel_key: jnp.array(observations[pixel_key] * 255.0, dtype=jnp.uint8),
+                        pixel_key: jnp.array(
+                            observations[pixel_key] * 255.0, dtype=jnp.uint8
+                        ),
                     }
                 )
         return observations
