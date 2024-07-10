@@ -143,7 +143,10 @@ def print_agent_params(agent, image_keys=("image",)):
     actor, critic = agent.state.params["modules_actor"], agent.state.params["modules_critic"]
 
     # calculate encoder params
-    pretrained_encoder_count = get_size(actor["encoder"][f"encoder_{image_keys[0]}"]["pretrained_encoder"])
+    try:
+        pretrained_encoder_count = get_size(actor["encoder"][f"encoder_{image_keys[0]}"]["pretrained_encoder"])
+    except Exception as e:
+        pretrained_encoder_count = 0
     encoder_count = get_size(actor["encoder"])
 
     actor_count = get_size(actor)
@@ -181,11 +184,14 @@ def plot_feature_kernel_histogram(agent):
     plt.show()
 
 
-def find_zero_weights(params, print_str=""):
+def find_zero_weights(params, print_str="", print_all=False):
     if isinstance(params, dict):
         for key in params.keys():
-            find_zero_weights(params[key], print_str=print_str + " " + key)
+            find_zero_weights(params[key], print_str=print_str + " " + key, print_all=print_all)
     else:
+        if print_all:
+            print(f"{print_str}  m:{params.mean()}  s:{params.std()}")
+            return
         if abs(params.mean()) < 1e-5:
             print(f" zero weights--> {print_str}    std: {params.std()}")
         else:

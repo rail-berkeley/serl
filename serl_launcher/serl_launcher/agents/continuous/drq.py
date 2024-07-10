@@ -234,7 +234,7 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "voxel-mlp":
+        elif encoder_type == "voxel-mlp":       # not used, too many weights...
             encoders = {
                 image_key: MLPEncoder(
                     mlp=MLP(

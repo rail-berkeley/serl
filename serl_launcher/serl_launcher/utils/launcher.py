@@ -119,7 +119,7 @@ def make_drq_agent(
             std_max=5,
         ),
         critic_network_kwargs=dict(
-            activations=nn.tanh,
+            activations=nn.tanh,        # TODO test relu
             use_layer_norm=True,
             hidden_dims=[256, 256],
         ),

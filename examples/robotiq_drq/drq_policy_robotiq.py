@@ -22,7 +22,8 @@ from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.utils.train_utils import (
     print_agent_params,
     parameter_overview,
-    plot_feature_kernel_histogram
+    plot_feature_kernel_histogram,
+    find_zero_weights
 )
 
 from agentlace.trainer import TrainerServer, TrainerClient
@@ -138,6 +139,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             step=FLAGS.eval_checkpoint_step,
         )
         agent = agent.replace(state=ckpt)
+        print("finding zero weights")
+        find_zero_weights(agent.state.params, print_all=False)
 
         # examine model parameters if trajs==0
         if FLAGS.eval_n_trajs == 0:
@@ -321,7 +324,6 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
     server.publish_network(agent.state.params)
     print_green("sent initial network to actor")
 
-    # 50/50 sampling from RLPD, half from demo and half from online experience
     replay_iterator = replay_buffer.get_iterator(
         sample_args={
             "batch_size": FLAGS.batch_size,
@@ -333,6 +335,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
     # wait till the replay buffer is filled with enough data
     timer = Timer()
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
+        timer.tick("learner_total")
 
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
@@ -346,6 +349,8 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
         with timer.context("train"):
             batch = next(replay_iterator)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
+
+        timer.tock("learner_total")
 
         # publish the updated network
         if step > 0 and step % (FLAGS.steps_per_update) == 0:
