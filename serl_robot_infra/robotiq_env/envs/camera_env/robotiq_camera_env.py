@@ -35,7 +35,8 @@ class RobotiqCameraEnv(RobotiqEnv):
             suction_reward=suction_reward,
             suction_cost=-suction_cost,
             orientation_cost=-orientation_cost,
-            position_cost=-position_cost
+            position_cost=-position_cost,
+            total_cost=-action_cost - step_cost - downward_force_cost + suction_reward - suction_cost - orientation_cost - position_cost
         )
         for key, info in cost_info.items():
             self.cost_infos[key] = info + (0. if key not in self.cost_infos else self.cost_infos[key])
@@ -44,7 +45,7 @@ class RobotiqCameraEnv(RobotiqEnv):
             return 100. - action_cost - orientation_cost - position_cost
         else:
             return 0. + suction_reward - action_cost - downward_force_cost - orientation_cost - position_cost - \
-                   suction_cost - step_cost
+                suction_cost - step_cost
 
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
