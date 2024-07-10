@@ -5,6 +5,8 @@ import flax.linen as nn
 import jax.numpy as jnp
 import jax.lax as lax
 
+from serl_launcher.utils.numpy_utils import int8_2_bool_jnp
+
 
 class MLPEncoder(nn.Module):
     mlp: nn.module = None
@@ -56,9 +58,13 @@ class VoxNet(nn.Module):
         if no_batch_dim:
             observations = observations[None]
 
-        observations = observations.astype(jnp.float32)[..., None] / 8.      # add conv channel and scale to [0, 1]
+        if observations.dtype == jnp.uint8:
+            observations = int8_2_bool_jnp(observations)  # bit conversion here
 
-        conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias, padding="valid")
+        observations = observations.astype(jnp.float32)[..., None]  # add conv channel
+
+        conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
+                       padding="valid")
         l_relu = partial(nn.leaky_relu, negative_slope=0.1)
 
         x = observations
@@ -68,7 +74,7 @@ class VoxNet(nn.Module):
             strides=(2, 2, 2),
             name="conv_5x5",
         )(x)
-        x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2)
+        x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
 
         x = conv(
             features=32,
@@ -76,7 +82,13 @@ class VoxNet(nn.Module):
             strides=(1, 1, 1),
             name="conv_3x3"
         )(x)
-        x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2)
+        x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, 32)
+
+        # TODO test 1x1 convolution (dimensionality reduction, no features)
+        # x = conv(
+        #     features=1,
+        #     kernel_size=(1, 1, 1),
+        # )(x)
 
         x = lax.reduce_window(
             x,

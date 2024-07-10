@@ -23,6 +23,8 @@ from robotiq_env.utils.real_time_plotter import DataClient
 from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
+from serl_launcher.utils.numpy_utils import bool_2_int8
+
 
 class ImageDisplayer(threading.Thread):
     def __init__(self, queue):
@@ -195,7 +197,7 @@ class RobotiqEnv(gym.Env):
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(        # TODO change here as well
-                0, 255, shape=(50, 50, 40), dtype=np.bool_
+                0, 255, shape=(50, 50, 5), dtype=np.uint8
             )
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
@@ -262,7 +264,10 @@ class RobotiqEnv(gym.Env):
         print("[RIC] Controller has started and is ready!")
 
         if self.camera_mode in ["pointcloud"]:
-            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196, voxel_grid_shape=(50, 50, 40))
+            voxel_grid_shape = self.observation_space["images"]["wrist_pointcloud"].shape
+            voxel_grid_shape[-1] *= 8
+            print(f"pointcloud resolution set to: {voxel_grid_shape}")
+            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196, voxel_grid_shape=voxel_grid_shape)
 
             # load pre calibrated, else calibrate
             if not self.pointcloud_fusion.load_finetuned():
@@ -503,8 +508,7 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode in ["pointcloud"]:
             voxel_grid, voxel_indices = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
-            # print(voxel_grid.shape, voxel_grid.dtype, voxel_grid.nbytes*8)
-            images["wrist_pointcloud"] = voxel_grid.astype(np.bool_)
+            images["wrist_pointcloud"] = bool_2_int8(voxel_grid)
             self.displayer.display(voxel_indices)
 
         # self.recording_frames.append(
