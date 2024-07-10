@@ -61,7 +61,7 @@ class PointCloudDisplayer:
     def display(self, points):
         self.pc.clear()
         # MASSIVE! speed up if float64 is used, see: https://github.com/isl-org/Open3D/issues/1045
-        self.pc.points = o3d.utility.Vector3dVector(points.astype(np.float64))
+        self.pc.points = o3d.utility.Vector3dVector(points.astype(np.float64) / 1000.)
         self.window.clear_geometries()
         self.window.add_geometry(self.pc)
         self.ctr.convert_from_pinhole_camera_parameters(self.param, True)
@@ -194,10 +194,9 @@ class RobotiqEnv(gym.Env):
                 )
 
         if camera_mode in ["pointcloud"]:
-            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
-                0, 1, shape=(50, 50, 40), dtype=np.uint8
+            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(        # TODO change here as well
+                0, 255, shape=(50, 50, 40), dtype=np.bool_
             )
-
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
@@ -263,7 +262,7 @@ class RobotiqEnv(gym.Env):
         print("[RIC] Controller has started and is ready!")
 
         if self.camera_mode in ["pointcloud"]:
-            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196)
+            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196, voxel_grid_shape=(50, 50, 40))
 
             # load pre calibrated, else calibrate
             if not self.pointcloud_fusion.load_finetuned():
@@ -503,10 +502,10 @@ class RobotiqEnv(gym.Env):
                 return self.get_image()
 
         if self.camera_mode in ["pointcloud"]:
-            voxel_grid = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
-            voxel_grid = np.sum(np.reshape(voxel_grid, (50, 2, 50, 2, 40, 2)), axis=(1, 3, 5))
-            images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
-            self.displayer.display(self.pointcloud_fusion.get_pointcloud_representation(voxelize=False))
+            voxel_grid, voxel_indices = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
+            # print(voxel_grid.shape, voxel_grid.dtype, voxel_grid.nbytes*8)
+            images["wrist_pointcloud"] = voxel_grid.astype(np.bool_)
+            self.displayer.display(voxel_indices)
 
         # self.recording_frames.append(
         #     np.concatenate([image for key, image in display_images.items() if "full" in key], axis=0)
