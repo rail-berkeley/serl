@@ -5,6 +5,8 @@ import flax.linen as nn
 import jax.numpy as jnp
 import jax.lax as lax
 
+import jax
+
 
 class MLPEncoder(nn.Module):
     mlp: nn.module = None
@@ -56,7 +58,7 @@ class VoxNet(nn.Module):
         if no_batch_dim:
             observations = observations[None]
 
-        observations = observations.astype(jnp.float32)[..., None]  # add conv channel
+        observations = observations.astype(jnp.float32)[..., None] / 1.  # add conv channel
 
         conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
                        padding="valid")
@@ -64,7 +66,7 @@ class VoxNet(nn.Module):
 
         x = observations
         x = conv(
-            features=32,
+            features=16,
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
             name="conv_5x5",
@@ -72,7 +74,7 @@ class VoxNet(nn.Module):
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
 
         x = conv(
-            features=32,
+            features=16,
             kernel_size=(3, 3, 3),
             strides=(1, 1, 1),
             name="conv_3x3"
