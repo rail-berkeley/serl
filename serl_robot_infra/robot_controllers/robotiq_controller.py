@@ -178,7 +178,7 @@ class RobotiqImpedanceController(threading.Thread):
         obj_status = await self.robotiq_gripper.get_object_status()
 
         pressure /= 100.  # pressure between [0, 1]
-        grip_status = [0., 1., 1., 0.][obj_status.value]  # 3-> no object detected, [0, 1, 2]-> obj detected
+        grip_status = [1., 1., 1., 0.][obj_status.value]  # 3-> no object detected, [0, 1, 2]-> obj detected
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = vel
@@ -303,9 +303,13 @@ class RobotiqImpedanceController(threading.Thread):
 
         # first disable vaccum gripper
         if self.robotiq_gripper:
-            self.target_grip[0] = -1.
-            await self.send_gripper_command()
-            time.sleep(0.1)
+            for _ in range(100):
+                self.target_grip[0] = -1.
+                await self.send_gripper_command()
+                time.sleep(0.1)
+                gripper_status = await self.robotiq_gripper.get_object_status()
+                if gripper_status.value == 3:
+                    break
 
         # then move up (so no boxes are moved)
         success = True
