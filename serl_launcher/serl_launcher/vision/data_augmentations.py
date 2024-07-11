@@ -36,6 +36,36 @@ def batched_random_crop(img, rng, *, padding, num_batch_dims: int = 1):
     return img
 
 
+def random_shift_3d(img, rng, *, padding):
+    crop_from = jax.random.randint(rng, (3,), 0, 2 * padding + 1)
+    padded_img = jnp.pad(
+        img,
+        (
+            (padding, padding),
+            (padding, padding),
+            (padding, padding),
+         ),
+        mode="constant"
+    )
+    return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
+
+
+@partial(jax.jit, static_argnames=("padding", "num_batch_dims"))
+def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
+    original_shape = img.shape
+    img = jnp.reshape(img, (-1, *img.shape[num_batch_dims:]))
+    # shape (B, X, Y, Z)
+
+    rngs = jax.random.split(rng, img.shape[0])
+    img = jax.vmap(
+        lambda i, r: random_shift_3d(i, r, padding=padding), in_axes=(0, 0), out_axes=0
+    )(img, rngs)
+
+    # Restore batch dims
+    img = jnp.reshape(img, original_shape)
+    return img
+
+
 def _maybe_apply(apply_fn, inputs, rng, apply_prob):
     should_apply = jax.random.uniform(rng, shape=()) <= apply_prob
     return jax.lax.cond(should_apply, inputs, apply_fn, inputs, lambda x: x)
@@ -66,7 +96,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
     radius = int(kernel_size / 2)
     kernel_size_ = 2 * radius + 1
     x = jnp.arange(-radius, radius + 1).astype(jnp.float32)
-    blur_filter = jnp.exp(-(x**2) / (2.0 * sigma**2))
+    blur_filter = jnp.exp(-(x ** 2) / (2.0 * sigma ** 2))
     blur_filter = blur_filter / jnp.sum(blur_filter)
     blur_v = jnp.reshape(blur_filter, [kernel_size_, 1, 1, 1])
     blur_h = jnp.reshape(blur_filter, [1, kernel_size_, 1, 1])
@@ -83,7 +113,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
 
 
 def _random_gaussian_blur(
-    image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
+        image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
 ):
     """Applies a random gaussian blur."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -148,22 +178,22 @@ def hsv_to_rgb(h, s, v):
     x = c * (1 - jnp.abs(fmodu - 1))
     hcat = jnp.floor(dh).astype(jnp.int32)
     rr = (
-        jnp.where(
-            (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
-        )
-        + m
+            jnp.where(
+                (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
+            )
+            + m
     )
     gg = (
-        jnp.where(
-            (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
-        )
-        + m
+            jnp.where(
+                (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
+            )
+            + m
     )
     bb = (
-        jnp.where(
-            (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
-        )
-        + m
+            jnp.where(
+                (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
+            )
+            + m
     )
     return rr, gg, bb
 
@@ -224,17 +254,17 @@ def _to_grayscale(image):
 
 
 def color_transform(
-    image,
-    rng,
-    *,
-    brightness,
-    contrast,
-    saturation,
-    hue,
-    to_grayscale_prob,
-    color_jitter_prob,
-    apply_prob,
-    shuffle
+        image,
+        rng,
+        *,
+        brightness,
+        contrast,
+        saturation,
+        hue,
+        to_grayscale_prob,
+        color_jitter_prob,
+        apply_prob,
+        shuffle
 ):
     """Applies color jittering to a single image."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -306,7 +336,7 @@ def random_flip(image, rng):
 
 
 def gaussian_blur(
-    image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
+        image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
 ):
     """Applies gaussian blur to a batch of images.
     Args:

@@ -18,7 +18,7 @@ from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
 from serl_launcher.vision.voxel_grid_encoders import MLPEncoder, VoxNet
 from serl_launcher.utils.train_utils import _unpack, concat_batches
-from serl_launcher.vision.data_augmentations import batched_random_crop
+from serl_launcher.vision.data_augmentations import batched_random_crop, batched_random_shift_voxel
 
 
 class DrQAgent(SACAgent):
@@ -234,7 +234,7 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "voxel-mlp":       # not used, too many weights...
+        elif encoder_type == "voxel-mlp":  # not used, too many weights...
             encoders = {
                 image_key: MLPEncoder(
                     mlp=MLP(
@@ -254,7 +254,7 @@ class DrQAgent(SACAgent):
                     use_conv_bias=False,
                 )
                 for image_key in image_keys
-            }       # TODO check weights
+            }
         elif encoder_type.lower() == "none":
             encoders = None
         else:
@@ -320,13 +320,22 @@ class DrQAgent(SACAgent):
 
     def data_augmentation_fn(self, rng, observations):
         for pixel_key in self.config["image_keys"]:
-            observations = observations.copy(
-                add_or_replace={
-                    pixel_key: batched_random_crop(
-                        observations[pixel_key], rng, padding=4, num_batch_dims=2
-                    )
-                }
-            )
+            if "pointcloud" in pixel_key:
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_shift_voxel(
+                            observations[pixel_key], rng, padding=3, num_batch_dims=2
+                        )
+                    }
+                )
+            else:
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_crop(
+                            observations[pixel_key], rng, padding=4, num_batch_dims=2
+                        )
+                    }
+                )
         return observations
 
     @partial(jax.jit, static_argnames=("utd_ratio", "pmap_axis"))
