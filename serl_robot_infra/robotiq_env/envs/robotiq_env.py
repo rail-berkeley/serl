@@ -197,7 +197,7 @@ class RobotiqEnv(gym.Env):
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(        # TODO change here as well
-                0, 255, shape=(50, 50, 5), dtype=np.uint8
+                0, 255, shape=(50, 50, 40), dtype=np.uint8
             )
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
@@ -264,8 +264,9 @@ class RobotiqEnv(gym.Env):
         print("[RIC] Controller has started and is ready!")
 
         if self.camera_mode in ["pointcloud"]:
-            voxel_grid_shape = self.observation_space["images"]["wrist_pointcloud"].shape
-            voxel_grid_shape[-1] *= 8
+            voxel_grid_shape = np.array(self.observation_space["images"]["wrist_pointcloud"].shape)
+            # voxel_grid_shape[-1] *= 8     # do not use compacting for now
+            # voxel_grid_shape *= 2
             print(f"pointcloud resolution set to: {voxel_grid_shape}")
             self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196, voxel_grid_shape=voxel_grid_shape)
 
@@ -508,7 +509,12 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode in ["pointcloud"]:
             voxel_grid, voxel_indices = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
-            images["wrist_pointcloud"] = bool_2_int8(voxel_grid)
+            # images["wrist_pointcloud"] = bool_2_int8(voxel_grid)
+            vs = self.observation_space["images"]["wrist_pointcloud"].shape
+
+            # downsample on 2x2x2 grid with sum of points (8 as max)
+            # voxel_grid = np.sum(np.reshape(voxel_grid, (vs[0], 2, vs[1], 2, vs[2], 2)), axis=(1, 3, 5))
+            images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
             self.displayer.display(voxel_indices)
 
         # self.recording_frames.append(

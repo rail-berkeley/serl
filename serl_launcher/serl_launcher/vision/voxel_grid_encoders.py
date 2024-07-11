@@ -5,8 +5,6 @@ import flax.linen as nn
 import jax.numpy as jnp
 import jax.lax as lax
 
-from serl_launcher.utils.numpy_utils import int8_2_bool_jnp
-
 
 class MLPEncoder(nn.Module):
     mlp: nn.module = None
@@ -58,9 +56,6 @@ class VoxNet(nn.Module):
         if no_batch_dim:
             observations = observations[None]
 
-        if observations.dtype == jnp.uint8:
-            observations = int8_2_bool_jnp(observations)  # bit conversion here
-
         observations = observations.astype(jnp.float32)[..., None]  # add conv channel
 
         conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
@@ -84,7 +79,7 @@ class VoxNet(nn.Module):
         )(x)
         x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, 32)
 
-        # TODO test 1x1 convolution (dimensionality reduction, no features)
+        # 1x1 convolution (dimensionality reduction, no features), not used for now
         # x = conv(
         #     features=1,
         #     kernel_size=(1, 1, 1),
@@ -98,12 +93,9 @@ class VoxNet(nn.Module):
             window_strides=(1, 2, 2, 2, 1),
             padding='VALID'
         )
-        # print(x.shape, end='  ')
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
-        # print(x.shape)
-
         if self.bottleneck_dim is not None:
             x = nn.Dense(self.bottleneck_dim)(x)
             x = nn.LayerNorm()(x)
