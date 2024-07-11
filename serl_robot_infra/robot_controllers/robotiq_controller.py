@@ -177,8 +177,13 @@ class RobotiqImpedanceController(threading.Thread):
         pressure = await self.robotiq_gripper.get_current_pressure()
         obj_status = await self.robotiq_gripper.get_object_status()
 
-        pressure /= 100.  # pressure between [0, 1]
-        grip_status = [1., 1., 1., 0.][obj_status.value]  # 3-> no object detected, [0, 1, 2]-> obj detected
+        # 3-> no object detected, 0-> sucking empty, [1, 2] obj detected
+        grip_status = [-1., 1., 1., 0.][obj_status.value]
+
+        pressure = pressure if pressure < 99 else 0     # 100 no obj, 99 sucking empty, so they are ignored
+        # grip status, 0->neutral, -1->bad (sucking but no obj), 1-> good (sucking and obj)
+        grip_status = 1. if pressure > 0 else grip_status
+        pressure /= 98.  # pressure between [0, 1]
         with self.lock:
             self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = vel
