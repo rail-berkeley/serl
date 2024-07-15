@@ -282,7 +282,8 @@ class RobotiqImpedanceController(threading.Thread):
             self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
-        elif self.target_grip[0] < -0.5 and not np.isclose(self.gripper_state[0], 1., atol=1e-4):
+        # release if below neg threshold and gripper activated (grip_status not zero)
+        elif self.target_grip[0] < -0.5 and abs(self.gripper_state[1]) > 0.5:
             await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             # print("release")
