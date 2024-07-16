@@ -81,7 +81,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):       # config for 10 boxes
     CONTROLLER_HZ = 100
     GRIPPER_TIMEOUT = 2000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.0  # faster
+    FORCEMODE_DAMPING: float = 0.02  # faster but more vulnerable to crash...
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.1, 1., 1., 1.])
@@ -93,8 +93,13 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):       # config for 10 boxes
 
 
 class RobotiqCameraConfigFinalTests(RobotiqCameraConfigFinal):
+    RANDOM_RESET = False
+    RANDOM_XY_RANGE = (0.0,)
+    RANDOM_RZ_RANGE = (0.0,)
+
     RESET_Q = np.array([
-        [ 0.0421, -1.3161,  1.9649, -2.2358, -1.3221, -1.5237],
+        # [ 0.0421, -1.3161,  1.9649, -2.2358, -1.3221, -1.5237],     # schräge position
+        [0.1882, -1.2777,  1.9699, -2.2983, -1.5567, -1.384]        # gerade pos
     ])
     ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.3, 3.2])
     ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.6, -0.3, -3.2])
