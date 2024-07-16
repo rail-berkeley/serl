@@ -159,7 +159,7 @@ def ensemblize(cls, num_qs, out_axes=0):
     return nn.vmap(
         cls,
         variable_axes={"params": 0},
-        split_rngs={"params": True},
+        split_rngs={"params": True, "dropout": True},
         in_axes=None,
         out_axes=out_axes,
         axis_size=num_qs,
