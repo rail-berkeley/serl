@@ -196,7 +196,7 @@ class RobotiqEnv(gym.Env):
                 )
 
         if camera_mode in ["pointcloud"]:
-            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(        # TODO change here as well
+            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
                 0, 255, shape=(50, 50, 40), dtype=np.uint8
             )
         if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
@@ -233,12 +233,11 @@ class RobotiqEnv(gym.Env):
         self.controller = RobotiqImpedanceController(
             robot_ip=config.ROBOT_IP,
             frequency=config.CONTROLLER_HZ,
-            kp=10000,
-            kd=2200,
+            kp=15000,
+            kd=3300,
             config=config,
             verbose=False,
             plot=False,
-            # old_obs=camera_mode is None       # do not use anymore
         )
         self.controller.start()  # start Thread
 
@@ -334,8 +333,12 @@ class RobotiqEnv(gym.Env):
 
         self.curr_path_length += 1
 
-        self._update_currpos()
         obs = self._get_obs()
+
+        reward = self.compute_reward(obs, action)
+        truncated = self._is_truncated()
+        reward = reward if not truncated else reward - 10.  # truncation penalty
+        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
 
         dt = time.time() - start_time
         to_sleep = max(0, (1.0 / self.hz) - dt)
@@ -343,12 +346,6 @@ class RobotiqEnv(gym.Env):
             warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         time.sleep(to_sleep)
 
-        reward = self.compute_reward(obs, action)
-        truncated = self._is_truncated()
-
-        reward = reward if not truncated else reward - 10.  # truncation penalty
-
-        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
         return obs, reward, done, truncated, self.get_cost_infos(done)
 
     def compute_reward(self, obs, action) -> float:
@@ -409,7 +406,6 @@ class RobotiqEnv(gym.Env):
         shift = self.go_to_rest(joint_reset=joint_reset)
         self.curr_path_length = 0
 
-        self._update_currpos()
         obs = self._get_obs()
         return obs, {"reset_shift": shift}
 
@@ -602,6 +598,13 @@ class RobotiqEnv(gym.Env):
         return self.controller.is_truncated()
 
     def _get_obs(self) -> dict:
+        # get image before state observation, so they match better in time
+
+        images = None
+        if self.camera_mode is not None:
+            images = self.get_image()
+
+        self._update_currpos()
         state_observation = {
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
@@ -609,11 +612,11 @@ class RobotiqEnv(gym.Env):
             "tcp_force": self.curr_force,
             "tcp_torque": self.curr_torque,
         }
+
         if self.realtime_plot:
             self.plotting_client.send(np.concatenate([self.curr_force, self.curr_torque]))
 
-        if self.camera_mode is not None:
-            images = self.get_image()
+        if images is not None:
             return copy.deepcopy(dict(images=images, state=state_observation))
         else:
             return copy.deepcopy(dict(state=state_observation))
