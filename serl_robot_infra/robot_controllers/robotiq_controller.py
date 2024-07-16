@@ -58,7 +58,8 @@ class RobotiqImpedanceController(threading.Thread):
         self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.curr_Q = np.zeros((6,), dtype=np.float32)
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
-        self.curr_force = np.zeros((6,), dtype=np.float32)  # force of tool tip
+        self.curr_force_lowpass = np.zeros((6,), dtype=np.float32)  # force of tool tip
+        self.curr_force = np.zeros((6,), dtype=np.float32)
 
         self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
@@ -187,8 +188,9 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
+            self.curr_force[:] = np.array(force)
             # use moving average (5), since the force fluctuates heavily
-            self.curr_force[:] = 0.1 * np.array(force) + 0.9 * self.curr_force[:]
+            self.curr_force_lowpass[:] = 0.1 * np.array(force) + 0.9 * self.curr_force_lowpass[:]
             self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
@@ -198,8 +200,8 @@ class RobotiqImpedanceController(threading.Thread):
                 "vel": self.curr_vel,
                 "Q": self.curr_Q,
                 "Qd": self.curr_Qd,
-                "force": self.curr_force[:3],
-                "torque": self.curr_force[3:],
+                "force": self.curr_force_lowpass[:3],
+                "torque": self.curr_force_lowpass[3:],
                 "gripper": self.gripper_state
             }
             return state
@@ -228,12 +230,9 @@ class RobotiqImpedanceController(threading.Thread):
         vel_rot_diff = R.from_rotvec(curr_vel[3:]).inv()
         torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
 
-        # TODO make better and more general (tcp force check)
         # check for big downward tcp force and adapt accordingly
-        if self.curr_force[2] > 0.5 and force_pos[2] < 0.:
-            # print(force_pos[2], end="  ")
-            force_pos[2] = max((1.5 - self.curr_force[2]), 0.) * force_pos[2] + min(self.curr_force[2] - 0.5, 1.) * 20.
-            # print(force_pos[2])
+        if self.curr_force[2] > 3.5 and force_pos[2] < 0.:
+            force_pos[2] = max((1.5 - self.curr_force_lowpass[2]), 0.) * force_pos[2] + min(self.curr_force_lowpass[2] - 0.5, 1.) * 20.
 
         return np.concatenate((force_pos, torque))
 
@@ -266,7 +265,12 @@ class RobotiqImpedanceController(threading.Thread):
         plt.show(block=True)
         self.stop()
 
-    async def send_gripper_command(self):
+    async def send_gripper_command(self, force_release=False):
+        if force_release:
+            await self.robotiq_gripper.automatic_release()
+            self.target_grip[0] = 0.0
+            return
+
         timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout[
             "timeout"]
         # target grip above threshold and timeout exceeded and not gripping something already
@@ -283,7 +287,7 @@ class RobotiqImpedanceController(threading.Thread):
             # print("release")
 
     def _truncate_check(self):
-        downward_force = self.curr_force[2] > 20.
+        downward_force = self.curr_force_lowpass[2] > 20.
         if downward_force:  # TODO add better criteria
             self._is_truncated.set()
         else:
@@ -303,14 +307,8 @@ class RobotiqImpedanceController(threading.Thread):
 
         # first disable vaccum gripper
         if self.robotiq_gripper:
-            for _ in range(10):
-                self.target_grip[0] = -1.
-                await self._update_robot_state()
-                await self.send_gripper_command()
-                time.sleep(0.1)
-                gripper_status = await self.robotiq_gripper.get_object_status()
-                if gripper_status.value == 3:
-                    break
+            await self.send_gripper_command(force_release=True)
+            time.sleep(0.01)
 
         # then move up (so no boxes are moved)
         success = True
@@ -368,7 +366,7 @@ class RobotiqImpedanceController(threading.Thread):
                 # calculate force
                 force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
-                self.print(f" p:{self.curr_pos}   f:{self.curr_force}   gr:{self.gripper_state}")  # log to file
+                self.print(f" p:{self.curr_pos}   f:{self.curr_force_lowpass}   gr:{self.gripper_state}")  # log to file
 
                 # send command to robot
                 t_start = self.robotiq_control.initPeriod()
@@ -381,7 +379,7 @@ class RobotiqImpedanceController(threading.Thread):
                 )
                 if not fm_successful:  # truncate if the robot ends up in a singularity
                     await self.restart_robotiq_interface()
-                    self.robotiq_control.moveJ(self.reset_Q, speed=1., acceleration=0.8)
+                    await self._go_to_reset_pose()
 
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
@@ -400,9 +398,8 @@ class RobotiqImpedanceController(threading.Thread):
 
             # release gripper
             if self.robotiq_gripper:
-                self.target_grip[0] = -1.
-                await self.send_gripper_command()
-                time.sleep(0.1)
+                await self.send_gripper_command(force_release=True)
+                time.sleep(0.05)
 
             # move to real home
             pi = 3.1415
