@@ -33,7 +33,6 @@ class RobotiqImpedanceController(threading.Thread):
             config=None,
             verbose=False,
             plot=False,
-            old_obs=False,
             *args,
             **kwargs
     ):
@@ -51,7 +50,6 @@ class RobotiqImpedanceController(threading.Thread):
         self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic() - 1e6}
         self.verbose = verbose
         self.do_plot = plot
-        self.old_obs = old_obs  # use the old observation layout
 
         self.target_pos = np.zeros((7,), dtype=np.float32)  # new as quat to avoid +- problems with axis angle repr.
         self.target_grip = np.zeros((1,), dtype=np.float32)
@@ -189,13 +187,9 @@ class RobotiqImpedanceController(threading.Thread):
             self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
-            if self.old_obs:
-                self.curr_force[:] = np.asarray(force)  # old representation for SAC policy
-                self.gripper_state[:] = [pressure, float(obj_status.value)]
-            else:
-                # use moving average (5), since the force fluctuates heavily
-                self.curr_force[:] = 0.1 * np.array(force) + 0.9 * self.curr_force[:]
-                self.gripper_state[:] = [pressure, grip_status]
+            # use moving average (5), since the force fluctuates heavily
+            self.curr_force[:] = 0.1 * np.array(force) + 0.9 * self.curr_force[:]
+            self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
         with self.lock:
@@ -309,8 +303,9 @@ class RobotiqImpedanceController(threading.Thread):
 
         # first disable vaccum gripper
         if self.robotiq_gripper:
-            for _ in range(100):
+            for _ in range(10):
                 self.target_grip[0] = -1.
+                await self._update_robot_state()
                 await self.send_gripper_command()
                 time.sleep(0.1)
                 gripper_status = await self.robotiq_gripper.get_object_status()
