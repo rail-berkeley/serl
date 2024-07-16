@@ -66,7 +66,7 @@ class VoxNet(nn.Module):
 
         x = observations
         x = conv(
-            features=16,
+            features=32,
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
             name="conv_5x5",
@@ -74,12 +74,22 @@ class VoxNet(nn.Module):
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
 
         x = conv(
-            features=16,
+            features=32,
             kernel_size=(3, 3, 3),
-            strides=(1, 1, 1),
-            name="conv_3x3"
+            strides=(2, 2, 2),
+            name="conv_3x3_1"
         )(x)
-        x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, 32)
+        x = l_relu(x)  # shape (B, (X-4)/4, (Y-4)/4, (Z-4)/4, 32)
+
+        x = conv(
+            features=32,
+            kernel_size=(3, 3, 3),
+            strides=(2, 2, 2),
+            name="conv_3x3_2"
+        )(x)
+        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, 32)
+
+        x = jnp.mean(x, axis=(-2))      # average over z dim
 
         # 1x1 convolution (dimensionality reduction, no features), not used for now
         # x = conv(
@@ -87,14 +97,14 @@ class VoxNet(nn.Module):
         #     kernel_size=(1, 1, 1),
         # )(x)
 
-        x = lax.reduce_window(
-            x,
-            init_value=-jnp.inf,
-            computation=lax.max,
-            window_dimensions=(1, 2, 2, 2, 1),
-            window_strides=(1, 2, 2, 2, 1),
-            padding='VALID'
-        )
+        # x = lax.reduce_window(
+        #     x,
+        #     init_value=-jnp.inf,
+        #     computation=lax.max,
+        #     window_dimensions=(1, 2, 2, 2, 1),
+        #     window_strides=(1, 2, 2, 2, 1),
+        #     padding='VALID'
+        # )
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
