@@ -92,7 +92,6 @@ class DrQAgent(SACAgent):
             target_entropy = -prod(actions.shape)
 
         print(f"config: discount: {discount}, target_entropy: {target_entropy}")
-        # print(f"actor_optimizer {actor_optimizer_kwargs} critic_optimizer {critic_optimizer_kwargs} temperature {temperature_optimizer_kwargs}")
 
         return cls(
             state=state,
@@ -266,8 +265,6 @@ class DrQAgent(SACAgent):
             enable_stacking=True,
             image_keys=image_keys,
         )
-
-        # print(f"encoder def: {encoder_def}")
 
         encoders = {
                 "critic": encoder_def,
