@@ -6,8 +6,8 @@ python drq_policy_robotiq.py "$@" \
     --max_traj_length 100 \
     --exp_name=drq_10box \
     --camera_mode pointcloud \
-    --seed 1 \
-    --max_steps 30000 \
+    --seed 2 \
+    --max_steps 20000 \
     --random_steps 500 \
     --training_starts 500 \
     --utd_ratio 8 \

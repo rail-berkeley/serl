@@ -6,8 +6,8 @@ python drq_policy_robotiq.py "$@" \
     --exp_name=drq_10box \
     --camera_mode pointcloud \
     --max_traj_length 100 \
-    --seed 1 \
-    --max_steps 15000 \
+    --seed 2 \
+    --max_steps 20000 \
     --random_steps 500 \
     --training_starts 500 \
     --utd_ratio 8 \
@@ -15,5 +15,5 @@ python drq_policy_robotiq.py "$@" \
     --eval_period 20000 \
     --encoder_type voxnet \
     --checkpoint_period 2500 \
-    --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/pcb_insert_20_demos_jul8_voxelgrid.pkl \
+    --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/pcb_insert_20_demos_jul15_vox_554b_newgripstat.pkl \
 #    --debug
