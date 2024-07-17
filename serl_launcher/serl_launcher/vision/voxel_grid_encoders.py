@@ -45,6 +45,7 @@ class VoxNet(nn.Module):
 
     use_conv_bias: bool = False
     bottleneck_dim: Optional[int] = None
+    final_activation: Callable[[jnp.ndarray], jnp.ndarray] | str = nn.tanh
 
     @nn.compact
     def __call__(
@@ -111,6 +112,6 @@ class VoxNet(nn.Module):
         if self.bottleneck_dim is not None:
             x = nn.Dense(self.bottleneck_dim)(x)
             x = nn.LayerNorm()(x)
-            x = nn.tanh(x)
+            x = self.final_activation(x)
 
         return x[0] if no_batch_dim else x

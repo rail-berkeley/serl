@@ -251,6 +251,7 @@ class DrQAgent(SACAgent):
                 image_key: VoxNet(
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                     use_conv_bias=False,
+                    final_activation=nn.tanh,
                 )
                 for image_key in image_keys
             }
