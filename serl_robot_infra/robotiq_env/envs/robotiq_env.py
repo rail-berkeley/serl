@@ -267,10 +267,11 @@ class RobotiqEnv(gym.Env):
             # voxel_grid_shape[-1] *= 8     # do not use compacting for now
             # voxel_grid_shape *= 2
             print(f"pointcloud resolution set to: {voxel_grid_shape}")
-            self.pointcloud_fusion = PointCloudFusion(angle=32., x_distance=0.196, voxel_grid_shape=voxel_grid_shape)
+            self.pointcloud_fusion = PointCloudFusion(angle=31., x_distance=0.205, voxel_grid_shape=voxel_grid_shape)
 
             # load pre calibrated, else calibrate
             if not self.pointcloud_fusion.load_finetuned():
+                # TODO make calibration more robust!
                 self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
                 self.calibration_thread.start()
 
@@ -522,6 +523,7 @@ class RobotiqEnv(gym.Env):
 
     def calibrate_pointcloud_fusion(self, save=True, visualize=False, num_samples=20):
         self.reset()
+        import open3d as o3d
 
         assert self.camera_mode in ["pointcloud"]
         print("calibrating pointcloud fusion...")
@@ -535,6 +537,7 @@ class RobotiqEnv(gym.Env):
 
             print(action)
             obs, reward, done, truncated, _ = self.step(np.array(action))
+            time.sleep(0.1)
 
             self.calibration_thread.append_backlog(*self.pointcloud_fusion.get_original_pcds())
 
@@ -547,7 +550,6 @@ class RobotiqEnv(gym.Env):
             self.pointcloud_fusion.save_finetuned()
 
         if visualize:
-            import open3d as o3d
             pc = o3d.geometry.PointCloud()
             for i in range(num_samples):
                 pc.clear()
@@ -555,7 +557,7 @@ class RobotiqEnv(gym.Env):
                 self.pointcloud_fusion.clear()
                 self.pointcloud_fusion.append(pcs[0])
                 self.pointcloud_fusion.append(pcs[1])
-                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False)
+                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False, cropped=False)
                 pc.points = o3d.utility.Vector3dVector(fused)
                 o3d.visualization.draw_geometries([pc])
 

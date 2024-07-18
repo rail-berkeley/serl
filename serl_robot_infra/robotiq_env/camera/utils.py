@@ -62,7 +62,7 @@ def transform_point_cloud(points, transform_matrix):
 
 
 class PointCloudFusion:
-    def __init__(self, angle=30., x_distance=0.195, voxel_grid_shape=(100, 100, 80)):
+    def __init__(self, angle=30., x_distance=0.195, y_distance=-0.0, voxel_grid_shape=(100, 100, 80)):
         self.pcd1, self.pcd2 = None, None
 
         # 10cm width and 8cm height for the box
@@ -80,11 +80,13 @@ class PointCloudFusion:
         t1 = np.eye(4)
         t1[:3, :3] = R.from_euler("xyz", [angle, 0., 0.], degrees=True).as_matrix()
         t1[1, 3] = x_distance / 2.
+        t1[0, 3] = y_distance / 2.
         self.t1 = t1
 
         t2 = np.eye(4)
         t2[:3, :3] = R.from_euler("xyz", [-angle, 0., 0.], degrees=True).as_matrix()
         t2[1, 3] = -x_distance / 2.
+        t2[0, 3] = -y_distance / 2.
         self.t2 = t2
 
     def save_finetuned(self):
@@ -177,12 +179,12 @@ class PointCloudFusion:
         elif not self.is_empty():
             return self.get_first(voxelize=voxelize)
 
-    def fuse_pointclouds(self, voxelize=True):
+    def fuse_pointclouds(self, voxelize=True, cropped=True):
         if not self._is_transformed:
             self._transform()
         swap = lambda x: np.moveaxis(x, 0, 1)
         fused = swap(np.hstack([swap(self.pcd1), swap(self.pcd2)]))
-        return self.voxelize(fused) if voxelize else self.crop(fused)
+        return self.voxelize(fused) if voxelize else (self.crop(fused) if cropped else fused)
 
     def get_first(self, voxelize=True):
         if not self._is_transformed:
@@ -219,7 +221,7 @@ class CalibrationTread(threading.Thread):
         self.pc_backlog.append([pc1, pc2])
         assert self.samples.shape[0] >= len(self.pc_backlog)
 
-    def calibrate(self):
+    def calibrate(self, visualize=False):
         print(f"calibrating for {len(self.pc_backlog)} samples...")
         for i, (pc1, pc2) in enumerate(self.pc_backlog):
             self.pc_fusion.clear()
@@ -227,6 +229,19 @@ class CalibrationTread(threading.Thread):
             self.pc_fusion.append(pc2)
 
             self.samples[i, ...] = self.pc_fusion.calibrate_fusion()
+
+            if visualize:
+                # visualize for testing
+                pc = self.pc_fusion.pcd1.copy()
+                pc2 = self.pc_fusion.pcd2.copy()
+                pc = transform_point_cloud(points=pc, transform_matrix=self.samples[i])  # transform
+
+                swap = lambda x: np.moveaxis(x, 0, 1)
+                fused = swap(np.hstack([swap(pc), swap(pc2)]))
+
+                pc = o3d.geometry.PointCloud()
+                pc.points = o3d.utility.Vector3dVector(fused)
+                o3d.visualization.draw_geometries([pc])
 
         rotations = R.from_matrix(self.samples[:, :3, :3])
         mean_rot = rotations.mean().as_matrix()
