@@ -119,16 +119,16 @@ def make_drq_agent(
             std_max=5,
         ),
         critic_network_kwargs=dict(
-            activations=nn.tanh,        # TODO test relu
+            activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.1           # TODO test dropout
+            dropout_rate=0.1
         ),
         policy_network_kwargs=dict(
             activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.1           # TODO test dropout
+            dropout_rate=0.1
         ),
         temperature_init=1e-2,
         discount=0.99,  # 0.99
