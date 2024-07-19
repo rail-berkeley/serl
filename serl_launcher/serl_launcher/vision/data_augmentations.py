@@ -2,8 +2,86 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import jax.lax as lax
+
+ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+# Rotations are in the array transposed for easy dot product
+ROT_GENERAL = jnp.array([jnp.eye(3), ROT90.transpose(), ROT90 @ ROT90, ROT90])
 
 
+@jax.jit
+def random_rot90_action(action, num_rot):       # action is (x, y, z, rx, ry, rz, gripper)
+    xyz_rotated = jnp.dot(action[:3], ROT_GENERAL[num_rot])
+    orientation_rotated = jnp.dot(action[3:6], ROT_GENERAL[num_rot])
+    return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
+
+
+@jax.jit
+def batched_random_rot90_action(actions, rng):
+    assert actions.shape[-1:] == (7,)
+    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
+    # jax.debug.print("rotation: {}", num_rot[:20])
+
+    actions = jax.vmap(
+        lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
+    )(actions, num_rot)
+    return actions
+
+
+@partial(jax.jit, static_argnames="num_batch_dims")
+def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1):
+    original_shape = state.shape
+    state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
+    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
+
+    state = jax.vmap(
+        lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
+    )(state, num_rot)
+
+    return state.reshape(original_shape)
+
+
+def random_rot90_state(state, num_rot):
+    assert state.shape[-1] == 20
+
+    # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
+    start_indexes = jnp.array([2, 8, 11, 14, 17])
+
+    def rotate_part(i, state):
+        part = lax.dynamic_slice(state, (start_indexes[i],), (3,))
+        rotated = jnp.dot(part, ROT_GENERAL[num_rot])
+        return lax.dynamic_update_slice(state, rotated, (start_indexes[i],))
+
+    # Apply rotations sequentially
+    state = jax.lax.fori_loop(0, start_indexes.shape[0], rotate_part, state)
+
+    return state
+
+
+@partial(jax.jit, static_argnames="num_batch_dims")
+def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
+    original_shape = voxel_grid.shape
+    voxel_grid = jnp.reshape(voxel_grid, (-1, *voxel_grid.shape[num_batch_dims:]))
+    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
+
+    voxel_grid = jax.vmap(
+        lambda v, k: random_rot90_voxel(v, k), in_axes=(0, 0), out_axes=0
+    )(voxel_grid, num_rot)
+
+    return voxel_grid.reshape(original_shape)
+
+
+@partial(jax.jit, static_argnames="axes")
+def rot90_traceable(m, k=1, axes=(0, 1)):
+    return jax.lax.switch(k, [partial(jnp.rot90, m, k=i, axes=axes) for i in range(4)])
+
+
+@jax.jit
+def random_rot90_voxel(voxel_grid, num_rot):
+    return rot90_traceable(voxel_grid, k=num_rot, axes=(-3, -2))
+
+
+@partial(jax.jit, static_argnames="padding")
 def random_crop(img, rng, *, padding):
     crop_from = jax.random.randint(rng, (2,), 0, 2 * padding + 1)
     crop_from = jnp.concatenate([crop_from, jnp.zeros((1,), dtype=jnp.int32)])
@@ -44,7 +122,7 @@ def random_shift_3d(img, rng, *, padding):
             (padding, padding),
             (padding, padding),
             (padding, padding),
-         ),
+        ),
         mode="constant"
     )
     return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
@@ -54,7 +132,7 @@ def random_shift_3d(img, rng, *, padding):
 def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
     original_shape = img.shape
     img = jnp.reshape(img, (-1, *img.shape[num_batch_dims:]))
-    # shape (B, X, Y, Z)
+    # shape (B, B2, X, Y, Z)
 
     rngs = jax.random.split(rng, img.shape[0])
     img = jax.vmap(
