@@ -313,7 +313,10 @@ class RobotiqImpedanceController(threading.Thread):
         # then move up (so no boxes are moved)
         success = True
         while self.curr_pos[2] < self.reset_height:
-            success = success and self.robotiq_control.speedL([0., 0., 0.25, 0., 0., 0.], acceleration=0.8)
+            if self.curr_Q[2] < 0.5:  # if the shoulder joint is near 180deg --> do not move into singularity
+                success = success and self.robotiq_control.speedJ([0., -1., 1., 0., 0., 0.], acceleration=0.8)
+            else:
+                success = success and self.robotiq_control.speedL([0., 0., 0.25, 0., 0., 0.], acceleration=0.8)
             await self._update_robot_state()
             time.sleep(0.01)
         self.robotiq_control.speedStop(a=1.)
@@ -389,6 +392,8 @@ class RobotiqImpedanceController(threading.Thread):
                 a = dt - (time.monotonic() - t_now)
                 time.sleep(max(0., a))
                 self.err, self.noerr = self.err + int(a < 0.), self.noerr + int(a >= 0.)  # some logging
+                if a < -0.04:       # log if delay more than 50ms
+                    self.print(f"Controller Thread stopped for {(time.monotonic() - t_now)*1e3:.1f} ms")
 
         finally:
             if self.verbose:
