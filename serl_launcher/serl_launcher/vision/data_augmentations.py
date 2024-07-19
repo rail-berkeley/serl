@@ -45,7 +45,7 @@ def random_rot90_state(state, num_rot):
     assert state.shape[-1] == 20
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
-    start_indexes = jnp.array([2, 8, 11, 14, 17])
+    start_indexes = jnp.array([2, 5, 8, 11, 14, 17])        # rotate everything (except gripper)
 
     def rotate_part(i, state):
         part = lax.dynamic_slice(state, (start_indexes[i],), (3,))
@@ -72,7 +72,7 @@ def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
 
 
 @partial(jax.jit, static_argnames="axes")
-def rot90_traceable(m, k=1, axes=(0, 1)):
+def rot90_traceable(m, k=1, axes=(0, 1)):           # TODO check if rotation is the wrong way around!
     return jax.lax.switch(k, [partial(jnp.rot90, m, k=i, axes=axes) for i in range(4)])
 
 

@@ -352,9 +352,9 @@ class DrQAgent(SACAgent):
                     )
                 }
             )
-            actions = batched_random_rot90_action(
-                actions, rng,
-            )
+            # actions = batched_random_rot90_action(
+            #     actions, rng,
+            # )     # maybe action are the problem
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
             return observations, next_observations, actions
