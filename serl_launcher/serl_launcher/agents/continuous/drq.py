@@ -441,6 +441,7 @@ class DrQAgent(SACAgent):
             add_or_replace={
                 "observations": obs,
                 "next_observations": next_obs,
+                "actions": actions,
             }
         )
 
