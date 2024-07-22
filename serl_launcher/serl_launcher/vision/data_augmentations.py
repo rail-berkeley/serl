@@ -20,7 +20,7 @@ def random_rot90_action(action, num_rot):       # action is (x, y, z, rx, ry, rz
 def batched_random_rot90_action(actions, rng):
     assert actions.shape[-1:] == (7,)
     num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
-    # jax.debug.print("rotation: {}", num_rot[:20])
+    # jax.debug.print("rotation: {}", num_rot[0])
 
     actions = jax.vmap(
         lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
@@ -72,8 +72,8 @@ def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
 
 
 @partial(jax.jit, static_argnames="axes")
-def rot90_traceable(m, k=1, axes=(0, 1)):           # TODO check if rotation is the wrong way around!
-    return jax.lax.switch(k, [partial(jnp.rot90, m, k=i, axes=axes) for i in range(4)])
+def rot90_traceable(m, k=1, axes=(0, 1)):
+    return jax.lax.switch(k, [partial(jnp.rot90, m, k=-i, axes=axes) for i in range(4)])
 
 
 @jax.jit
