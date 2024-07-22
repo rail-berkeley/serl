@@ -83,7 +83,7 @@ flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/r
 flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
 flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
 
-flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_sac/rlds',
+flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_drq/rlds',
                     "Path to save RLDS logs.")
 flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 
