@@ -14,13 +14,16 @@ class RelativeFrame(gym.Wrapper):
     This wrapper transforms the observation and action to be expressed in the end-effector frame.
     Optionally, it can transform the tcp_pose into a relative frame defined as the reset pose.
 
-    This wrapper is expected to be used on top of the base Franka environment, which has the following
+    This wrapper is expected to be used on top of the base Robotiq environment, which has the following
     observation space:
     {
         "state": spaces.Dict(
             {
                 "tcp_pose": spaces.Box(-np.inf, np.inf, shape=(7,)), # xyz + quat
-                ......
+                "tcp_vel": spaces.Box(-np.inf, np.inf, shape=(6,)),
+                "tcp_force": spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "tcp_torque": spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "gripper_state": spaces.Box(-np.inf, np.inf, shape=(2,)),
             }
         ),
         ......
@@ -76,10 +79,12 @@ class RelativeFrame(gym.Wrapper):
     def transform_observation(self, obs):
         """
         Transform observations from spatial(base) frame into body(end-effector) frame
-        using the adjoint matrix
+        using the rotation, adjoint and homogeneous matrix
         """
         adjoint_inv = np.linalg.inv(self.adjoint_matrix)
         obs["state"]["tcp_vel"] = adjoint_inv @ obs["state"]["tcp_vel"]
+        obs["state"]["tcp_force"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_force"]
+        obs["state"]["tcp_torque"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_torque"]
 
         if self.include_relative_pose:
             T_b_o = construct_homogeneous_matrix(obs["state"]["tcp_pose"])
@@ -95,7 +100,7 @@ class RelativeFrame(gym.Wrapper):
     def transform_action(self, action: np.ndarray):
         """
         Transform action from body(end-effector) frame into spatial(base) frame
-        using the adjoint matrix
+        using the rotation matrix
         """
         action = np.array(action)  # in case action is a jax read-only array
         action[:3] = self.rotation_matrix @ action[:3]
@@ -104,8 +109,8 @@ class RelativeFrame(gym.Wrapper):
     def transform_action_inv(self, action: np.ndarray):
         """
         Transform action from spatial(base) frame into body(end-effector) frame
-        using the adjoint matrix.
+        using the rotation matrix.
         """
         action = np.array(action)
-        action[:3] = np.linalg.inv(self.rotation_matrix) @ action[:3]
+        action[:3] = self.rotation_matrix.transpose() @ action[:3]
         return action
