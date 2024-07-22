@@ -332,6 +332,7 @@ class DrQAgent(SACAgent):
             # rotation of state, action and voxel grid (use the same rng for all of them, so same rotation)
             # jax.debug.print("before {}  {}  {}", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
+            # jax.debug.print("action: {}", actions[0, :])
             observations = observations.copy(
                 add_or_replace={
                     "state": batched_random_rot90_state(
@@ -352,11 +353,12 @@ class DrQAgent(SACAgent):
                     )
                 }
             )
-            # actions = batched_random_rot90_action(
-            #     actions, rng,
-            # )     # maybe action are the problem
+            actions = batched_random_rot90_action(
+                actions, rng,
+            )
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
+            # jax.debug.print("action after: {}", actions[0, :])
             return observations, next_observations, actions
 
     def image_augmentation_fn(self, obs_rng, observations, next_obs_rng, next_observations):
