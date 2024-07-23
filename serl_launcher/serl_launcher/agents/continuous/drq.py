@@ -324,10 +324,12 @@ class DrQAgent(SACAgent):
 
         return agent
 
-    def batch_augmentation_fn(self, observations, next_observations, actions, rng):
+    def batch_augmentation_fn(self, observations, next_observations, actions, rng, activated=True):
+        if not activated:
+            return observations, next_observations, actions
         for pixel_key in self.config["image_keys"]:
             if not "pointcloud" in pixel_key:
-                continue        # skip if not pointcloud
+                continue  # skip if not pointcloud
 
             # rotation of state, action and voxel grid (use the same rng for all of them, so same rotation)
             # jax.debug.print("before {}  {}  {}", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
@@ -435,7 +437,8 @@ class DrQAgent(SACAgent):
             observations=obs,
             next_observations=next_obs,
             actions=batch["actions"],
-            rng=rot90_rng
+            rng=rot90_rng,
+            activated=False,
         )
         batch = batch.copy(
             add_or_replace={
@@ -479,7 +482,8 @@ class DrQAgent(SACAgent):
             observations=obs,
             next_observations=next_obs,
             actions=batch["actions"],
-            rng=rot90_rng
+            rng=rot90_rng,
+            activated=False,
         )
 
         batch = batch.copy(
