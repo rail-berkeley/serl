@@ -50,6 +50,7 @@ class DrQAgent(SACAgent):
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
         image_keys: Iterable[str] = ("image",),
+        dr3_coefficient: float = 0.0,
     ):
         networks = {
             "actor": actor_def,
@@ -98,6 +99,7 @@ class DrQAgent(SACAgent):
                 target_entropy=target_entropy,
                 backup_entropy=backup_entropy,
                 image_keys=image_keys,
+                dr3_coefficient=dr3_coefficient,
             ),
         )
 

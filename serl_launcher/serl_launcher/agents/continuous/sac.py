@@ -1,6 +1,6 @@
 import copy
 from functools import partial
-from typing import Optional, Tuple, FrozenSet
+from typing import Optional, Tuple, FrozenSet, Union
 
 import chex
 import distrax
@@ -88,6 +88,22 @@ class SACAgent(flax.struct.PyTreeNode):
             name="actor",
             rngs={"dropout": rng} if train else {},
             train=train,
+        )
+
+    def forward_critic_encoder(
+        self,
+        observations: Union[Data, Tuple[Data, Data]],
+        *,
+        grad_params: Optional[Params] = None,
+    ):
+        """
+        Forward pass for critic encoder network.
+        Pass grad_params to use non-default parameters (e.g. for gradients).
+        """
+        return self.state.apply_fn(
+            {"params": grad_params or self.state.params},
+            observations,
+            name="critic_encoder",
         )
 
     def forward_temperature(
@@ -187,6 +203,26 @@ class SACAgent(flax.struct.PyTreeNode):
             "predicted_qs": jnp.mean(predicted_qs),
             "target_qs": jnp.mean(target_qs),
         }
+
+        # DR3 regularization
+        # https://arxiv.org/abs/2112.04716
+        if self.config["dr3_coefficient"] > 0.0:
+            dr3_loss = jnp.mean(
+                batch["masks"]
+                * jnp.sum(
+                    self.forward_critic_encoder(
+                        batch["observations"],
+                        grad_params=params,
+                    )
+                    * self.forward_critic_encoder(
+                        batch["next_observations"],
+                        grad_params=params,
+                    ),
+                    axis=-1,
+                )
+            )
+            critic_loss = critic_loss + self.config["dr3_coefficient"] * dr3_loss
+            info["dr3_loss"] = dr3_loss
 
         return critic_loss, info
 
@@ -349,6 +385,7 @@ class SACAgent(flax.struct.PyTreeNode):
         backup_entropy: bool = False,
         critic_ensemble_size: int = 2,
         critic_subsample_size: Optional[int] = None,
+        dr3_coefficient: float = 0.0,
     ):
         networks = {
             "actor": actor_def,
@@ -396,6 +433,7 @@ class SACAgent(flax.struct.PyTreeNode):
                 soft_target_update_rate=soft_target_update_rate,
                 target_entropy=target_entropy,
                 backup_entropy=backup_entropy,
+                dr3_coefficient=dr3_coefficient,
             ),
         )
 
