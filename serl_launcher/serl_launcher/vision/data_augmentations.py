@@ -28,7 +28,7 @@ def euler_xyz_to_yxz(xyz_angles):
     return jnp.array([y, x, z])
 
 
-@jax.partial(jax.jit, static_argnames="action_scale")
+@partial(jax.jit, static_argnames="action_scale")
 def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale: float = 0.1) -> jnp.ndarray:
     assert array.shape == (3,)
 
