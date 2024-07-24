@@ -4,15 +4,47 @@ import jax
 import jax.numpy as jnp
 import jax.lax as lax
 
+import jaxlie
+
 ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 # Rotations are in the array transposed for easy dot product
 ROT_GENERAL = jnp.array([jnp.eye(3), ROT90.transpose(), ROT90 @ ROT90, ROT90])
 
 
+# big TODO: action scale and euler angles have to be considered!!!
 @jax.jit
-def random_rot90_action(action, num_rot):       # action is (x, y, z, rx, ry, rz, gripper)
+def euler_xyz_to_yxz(xyz_angles):
+    # Create SO3 object from xyz Euler angles
+    so3 = jaxlie.SO3.from_rpy_radians(
+        roll=xyz_angles[0],
+        pitch=xyz_angles[1],
+        yaw=xyz_angles[2]
+    )
+    rot_matrix = so3.as_matrix()
+
+    # Extract yxz Euler angles from rotation matrix
+    y = jnp.arctan2(-rot_matrix[2, 0], rot_matrix[2, 2])
+    x = jnp.arcsin(rot_matrix[2, 1])
+    z = jnp.arctan2(-rot_matrix[0, 1], rot_matrix[1, 1])
+    return jnp.array([y, x, z])
+
+
+@jax.jit
+def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale=0.1) -> jnp.ndarray:
+    assert array.shape == (3,)
+
+    def single_90_rotation(arr):
+        yxz = euler_xyz_to_yxz(arr * action_scale)
+        return yxz.at[1].set(-yxz[1]) / action_scale
+
+    # Apply the rotation 'rot' number of times
+    return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
+
+
+@jax.jit
+def random_rot90_action(action, num_rot):  # action is (x, y, z, rx, ry, rz, gripper)
     xyz_rotated = jnp.dot(action[:3], ROT_GENERAL[num_rot])
-    orientation_rotated = jnp.dot(action[3:6], ROT_GENERAL[num_rot])
+    orientation_rotated = orient_rot90_jax(action[3:6], num_rot)
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
 
@@ -45,16 +77,22 @@ def random_rot90_state(state, num_rot):
     assert state.shape[-1] == 20
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
-    start_indexes = jnp.array([2, 5, 8, 11, 14, 17])        # rotate everything (except gripper)
+    normal_indices = jnp.array([2, 5, 11, 14])
+    orientation_indices = jnp.array([8, 17])
 
-    def rotate_part(i, state):
-        part = lax.dynamic_slice(state, (start_indexes[i],), (3,))
+    def normal_rotate(i, state):
+        part = lax.dynamic_slice(state, (normal_indices[i],), (3,))
         rotated = jnp.dot(part, ROT_GENERAL[num_rot])
-        return lax.dynamic_update_slice(state, rotated, (start_indexes[i],))
+        return lax.dynamic_update_slice(state, rotated, (normal_indices[i],))
+
+    def orientation_rotate(i, state):
+        part = lax.dynamic_slice(state, (orientation_indices[i],), (3,))
+        rotated = orient_rot90_jax(part, num_rot)
+        return lax.dynamic_update_slice(state, rotated, (orientation_indices[i],))
 
     # Apply rotations sequentially
-    state = jax.lax.fori_loop(0, start_indexes.shape[0], rotate_part, state)
-
+    state = jax.lax.fori_loop(0, normal_indices.shape[0], normal_rotate, state)
+    state = jax.lax.fori_loop(0, orientation_indices.shape[0], orientation_rotate, state)
     return state
 
 
@@ -73,7 +111,7 @@ def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
 
 @partial(jax.jit, static_argnames="axes")
 def rot90_traceable(m, k=1, axes=(0, 1)):
-    return jax.lax.switch(k, [partial(jnp.rot90, m, k=-i, axes=axes) for i in range(4)])
+    return jax.lax.switch(k, [partial(jnp.rot90, m, k=i, axes=axes) for i in range(4)])
 
 
 @jax.jit
