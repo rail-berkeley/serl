@@ -3,7 +3,6 @@ import gymnasium as gym
 import numpy as np
 from gym import Env
 from franka_env.utils.transformations import (
-    construct_adjoint_matrix,
     construct_homogeneous_matrix,
     construct_rotation_matrix
 )
@@ -32,7 +31,6 @@ class RelativeFrame(gym.Wrapper):
 
     def __init__(self, env: Env, include_relative_pose=True):
         super().__init__(env)
-        self.adjoint_matrix = np.zeros((6, 6))
         self.rotation_matrix = np.eye((3))
 
         self.include_relative_pose = include_relative_pose
@@ -51,8 +49,7 @@ class RelativeFrame(gym.Wrapper):
         if "intervene_action" in info:
             info["intervene_action"] = self.transform_action_inv(info["intervene_action"])
 
-        # Update adjoint and rotation matrix
-        self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
+        # Update rotation matrix
         self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
 
         # Transform observation to spatial frame
@@ -64,8 +61,6 @@ class RelativeFrame(gym.Wrapper):
 
         # obs['state']['tcp_pose'][:2] -= info['reset_shift']  # set rel pose to original reset pose (no random)
 
-        # Update adjoint and rotation matrix
-        self.adjoint_matrix = construct_adjoint_matrix(obs["state"]["tcp_pose"])
         self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
         if self.include_relative_pose:
             # Update transformation matrix from the reset pose's relative frame to base frame
@@ -79,10 +74,10 @@ class RelativeFrame(gym.Wrapper):
     def transform_observation(self, obs):
         """
         Transform observations from spatial(base) frame into body(end-effector) frame
-        using the rotation, adjoint and homogeneous matrix
+        using the rotation and homogeneous matrix
         """
-        adjoint_inv = np.linalg.inv(self.adjoint_matrix)
-        obs["state"]["tcp_vel"] = adjoint_inv @ obs["state"]["tcp_vel"]
+        obs["state"]["tcp_vel"][:3] = self.rotation_matrix.transpose() @ obs["state"]["tcp_vel"][:3]
+        obs["state"]["tcp_vel"][3:6] = self.rotation_matrix.transpose() @ obs["state"]["tcp_vel"][3:6]
         obs["state"]["tcp_force"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_force"]
         obs["state"]["tcp_torque"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_torque"]
 
