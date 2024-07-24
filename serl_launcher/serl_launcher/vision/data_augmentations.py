@@ -8,10 +8,9 @@ import jaxlie
 
 ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 # Rotations are in the array transposed for easy dot product
-ROT_GENERAL = jnp.array([jnp.eye(3), ROT90.transpose(), ROT90 @ ROT90, ROT90])
+ROT_GENERAL = jnp.array([jnp.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
 
 
-# big TODO: action scale and euler angles have to be considered!!!
 @jax.jit
 def euler_xyz_to_yxz(xyz_angles):
     # Create SO3 object from xyz Euler angles
@@ -29,13 +28,13 @@ def euler_xyz_to_yxz(xyz_angles):
     return jnp.array([y, x, z])
 
 
-@jax.jit
-def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale=0.1) -> jnp.ndarray:
+@jax.partial(jax.jit, static_argnames="action_scale")
+def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale: float = 0.1) -> jnp.ndarray:
     assert array.shape == (3,)
 
     def single_90_rotation(arr):
         yxz = euler_xyz_to_yxz(arr * action_scale)
-        return yxz.at[1].set(-yxz[1]) / action_scale
+        return yxz.at[0].set(-yxz[0]) / action_scale
 
     # Apply the rotation 'rot' number of times
     return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
@@ -43,7 +42,8 @@ def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale=0.1) -> jnp.ndar
 
 @jax.jit
 def random_rot90_action(action, num_rot):  # action is (x, y, z, rx, ry, rz, gripper)
-    xyz_rotated = jnp.dot(action[:3], ROT_GENERAL[num_rot])
+    assert action.shape == (7,)
+    xyz_rotated = jnp.dot(ROT_GENERAL[num_rot], action[:3])
     orientation_rotated = orient_rot90_jax(action[3:6], num_rot)
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
@@ -82,7 +82,7 @@ def random_rot90_state(state, num_rot):
 
     def normal_rotate(i, state):
         part = lax.dynamic_slice(state, (normal_indices[i],), (3,))
-        rotated = jnp.dot(part, ROT_GENERAL[num_rot])
+        rotated = jnp.dot(ROT_GENERAL[num_rot], part)
         return lax.dynamic_update_slice(state, rotated, (normal_indices[i],))
 
     def orientation_rotate(i, state):
