@@ -32,6 +32,7 @@ class RelativeFrame(gym.Wrapper):
     def __init__(self, env: Env, include_relative_pose=True):
         super().__init__(env)
         self.rotation_matrix = np.eye((3))
+        self.rotation_matrix_reset = np.eye((3))
 
         self.include_relative_pose = include_relative_pose
         if self.include_relative_pose:
@@ -62,6 +63,7 @@ class RelativeFrame(gym.Wrapper):
         # obs['state']['tcp_pose'][:2] -= info['reset_shift']  # set rel pose to original reset pose (no random)
 
         self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
+        self.rotation_matrix_reset = self.rotation_matrix.copy()
         if self.include_relative_pose:
             # Update transformation matrix from the reset pose's relative frame to base frame
             self.T_r_o_inv = np.linalg.inv(
@@ -76,8 +78,8 @@ class RelativeFrame(gym.Wrapper):
         Transform observations from spatial(base) frame into body(end-effector) frame
         using the rotation and homogeneous matrix
         """
-        obs["state"]["tcp_vel"][:3] = self.rotation_matrix.transpose() @ obs["state"]["tcp_vel"][:3]
-        obs["state"]["tcp_vel"][3:6] = self.rotation_matrix.transpose() @ obs["state"]["tcp_vel"][3:6]
+        obs["state"]["tcp_vel"][:3] = self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][:3]
+        obs["state"]["tcp_vel"][3:6] = self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][3:6]
         obs["state"]["tcp_force"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_force"]
         obs["state"]["tcp_torque"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_torque"]
 
