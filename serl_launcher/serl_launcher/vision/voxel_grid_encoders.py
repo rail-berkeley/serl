@@ -46,6 +46,7 @@ class VoxNet(nn.Module):
     use_conv_bias: bool = False
     bottleneck_dim: Optional[int] = None
     final_activation: Callable[[jnp.ndarray], jnp.ndarray] | str = nn.tanh
+    scale_factor: float = 1.
 
     @nn.compact
     def __call__(
@@ -59,7 +60,7 @@ class VoxNet(nn.Module):
         if no_batch_dim:
             observations = observations[None]
 
-        observations = observations.astype(jnp.float32)[..., None] / 1.  # add conv channel
+        observations = observations.astype(jnp.float32)[..., None] / self.scale_factor  # add conv channel
 
         conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
                        padding="valid")
@@ -90,7 +91,7 @@ class VoxNet(nn.Module):
         )(x)
         x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, 32)
 
-        x = jnp.mean(x, axis=(-2))      # average over z dim
+        # x = jnp.mean(x, axis=(-2))      # average over z dim
 
         # 1x1 convolution (dimensionality reduction, no features), not used for now
         # x = conv(
@@ -111,7 +112,7 @@ class VoxNet(nn.Module):
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
         if self.bottleneck_dim is not None:
             x = nn.Dense(self.bottleneck_dim)(x)
-            x = nn.LayerNorm()(x)
+            # x = nn.LayerNorm()(x)
             x = self.final_activation(x)
 
         return x[0] if no_batch_dim else x

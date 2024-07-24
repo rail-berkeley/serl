@@ -260,6 +260,7 @@ class DrQAgent(SACAgent):
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                     use_conv_bias=False,
                     final_activation=nn.tanh,
+                    scale_factor=1.         # if down-sampling from more refined grid_shape is used, otherwise 1.
                 )
                 for image_key in image_keys
             }
@@ -273,6 +274,7 @@ class DrQAgent(SACAgent):
             use_proprio=use_proprio,
             enable_stacking=True,
             image_keys=image_keys,
+            proprio_latent_dim=64,
         )
 
         encoders = {
