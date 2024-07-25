@@ -28,13 +28,13 @@ def euler_xyz_to_yxz(xyz_angles):
     return jnp.array([y, x, z])
 
 
-@partial(jax.jit, static_argnames="action_scale")
-def orient_rot90_jax(array: jnp.ndarray, rot: int, action_scale: float = 0.1) -> jnp.ndarray:
+@jax.jit
+def orient_rot90_jax(array: jnp.ndarray, rot: int) -> jnp.ndarray:
     assert array.shape == (3,)
 
     def single_90_rotation(arr):
-        yxz = euler_xyz_to_yxz(arr * action_scale)
-        return yxz.at[0].set(-yxz[0]) / action_scale
+        yxz = euler_xyz_to_yxz(arr)
+        return yxz.at[0].set(-yxz[0])
 
     # Apply the rotation 'rot' number of times
     return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
@@ -48,28 +48,39 @@ def random_rot90_action(action, num_rot):  # action is (x, y, z, rx, ry, rz, gri
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
 
-@jax.jit
-def batched_random_rot90_action(actions, rng):
+@partial(jax.jit, static_argnames="action_rotation_scale")
+def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 0.1):
     assert actions.shape[-1:] == (7,)
     num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
     # jax.debug.print("rotation: {}", num_rot[0])
 
+    # scale the actions back to normal rad angles
+    actions = actions.at[:, 3:6].multiply(action_rotation_scale)
+
     actions = jax.vmap(
         lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
     )(actions, num_rot)
-    return actions
+
+    return actions.at[3:6].multiply(1 / action_rotation_scale)
 
 
 @partial(jax.jit, static_argnames="num_batch_dims")
-def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1):
+def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, state_rotation_scale: float = 10.):
     original_shape = state.shape
     state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
     num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
+
+    # reverse the scaling here
+    state = state.at[8:11].multiply(1 / state_rotation_scale)
+    state = state.at[17:20].multiply(1 / state_rotation_scale)
 
     state = jax.vmap(
         lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
     )(state, num_rot)
 
+    # apply the scaling again
+    state = state.at[8:11].multiply(state_rotation_scale)
+    state = state.at[17:20].multiply(state_rotation_scale)
     return state.reshape(original_shape)
 
 

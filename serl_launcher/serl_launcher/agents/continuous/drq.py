@@ -260,7 +260,7 @@ class DrQAgent(SACAgent):
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                     use_conv_bias=False,
                     final_activation=nn.tanh,
-                    scale_factor=1.         # if down-sampling from more refined grid_shape is used, otherwise 1.
+                    scale_factor=1.  # if down-sampling from more refined grid_shape is used, otherwise 1.
                 )
                 for image_key in image_keys
             }
@@ -340,17 +340,19 @@ class DrQAgent(SACAgent):
             observations = observations.copy(
                 add_or_replace={
                     "state": batched_random_rot90_state(
-                        observations["state"], rng, num_batch_dims=2
+                        observations["state"], rng, num_batch_dims=2,
+                        state_rotation_scale=self.config["observation_rotation_scale"]
                     ),
                     pixel_key: batched_random_rot90_voxel(
-                        observations[pixel_key], rng, num_batch_dims=2
+                        observations[pixel_key], rng, num_batch_dims=2,
                     ),
                 }
             )
             next_observations = next_observations.copy(
                 add_or_replace={
                     "state": batched_random_rot90_state(
-                        next_observations["state"], rng, num_batch_dims=2
+                        next_observations["state"], rng, num_batch_dims=2,
+                        state_rotation_scale=self.config["observation_rotation_scale"]
                     ),
                     pixel_key: batched_random_rot90_voxel(
                         next_observations[pixel_key], rng, num_batch_dims=2
@@ -358,7 +360,7 @@ class DrQAgent(SACAgent):
                 }
             )
             actions = batched_random_rot90_action(
-                actions, rng,
+                actions, rng, action_rotation_scale=self.config["action_rotation_scale"]
             )
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
@@ -440,7 +442,7 @@ class DrQAgent(SACAgent):
             next_observations=next_obs,
             actions=batch["actions"],
             rng=rot90_rng,
-            activated=False,
+            activated=True,
         )
         batch = batch.copy(
             add_or_replace={
@@ -485,7 +487,7 @@ class DrQAgent(SACAgent):
             next_observations=next_obs,
             actions=batch["actions"],
             rng=rot90_rng,
-            activated=False,
+            activated=True,
         )
 
         batch = batch.copy(
