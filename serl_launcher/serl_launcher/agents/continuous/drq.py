@@ -341,7 +341,7 @@ class DrQAgent(SACAgent):
                 add_or_replace={
                     "state": batched_random_rot90_state(
                         observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rotation_scale"]
+                        state_rotation_scale=self.config["observation_rot_scale"]
                     ),
                     pixel_key: batched_random_rot90_voxel(
                         observations[pixel_key], rng, num_batch_dims=2,
@@ -352,7 +352,7 @@ class DrQAgent(SACAgent):
                 add_or_replace={
                     "state": batched_random_rot90_state(
                         next_observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rotation_scale"]
+                        state_rotation_scale=self.config["observation_rot_scale"]
                     ),
                     pixel_key: batched_random_rot90_voxel(
                         next_observations[pixel_key], rng, num_batch_dims=2
@@ -360,7 +360,7 @@ class DrQAgent(SACAgent):
                 }
             )
             actions = batched_random_rot90_action(
-                actions, rng, action_rotation_scale=self.config["action_rotation_scale"]
+                actions, rng, action_rotation_scale=self.config["action_rot_scale"]
             )
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
@@ -437,6 +437,7 @@ class DrQAgent(SACAgent):
             next_obs_rng=next_obs_rng,
             next_observations=batch["next_observations"]
         )
+
         obs, next_obs, actions = self.batch_augmentation_fn(
             observations=obs,
             next_observations=next_obs,
@@ -509,3 +510,36 @@ class DrQAgent(SACAgent):
         del critic_infos["temperature"]
 
         return new_agent, critic_infos
+
+    def test_augmentation(self, batch: Batch):
+        if len(self.config["image_keys"]) and self.config["image_keys"][0] not in batch["next_observations"]:
+            batch = _unpack(batch)
+
+        obs_cp, next_obs_cp, actions_cp = batch["observations"].copy(), batch["next_observations"].copy(), batch[
+            "actions"].copy()
+
+        rng, rot90_rng = jax.random.split(self.state.rng, 2)
+        obs, next_obs, actions = self.batch_augmentation_fn(
+            observations=batch["observations"],
+            next_observations=batch["next_observations"],
+            actions=batch["actions"],
+            rng=rot90_rng,
+            activated=True,
+        )
+
+        for _ in range(3):
+            obs, next_obs, actions = self.batch_augmentation_fn(
+                observations=obs,
+                next_observations=next_obs,
+                actions=actions,
+                rng=rot90_rng,
+                activated=True,
+            )
+
+        # each instance of the batch is rotated by 0, 90, 180 or 270 degrees,
+        # 4 times these should all return to the original one
+        print("-" * 35, "\nAsugmentation check here!\n", "-" * 35)
+        jax.debug.print("obs {}", jnp.sum(jnp.abs(obs["state"] - obs_cp["state"])))
+        jax.debug.print("next_obs {}", jnp.sum(jnp.abs(next_obs["state"] - next_obs_cp["state"])))
+        jax.debug.print("actions {}", jnp.sum(jnp.abs(actions - actions_cp)))
+        # they are all in range 1e-6 to 1e-7, check done

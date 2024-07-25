@@ -61,7 +61,7 @@ def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 
         lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
     )(actions, num_rot)
 
-    return actions.at[3:6].multiply(1 / action_rotation_scale)
+    return actions.at[:, 3:6].multiply(1 / action_rotation_scale)
 
 
 @partial(jax.jit, static_argnames="num_batch_dims")

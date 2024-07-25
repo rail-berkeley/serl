@@ -446,7 +446,7 @@ def main(_):
     print_agent_params(agent, image_keys)
 
     # add ScaleObservationWrapper scales to the agent here (needed in batch rotation augmentation)
-    agent.config["observation_rotation_scale"] = env.scale_wrapper_get_scales()["rotation_scale"]
+    agent.config["observation_rot_scale"] = env.scale_wrapper_get_scales()["rotation_scale"]
     agent.config["action_rot_scale"] = env.action_scale[1]
 
     def create_replay_buffer_and_wandb_logger():
