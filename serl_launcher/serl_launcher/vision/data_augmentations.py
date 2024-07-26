@@ -28,13 +28,13 @@ def euler_xyz_to_yxz(xyz_angles):
     return jnp.array([y, x, z])
 
 
-@jax.jit
 def orient_rot90_jax(array: jnp.ndarray, rot: int) -> jnp.ndarray:
     assert array.shape == (3,)
 
     def single_90_rotation(arr):
         yxz = euler_xyz_to_yxz(arr)
-        return yxz.at[0].set(-yxz[0])
+        yxz = yxz.at[0].multiply(-1.)
+        return yxz
 
     # Apply the rotation 'rot' number of times
     return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
@@ -51,7 +51,8 @@ def random_rot90_action(action, num_rot):  # action is (x, y, z, rx, ry, rz, gri
 @partial(jax.jit, static_argnames="action_rotation_scale")
 def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 0.1):
     assert actions.shape[-1:] == (7,)
-    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
+    # num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
+    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 2) * 3
     # jax.debug.print("rotation: {}", num_rot[0])
 
     # scale the actions back to normal rad angles
@@ -68,7 +69,8 @@ def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 
 def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, state_rotation_scale: float = 10.):
     original_shape = state.shape
     state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
-    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
+    # num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
+    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 2) * 2
 
     # reverse the scaling here
     state = state.at[8:11].multiply(1 / state_rotation_scale)
@@ -111,7 +113,8 @@ def random_rot90_state(state, num_rot):
 def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
     original_shape = voxel_grid.shape
     voxel_grid = jnp.reshape(voxel_grid, (-1, *voxel_grid.shape[num_batch_dims:]))
-    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
+    # num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
+    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 2) * 2
 
     voxel_grid = jax.vmap(
         lambda v, k: random_rot90_voxel(v, k), in_axes=(0, 0), out_axes=0
