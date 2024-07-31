@@ -11,7 +11,6 @@ ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 ROT_GENERAL = jnp.array([jnp.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
 
 
-@jax.jit
 def euler_xyz_to_yxz(xyz_angles):
     # Create SO3 object from xyz Euler angles
     so3 = jaxlie.SO3.from_rpy_radians(
@@ -23,7 +22,7 @@ def euler_xyz_to_yxz(xyz_angles):
 
     # Extract yxz Euler angles from rotation matrix
     y = jnp.arctan2(-rot_matrix[2, 0], rot_matrix[2, 2])
-    x = jnp.arcsin(rot_matrix[2, 1])
+    x = jnp.arcsin(jnp.clip(rot_matrix[2, 1], -1.0, 1.0))       # might prevent NaN's
     z = jnp.arctan2(-rot_matrix[0, 1], rot_matrix[1, 1])
     return jnp.array([y, x, z])
 
@@ -41,18 +40,20 @@ def orient_rot90_jax(array: jnp.ndarray, rot: int) -> jnp.ndarray:
 
 
 @jax.jit
-def random_rot90_action(action, num_rot):  # action is (x, y, z, rx, ry, rz, gripper)
+def random_rot90_action(action: jnp.ndarray, num_rot: int):  # action is (x, y, z, rx, ry, rz, gripper)
     assert action.shape == (7,)
     xyz_rotated = jnp.dot(ROT_GENERAL[num_rot], action[:3])
     orientation_rotated = orient_rot90_jax(action[3:6], num_rot)
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
 
-@partial(jax.jit, static_argnames="action_rotation_scale")
-def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 0.1):
+@partial(jax.jit, static_argnames=("action_rotation_scale", "only_180"))
+def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 0.1, only_180=False):
     assert actions.shape[-1:] == (7,)
-    # num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
-    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 2) * 3
+    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
+    if only_180:
+        num_rot = (num_rot % 2) * 2
+
     # jax.debug.print("rotation: {}", num_rot[0])
 
     # scale the actions back to normal rad angles
@@ -65,33 +66,36 @@ def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 
     return actions.at[:, 3:6].multiply(1 / action_rotation_scale)
 
 
-@partial(jax.jit, static_argnames="num_batch_dims")
-def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, state_rotation_scale: float = 10.):
+@partial(jax.jit, static_argnames=("num_batch_dims", "only_180"))
+def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, state_rotation_scale: float = 10.,
+                               only_180=False):
     original_shape = state.shape
     state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
-    # num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
-    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 2) * 2
+    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
+    if only_180:
+        num_rot = (num_rot % 2) * 2
 
     # reverse the scaling here
-    state = state.at[8:11].multiply(1 / state_rotation_scale)
-    state = state.at[17:20].multiply(1 / state_rotation_scale)
+    state = state.at[5:8].multiply(1 / state_rotation_scale)
+    state = state.at[11:14].multiply(1 / state_rotation_scale)
 
     state = jax.vmap(
         lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
     )(state, num_rot)
 
     # apply the scaling again
-    state = state.at[8:11].multiply(state_rotation_scale)
-    state = state.at[17:20].multiply(state_rotation_scale)
+    state = state.at[5:8].multiply(state_rotation_scale)
+    state = state.at[11:14].multiply(state_rotation_scale)
     return state.reshape(original_shape)
 
 
 def random_rot90_state(state, num_rot):
-    assert state.shape[-1] == 20
+    assert state.shape[-1] == 14  # modified for no FT
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
-    normal_indices = jnp.array([2, 5, 11, 14])
-    orientation_indices = jnp.array([8, 17])
+    # without force and torque: (gripper[0], pose[2], orientation[5], velocity[8], or vel[11])
+    normal_indices = jnp.array([2, 8])
+    orientation_indices = jnp.array([5, 11])
 
     def normal_rotate(i, state):
         part = lax.dynamic_slice(state, (normal_indices[i],), (3,))
@@ -109,12 +113,14 @@ def random_rot90_state(state, num_rot):
     return state
 
 
-@partial(jax.jit, static_argnames="num_batch_dims")
-def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
+@partial(jax.jit, static_argnames=("num_batch_dims", "only_180"))
+def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1, only_180=False):
     original_shape = voxel_grid.shape
     voxel_grid = jnp.reshape(voxel_grid, (-1, *voxel_grid.shape[num_batch_dims:]))
-    # num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
-    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 2) * 2
+
+    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
+    if only_180:
+        num_rot = (num_rot % 2) * 2
 
     voxel_grid = jax.vmap(
         lambda v, k: random_rot90_voxel(v, k), in_axes=(0, 0), out_axes=0
