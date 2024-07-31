@@ -59,6 +59,7 @@ class PointCloudDisplayer:
         self.param = o3d.io.read_pinhole_camera_parameters(
             "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/camera_parameters.json")
         self.ctr = self.window.get_view_control()
+        self.coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.01, origin=[0, 0, 0])
 
     def display(self, points):
         self.pc.clear()
@@ -66,6 +67,7 @@ class PointCloudDisplayer:
         self.pc.points = o3d.utility.Vector3dVector(points.astype(np.float64) / 1000.)
         self.window.clear_geometries()
         self.window.add_geometry(self.pc)
+        # self.window.add_geometry(self.coord_frame)
         self.ctr.convert_from_pinhole_camera_parameters(self.param, True)
 
         self.window.poll_events()
@@ -208,9 +210,9 @@ class RobotiqEnv(gym.Env):
                     -np.inf, np.inf, shape=(7,)
                 ),  # xyz + quat
                 "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                "gripper_state": gym.spaces.Box(-np.inf, np.inf, shape=(2,)),
-                "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
-                "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
+                # "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                # "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
             }
         )
 
@@ -611,8 +613,8 @@ class RobotiqEnv(gym.Env):
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
             "gripper_state": self.gripper_state,
-            "tcp_force": self.curr_force,
-            "tcp_torque": self.curr_torque,
+            # "tcp_force": self.curr_force,
+            # "tcp_torque": self.curr_torque,
         }
 
         if self.realtime_plot:

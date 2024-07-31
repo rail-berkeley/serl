@@ -16,7 +16,8 @@ class RobotiqCameraEnv(RobotiqEnv):
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.1
 
-        downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
+        # downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
+        downward_force_cost = 0.
         suction_reward = 0.3 * float(obs["state"]["gripper_state"][1] > 0.5)
         suction_cost = 3. * float(obs["state"]["gripper_state"][1] < -0.5)
 
