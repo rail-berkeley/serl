@@ -137,7 +137,7 @@ def make_drq_agent(
         critic_subsample_size=2,
         encoder_kwargs=dict(
             # pooling_method="spatial_softmax",        # default "spatial_learned_embeddings"
-            bottleneck_dim=64,
+            bottleneck_dim=128,
             # num_spatial_blocks=8,
             # num_kp=64,
         ),

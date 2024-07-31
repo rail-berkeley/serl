@@ -4,11 +4,11 @@ python drq_policy_robotiq.py "$@" \
     --actor \
     --env robotiq_camera_env \
     --max_traj_length 100 \
-    --exp_name=drq_10box \
+    --exp_name=d \
     --camera_mode pointcloud \
     --seed 2 \
     --max_steps 20000 \
-    --random_steps 500 \
+    --random_steps 0 \
     --training_starts 500 \
     --utd_ratio 8 \
     --batch_size 128 \
