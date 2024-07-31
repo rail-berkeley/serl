@@ -79,7 +79,7 @@ class SpatialSoftArgmax3D(nn.Module):
         expected_z = jnp.sum(self.pos_z * softmax_attention, axis=-1)
         expected_xyz = jnp.concatenate([expected_x, expected_y, expected_z], axis=-1)
 
-        expected_xy = jnp.reshape(expected_xyz, (batch_size, 3 * num_featuremaps))
+        expected_xy = jnp.reshape(expected_xyz, (batch_size, 3, num_featuremaps))
 
         if no_batch_dim:
             expected_xy = expected_xy[0]
@@ -110,38 +110,49 @@ class VoxNet(nn.Module):
 
         observations = observations.astype(jnp.float32)[..., None] / self.scale_factor  # add conv channel
 
-        conv = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
-                       padding="valid")
+        conv3d = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
+                         padding="valid")
         l_relu = partial(nn.leaky_relu, negative_slope=0.1)
+        max_pool = partial(nn.max_pool, window_shape=(2, 2, 2), strides=(2, 2, 2))
 
         x = observations
-        x = conv(
+        x = conv3d(
             features=32,
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
-            name="conv_5x5",
+            name="conv_3x3x3",
         )(x)
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
+        # x = max_pool(x)
+        x = nn.LayerNorm()(x)
 
-        x = conv(
+        x = jax.lax.stop_gradient(x)        # do not change pretrained kernels for now
+
+        x = conv3d(
             features=32,
             kernel_size=(3, 3, 3),
             strides=(2, 2, 2),
-            name="conv_3x3_1"
+            name="conv_3x3x3_2"
         )(x)
-        x = l_relu(x)  # shape (B, (X-4)/4, (Y-4)/4, (Z-4)/4, 32)
+        x = l_relu(x)  # shape (B, (X-4)/4, (Y-4)/4, (Z-4)/4, F)
+        # x = max_pool(x)
+        x = nn.LayerNorm()(x)
 
-        x = conv(
+        x = conv3d(
             features=32,
             kernel_size=(3, 3, 3),
             strides=(2, 2, 2),
-            name="conv_3x3_2"
+            name="conv_3x3x3_3"
         )(x)
-        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, 32)
+        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
+        # x = max_pool(x)
+        x = nn.LayerNorm()(x)
 
         # x = jnp.mean(x, axis=(-2))      # average over z dim
 
-        x = SpatialSoftArgmax3D(5, 5, 3, 32)(x)
+        # x = SpatialSoftArgmax3D(9, 9, 6, 32)(x)
+
+        # jax.debug.print("ssam {}", x)     # what , all 1s 0s or -1s???
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))

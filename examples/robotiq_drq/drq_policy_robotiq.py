@@ -23,7 +23,9 @@ from serl_launcher.utils.train_utils import (
     print_agent_params,
     parameter_overview,
     plot_feature_kernel_histogram,
-    find_zero_weights
+    find_zero_weights,
+    plot_conv3d_kernels,
+    get_pretrained_VoxNet_Conv3d_kernels
 )
 
 from agentlace.trainer import TrainerServer, TrainerClient
@@ -228,7 +230,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 )
                 actions = np.asarray(jax.device_get(actions))
             else:
-                # TODO test it more
                 sampling_rng, rot_rng, key = jax.random.split(sampling_rng, 3)
                 only_180 = agent.config["activate_batch_rotation"] == 180
 
@@ -465,13 +466,17 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
+    # manually set the first 3D-conv kernels from pretrained VoxNet
+    agent.state.params["modules_actor"]["encoder"]["encoder_wrist_pointcloud"]["conv_3x3x3"]["kernel"] = agent.state.params["modules_actor"]["encoder"]["encoder_wrist_pointcloud"]["conv_3x3x3"]["kernel"].at[...].set(get_pretrained_VoxNet_Conv3d_kernels(features=32))
+
     # print useful info
     print_agent_params(agent, image_keys)
+    # plot_conv3d_kernels(agent.state.params)
 
     # add ScaleObservationWrapper scales to the agent here (needed in batch rotation augmentation)
     agent.config["observation_rot_scale"] = env.scale_wrapper_get_scales()["rotation_scale"]
     agent.config["action_rot_scale"] = env.action_scale[1]
-    agent.config["activate_batch_rotation"] = 180
+    agent.config["activate_batch_rotation"] = False     # deactivate for now
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
