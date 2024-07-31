@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import copy
 import time
 from functools import partial
 import jax
@@ -39,8 +39,13 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObserv
 from serl_launcher.wrappers.observation_statistics_wrapper import ObservationStatisticsWrapper
 from robotiq_env.envs.relative_env import RelativeFrame
 from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from serl_launcher.vision.data_augmentations import batched_random_rot90_state, batched_random_rot90_voxel, \
+    batched_random_rot90_action
 
 import robotiq_env
+
+# used to debug nan errors (also in jit-ed functions)
+# jax.config.update("jax_debug_nans", True)
 
 devices = jax.local_devices()
 num_devices = len(devices)
@@ -214,13 +219,31 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         with timer.context("sample_actions"):
             if step < FLAGS.random_steps:
                 actions = env.action_space.sample()
-            else:
+            elif not agent.config["activate_batch_rotation"]:
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     seed=key,
                     deterministic=False,
                 )
+                actions = np.asarray(jax.device_get(actions))
+            else:
+                # TODO test it more
+                sampling_rng, rot_rng, key = jax.random.split(sampling_rng, 3)
+                only_180 = agent.config["activate_batch_rotation"] == 180
+
+                rotated_obs = copy.deepcopy(obs)
+                rotated_obs["state"] = batched_random_rot90_state(obs["state"], rot_rng, only_180=only_180)
+                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng, only_180=only_180)
+
+                actions = agent.sample_actions(
+                    observations=jax.device_put(rotated_obs),
+                    seed=key,
+                    deterministic=False,
+                )
+                for _ in range(3):
+                    actions = batched_random_rot90_action(actions[None, ...], rot_rng, only_180=only_180)[0, ...]  # rotate back
+
                 actions = np.asarray(jax.device_get(actions))
                 # print(actions)
 
@@ -448,6 +471,7 @@ def main(_):
     # add ScaleObservationWrapper scales to the agent here (needed in batch rotation augmentation)
     agent.config["observation_rot_scale"] = env.scale_wrapper_get_scales()["rotation_scale"]
     agent.config["action_rot_scale"] = env.action_scale[1]
+    agent.config["activate_batch_rotation"] = 180
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(

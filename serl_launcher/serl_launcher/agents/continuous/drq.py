@@ -332,6 +332,7 @@ class DrQAgent(SACAgent):
         for pixel_key in self.config["image_keys"]:
             if not "pointcloud" in pixel_key:
                 continue  # skip if not pointcloud
+            only_180 = self.config["activate_batch_rotation"] == 180
 
             # rotation of state, action and voxel grid (use the same rng for all of them, so same rotation)
             # jax.debug.print("before {}  {}  {}", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
@@ -341,10 +342,10 @@ class DrQAgent(SACAgent):
                 add_or_replace={
                     "state": batched_random_rot90_state(
                         observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rot_scale"]
+                        state_rotation_scale=self.config["observation_rot_scale"], only_180=only_180
                     ),
                     pixel_key: batched_random_rot90_voxel(
-                        observations[pixel_key], rng, num_batch_dims=2,
+                        observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
                     ),
                 }
             )
@@ -352,15 +353,15 @@ class DrQAgent(SACAgent):
                 add_or_replace={
                     "state": batched_random_rot90_state(
                         next_observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rot_scale"]
+                        state_rotation_scale=self.config["observation_rot_scale"], only_180=only_180
                     ),
                     pixel_key: batched_random_rot90_voxel(
-                        next_observations[pixel_key], rng, num_batch_dims=2
+                        next_observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
                     )
                 }
             )
             actions = batched_random_rot90_action(
-                actions, rng, action_rotation_scale=self.config["action_rot_scale"]
+                actions, rng, action_rotation_scale=self.config["action_rot_scale"], only_180=only_180
             )
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
@@ -443,7 +444,7 @@ class DrQAgent(SACAgent):
             next_observations=next_obs,
             actions=batch["actions"],
             rng=rot90_rng,
-            activated=True,
+            activated=self.config["activate_batch_rotation"] > 0,
         )
         batch = batch.copy(
             add_or_replace={
@@ -488,7 +489,7 @@ class DrQAgent(SACAgent):
             next_observations=next_obs,
             actions=batch["actions"],
             rng=rot90_rng,
-            activated=True,
+            activated=self.config["activate_batch_rotation"] > 0,
         )
 
         batch = batch.copy(
