@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow as tf
 import wandb
+import matplotlib.pyplot as plt
 from flax.core import frozen_dict
 from jaxlib.xla_extension import ArrayImpl
 
@@ -172,14 +173,15 @@ def plot_feature_kernel_histogram(agent):
     print(f"kernel has shape: {feature_kernel.shape}")
 
     plots = feature_kernel.shape[0] // 256 + 1
-    fig, axes = plt.subplots(nrows=plots, ncols=1, sharex=True, sharey=True, figsize=(5, 3*plots))
+    fig, axes = plt.subplots(nrows=plots, ncols=1, sharex=True, sharey=True, figsize=(5, 3 * plots))
 
     feature_kernel = feature_kernel.mean(axis=1)
 
     for p in range(plots):
-        legend = f"image {p}" if p < plots-1 else "observations"
-        print(f"{legend} mean and std:   ", [feature_kernel[p*256:(p+1)*256].mean(), feature_kernel[p*256:(p+1)*256].std()])
-        axes[p].hist(feature_kernel[p*256:(p+1)*256], bins=50)
+        legend = f"image {p}" if p < plots - 1 else "observations"
+        print(f"{legend} mean and std:   ",
+              [feature_kernel[p * 256:(p + 1) * 256].mean(), feature_kernel[p * 256:(p + 1) * 256].std()])
+        axes[p].hist(feature_kernel[p * 256:(p + 1) * 256], bins=50)
         axes[p].set_title(legend)
     plt.show()
 
@@ -196,3 +198,45 @@ def find_zero_weights(params, print_str="", print_all=False):
             print(f" zero weights--> {print_str}    std: {params.std()}")
         else:
             print(".", end='')
+
+
+def plot_3d_kernel(kernel, nr):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    x_len, y_len, z_len = kernel.shape
+
+    x = np.arange(x_len)
+    y = np.arange(y_len)
+    z = np.arange(z_len)
+    x, y, z = np.meshgrid(x, y, z, indexing='ij')
+
+    # Normalize the values for color mapping
+    norm = plt.Normalize(kernel.min(), kernel.max())
+    colors = plt.cm.viridis(norm(kernel))
+    alpha = np.clip(np.abs(kernel) * 9, 0., 1.)
+    alpha = np.clip(np.where(alpha < 0.17, 0., alpha), 0., 1.)
+
+    for i in range(x_len):
+        for j in range(y_len):
+            for k in range(z_len):
+                ax.bar3d(i, j, k, .9, .9, .9, color=colors[i, j, k], alpha=alpha[i, j, k])
+
+    ax.set_title(str(nr))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+    plt.show()
+
+
+def plot_conv3d_kernels(params):
+    kernels = params["modules_actor"]["encoder"]["encoder_wrist_pointcloud"]["conv_5x5x5"]["kernel"]
+    # shape (5, 5, 5, 1, 32)
+    for i in range(kernels.shape[-1]):
+        print(kernels[..., 0, i].mean(), kernels[..., 0, i].std())
+        plot_3d_kernel(kernels[..., 0, i], i)
+
+
+def get_pretrained_VoxNet_Conv3d_kernels(features: int = 32):
+    ckpt = jnp.load("/home/nico/Downloads/c-11/voxnet/conv1/conv3d/kernel:0.npy")
+    return ckpt[..., :features]
