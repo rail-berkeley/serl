@@ -56,7 +56,11 @@ class RSCapture:
         self.align = rs.align(align_to)
 
     def read(self):
+        t = time.time()
         frames = self.pipe.wait_for_frames()
+        tdiff = time.time() - t
+        if tdiff > 0.5:
+            print(f"wait for frames took {tdiff:.3f} seconds")
         image, depth, pointcloud = None, None, None
 
         if self.rgb:
