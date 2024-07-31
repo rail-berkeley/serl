@@ -38,9 +38,57 @@ class MLPEncoder(nn.Module):
         return x[0] if no_batch_dim else x
 
 
+class SpatialSoftArgmax3D(nn.Module):
+    """
+    3D Implementation of Spatial Soft Argmax
+    why arg-max and not max: see https://github.com/tensorflow/tensorflow/issues/6271#issuecomment-266893850
+    """
+    x_len: int
+    y_len: int
+    z_len: int
+    channel: int
+    temperature: float = 1.
+
+    def setup(self):
+        pos_x, pos_y, pos_z = jnp.meshgrid(
+            jnp.linspace(-1.0, 1.0, self.x_len),
+            jnp.linspace(-1.0, 1.0, self.y_len),
+            jnp.linspace(-1.0, 1.0, self.z_len),
+            indexing='ij'
+        )
+        self.pos_x = pos_x.reshape(-1)  # shape (x*y*z)
+        self.pos_y = pos_y.reshape(-1)
+        self.pos_z = pos_z.reshape(-1)
+
+    @nn.compact
+    def __call__(self, features):
+        # add batch dim if missing
+        no_batch_dim = len(features.shape) < 5
+        if no_batch_dim:
+            features = features[None]
+
+        assert len(features.shape) == 5
+        batch_size, num_featuremaps = features.shape[0], features.shape[-1]
+        features = features.transpose(0, 4, 1, 2, 3).reshape(
+            batch_size, num_featuremaps, self.x_len * self.y_len * self.z_len
+        )
+
+        softmax_attention = nn.softmax(features / self.temperature, axis=-1)
+        expected_x = jnp.sum(self.pos_x * softmax_attention, axis=-1)
+        expected_y = jnp.sum(self.pos_y * softmax_attention, axis=-1)
+        expected_z = jnp.sum(self.pos_z * softmax_attention, axis=-1)
+        expected_xyz = jnp.concatenate([expected_x, expected_y, expected_z], axis=-1)
+
+        expected_xy = jnp.reshape(expected_xyz, (batch_size, 3 * num_featuremaps))
+
+        if no_batch_dim:
+            expected_xy = expected_xy[0]
+        return expected_xy
+
+
 class VoxNet(nn.Module):
     """
-    Voxnet implementation: https://github.com/AutoDeep/VoxNet/blob/master/src/nets/voxNet.py
+    Voxnet-like implementation: https://github.com/AutoDeep/VoxNet/blob/master/src/nets/voxNet.py
     """
 
     use_conv_bias: bool = False
@@ -93,26 +141,13 @@ class VoxNet(nn.Module):
 
         # x = jnp.mean(x, axis=(-2))      # average over z dim
 
-        # 1x1 convolution (dimensionality reduction, no features), not used for now
-        # x = conv(
-        #     features=1,
-        #     kernel_size=(1, 1, 1),
-        # )(x)
-
-        # x = lax.reduce_window(
-        #     x,
-        #     init_value=-jnp.inf,
-        #     computation=lax.max,
-        #     window_dimensions=(1, 2, 2, 2, 1),
-        #     window_strides=(1, 2, 2, 2, 1),
-        #     padding='VALID'
-        # )
+        x = SpatialSoftArgmax3D(5, 5, 3, 32)(x)
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
         if self.bottleneck_dim is not None:
             x = nn.Dense(self.bottleneck_dim)(x)
-            # x = nn.LayerNorm()(x)
+            x = nn.LayerNorm()(x)
             x = self.final_activation(x)
 
         return x[0] if no_batch_dim else x
