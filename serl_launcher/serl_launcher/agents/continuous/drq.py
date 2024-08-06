@@ -254,7 +254,7 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "voxnet":
+        elif encoder_type == "voxnet" or encoder_type == "voxnet-semi-pretrained":
             encoders = {
                 image_key: VoxNet(
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
@@ -324,6 +324,11 @@ class DrQAgent(SACAgent):
 
             agent = load_resnet10_params(agent, image_keys)
 
+        if encoder_type == "voxnet-semi-pretrained":
+            from serl_launcher.utils.train_utils import load_pretrained_VoxNet_params
+
+            agent = load_pretrained_VoxNet_params(agent, image_keys)
+
         return agent
 
     def batch_augmentation_fn(self, observations, next_observations, actions, rng, activated=True):
@@ -341,8 +346,7 @@ class DrQAgent(SACAgent):
             observations = observations.copy(
                 add_or_replace={
                     "state": batched_random_rot90_state(
-                        observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rot_scale"], only_180=only_180
+                        observations["state"], rng, num_batch_dims=2, only_180=only_180
                     ),
                     pixel_key: batched_random_rot90_voxel(
                         observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
@@ -352,17 +356,15 @@ class DrQAgent(SACAgent):
             next_observations = next_observations.copy(
                 add_or_replace={
                     "state": batched_random_rot90_state(
-                        next_observations["state"], rng, num_batch_dims=2,
-                        state_rotation_scale=self.config["observation_rot_scale"], only_180=only_180
+                        next_observations["state"], rng, num_batch_dims=2, only_180=only_180
                     ),
                     pixel_key: batched_random_rot90_voxel(
                         next_observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
                     )
                 }
             )
-            actions = batched_random_rot90_action(
-                actions, rng, action_rotation_scale=self.config["action_rot_scale"], only_180=only_180
-            )
+            actions = batched_random_rot90_action(actions, rng, only_180=only_180)
+
             # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
             # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
             # jax.debug.print("action after: {}", actions[0, :])

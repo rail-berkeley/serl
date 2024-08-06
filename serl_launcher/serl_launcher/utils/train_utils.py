@@ -132,6 +132,26 @@ def load_resnet10_params(agent, image_keys=("image",), public=True):
     return agent
 
 
+def load_pretrained_VoxNet_params(agent, image_keys=("pointcloud",)):
+    ckpt = jnp.load("/home/nico/Downloads/c-11.npz")
+
+    new_params = agent.state.params
+
+    for image_key in image_keys:
+        new_encoder_params = new_params["modules_actor"]["encoder"][
+            f"encoder_{image_key}"
+        ]
+        new_encoder_params["conv_5x5x5"]["kernel"].at[:].set(ckpt["voxnet/conv1/conv3d/kernel:0"])
+        new_encoder_params["conv_3x3x3"]["kernel"].at[:].set(ckpt["voxnet/conv2/conv3d/kernel:0"])
+        new_encoder_params["conv_2x2x2"]["kernel"].at[:].set(ckpt["voxnet/conv3/conv3d/kernel:0"][..., :128])
+
+        to_replace = ["conv_5x5x5", "conv_3x3x3", "conv_2x2x2"]
+        print(f"replaced {to_replace} in {image_key}")
+
+    agent = agent.replace(state=agent.state.replace(params=new_params))
+    return agent
+
+
 def print_agent_params(agent, image_keys=("image",)):
     """
     helper function to print the parameter count of the actor and critic networks
@@ -235,8 +255,3 @@ def plot_conv3d_kernels(params):
     for i in range(kernels.shape[-1]):
         print(kernels[..., 0, i].mean(), kernels[..., 0, i].std())
         plot_3d_kernel(kernels[..., 0, i], i)
-
-
-def get_pretrained_VoxNet_Conv3d_kernels(features: int = 32):
-    ckpt = jnp.load("/home/nico/Downloads/c-11/voxnet/conv1/conv3d/kernel:0.npy")
-    return ckpt[..., :features]

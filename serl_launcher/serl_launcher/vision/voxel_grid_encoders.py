@@ -111,46 +111,45 @@ class VoxNet(nn.Module):
         observations = observations.astype(jnp.float32)[..., None] / self.scale_factor  # add conv channel
 
         conv3d = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
-                         padding="valid")
+                         padding="valid", bias_init=nn.zeros_init())
         l_relu = partial(nn.leaky_relu, negative_slope=0.1)
         max_pool = partial(nn.max_pool, window_shape=(2, 2, 2), strides=(2, 2, 2))
 
         x = observations
         x = conv3d(
-            features=32,
+            features=64,
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
-            name="conv_3x3x3",
+            name="conv_5x5x5",
         )(x)
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
         # x = max_pool(x)
         x = nn.LayerNorm()(x)
 
-        x = jax.lax.stop_gradient(x)        # do not change pretrained kernels for now
-
         x = conv3d(
-            features=32,
+            features=64,
             kernel_size=(3, 3, 3),
-            strides=(2, 2, 2),
-            name="conv_3x3x3_2"
+            strides=(1, 1, 1),
+            name="conv_3x3x3"
         )(x)
         x = l_relu(x)  # shape (B, (X-4)/4, (Y-4)/4, (Z-4)/4, F)
         # x = max_pool(x)
         x = nn.LayerNorm()(x)
 
         x = conv3d(
-            features=32,
-            kernel_size=(3, 3, 3),
+            features=128,
+            kernel_size=(2, 2, 2),
             strides=(2, 2, 2),
-            name="conv_3x3x3_3"
+            name="conv_2x2x2"
         )(x)
         x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
-        # x = max_pool(x)
         x = nn.LayerNorm()(x)
+
+        x = jax.lax.stop_gradient(x)        # do not change pretrained kernels for now
 
         # x = jnp.mean(x, axis=(-2))      # average over z dim
 
-        # x = SpatialSoftArgmax3D(9, 9, 6, 32)(x)
+        x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
 
         # jax.debug.print("ssam {}", x)     # what , all 1s 0s or -1s???
 
