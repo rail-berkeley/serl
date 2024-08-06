@@ -284,12 +284,10 @@ class RobotiqEnv(gym.Env):
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
         orientation_diff = (R.from_quat(next_pos[3:]) * R.from_quat(self.curr_reset_pose[3:]).inv()).as_mrp()
-        print(self.curr_reset_pose[3:], next_pos[3:], orientation_diff, end=" ")
         orientation_diff = np.clip(
             orientation_diff, self.mrp_bounding_box.low, self.mrp_bounding_box.high
         )
         next_pos[3:] = (R.from_mrp(orientation_diff) * R.from_quat(self.curr_reset_pose[3:])).as_quat()
-        print(orientation_diff, next_pos[3:])
 
         return next_pos
 
