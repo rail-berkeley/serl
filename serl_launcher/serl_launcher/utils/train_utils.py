@@ -141,12 +141,19 @@ def load_pretrained_VoxNet_params(agent, image_keys=("pointcloud",)):
         new_encoder_params = new_params["modules_actor"]["encoder"][
             f"encoder_{image_key}"
         ]
-        new_encoder_params["conv_5x5x5"]["kernel"].at[:].set(ckpt["voxnet/conv1/conv3d/kernel:0"])
-        new_encoder_params["conv_3x3x3"]["kernel"].at[:].set(ckpt["voxnet/conv2/conv3d/kernel:0"])
-        new_encoder_params["conv_2x2x2"]["kernel"].at[:].set(ckpt["voxnet/conv3/conv3d/kernel:0"][..., :128])
+        to_replace = {
+            "conv_5x5x5": "voxnet/conv1/conv3d/kernel:0",
+            "conv_3x3x3": "voxnet/conv2/conv3d/kernel:0",
+            "conv_2x2x2": "voxnet/conv3/conv3d/kernel:0"
+        }
+        replaced = []
+        for key, weights in to_replace.items():
+            if key in new_encoder_params:
+                shape = new_encoder_params[key]["kernel"].shape
+                new_encoder_params[key]["kernel"].at[:].set(ckpt[weights][..., :shape[-1]])
+                replaced.append(f"{key}:{shape}")
 
-        to_replace = ["conv_5x5x5", "conv_3x3x3", "conv_2x2x2"]
-        print(f"replaced {to_replace} in {image_key}")
+        print(f"replaced {replaced} in {image_key}")
 
     agent = agent.replace(state=agent.state.replace(params=new_params))
     return agent
