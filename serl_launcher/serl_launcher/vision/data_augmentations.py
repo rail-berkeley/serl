@@ -4,12 +4,13 @@ import jax
 import jax.numpy as jnp
 import jax.lax as lax
 
-import jaxlie
 
 ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-# Rotations are in the array transposed for easy dot product
 ROT_GENERAL = jnp.array([jnp.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
 
+
+"""     # not used anymore, since we are no longer using euler angles
+import jaxlie
 
 def euler_xyz_to_yxz(xyz_angles):
     # Create SO3 object from xyz Euler angles
@@ -37,18 +38,19 @@ def orient_rot90_jax(array: jnp.ndarray, rot: int) -> jnp.ndarray:
 
     # Apply the rotation 'rot' number of times
     return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
+"""
 
 
 @jax.jit
 def random_rot90_action(action: jnp.ndarray, num_rot: int):  # action is (x, y, z, rx, ry, rz, gripper)
     assert action.shape == (7,)
     xyz_rotated = jnp.dot(ROT_GENERAL[num_rot], action[:3])
-    orientation_rotated = orient_rot90_jax(action[3:6], num_rot)
+    orientation_rotated = jnp.dot(ROT_GENERAL[num_rot], action[3:6])
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
 
-@partial(jax.jit, static_argnames=("action_rotation_scale", "only_180"))
-def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 0.1, only_180=False):
+@partial(jax.jit, static_argnames="only_180")
+def batched_random_rot90_action(actions, rng, *, only_180=False):
     assert actions.shape[-1:] == (7,)
     num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
     if only_180:
@@ -56,36 +58,25 @@ def batched_random_rot90_action(actions, rng, *, action_rotation_scale: float = 
 
     # jax.debug.print("rotation: {}", num_rot[0])
 
-    # scale the actions back to normal rad angles
-    actions = actions.at[:, 3:6].multiply(action_rotation_scale)
-
     actions = jax.vmap(
         lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
     )(actions, num_rot)
 
-    return actions.at[:, 3:6].multiply(1 / action_rotation_scale)
+    return actions
 
 
 @partial(jax.jit, static_argnames=("num_batch_dims", "only_180"))
-def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, state_rotation_scale: float = 10.,
-                               only_180=False):
+def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, only_180=False):
     original_shape = state.shape
     state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
     num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
     if only_180:
         num_rot = (num_rot % 2) * 2
 
-    # reverse the scaling here
-    state = state.at[5:8].multiply(1 / state_rotation_scale)
-    state = state.at[11:14].multiply(1 / state_rotation_scale)
-
     state = jax.vmap(
         lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
     )(state, num_rot)
 
-    # apply the scaling again
-    state = state.at[5:8].multiply(state_rotation_scale)
-    state = state.at[11:14].multiply(state_rotation_scale)
     return state.reshape(original_shape)
 
 
@@ -94,22 +85,15 @@ def random_rot90_state(state, num_rot):
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
     # without force and torque: (gripper[0], pose[2], orientation[5], velocity[8], or vel[11])
-    normal_indices = jnp.array([2, 8])
-    orientation_indices = jnp.array([5, 11])
+    indices = jnp.array([2, 5, 8, 11])
 
-    def normal_rotate(i, state):
-        part = lax.dynamic_slice(state, (normal_indices[i],), (3,))
+    def rotate(i, state):
+        part = lax.dynamic_slice(state, (indices[i],), (3,))
         rotated = jnp.dot(ROT_GENERAL[num_rot], part)
-        return lax.dynamic_update_slice(state, rotated, (normal_indices[i],))
-
-    def orientation_rotate(i, state):
-        part = lax.dynamic_slice(state, (orientation_indices[i],), (3,))
-        rotated = orient_rot90_jax(part, num_rot)
-        return lax.dynamic_update_slice(state, rotated, (orientation_indices[i],))
+        return lax.dynamic_update_slice(state, rotated, (indices[i],))
 
     # Apply rotations sequentially
-    state = jax.lax.fori_loop(0, normal_indices.shape[0], normal_rotate, state)
-    state = jax.lax.fori_loop(0, orientation_indices.shape[0], orientation_rotate, state)
+    state = jax.lax.fori_loop(0, indices.shape[0], rotate, state)
     return state
 
 
