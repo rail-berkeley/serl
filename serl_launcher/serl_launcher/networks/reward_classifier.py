@@ -101,9 +101,7 @@ def load_classifier_func(
     Return: a function that takes in an observation
             and returns the logits of the classifier.
     """
-    checkpoint_path = "../serl"
-    step = 20
-    print("Loading classifier from", checkpoint_path, "at step", step)
+    print("Loading classifier from:", checkpoint_path, "; at step: ", step)
     classifier = create_classifier(key, sample, image_keys)
     pretrained_chkpt_params = classifier.params
     classifier = checkpoints.restore_checkpoint(
