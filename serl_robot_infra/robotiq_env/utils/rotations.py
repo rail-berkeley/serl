@@ -18,6 +18,10 @@ def quat_2_euler(quat):
     return R.from_quat(quat).as_euler('xyz')
 
 
+def quat_2_mrp(quat):
+    return R.from_quat(quat).as_mrp()
+
+
 def euler_2_quat(euler):
     return R.from_euler(euler).as_quat()
 

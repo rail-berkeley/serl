@@ -56,7 +56,7 @@ class RobotiqCameraConfigBox5(DefaultEnvConfig):
     }
 
 
-class RobotiqCameraConfigFinal(DefaultEnvConfig):       # config for 10 boxes
+class RobotiqCameraConfigFinal(DefaultEnvConfig):  # config for 10 boxes
     RESET_Q = np.array([
         [2.6259, - 1.5196, 2.1287, - 2.1784, - 1.5665, - 0.4741],
         [2.0131, - 1.271, 1.9316, - 2.2306, - 1.566, 0.4537],
@@ -72,8 +72,8 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):       # config for 10 boxes
     RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_RZ_RANGE = (0.0,)
-    ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.18, 3.2])
-    ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.8, -0.18, -3.2])
+    ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 0.05, 0.05, 1.])
+    ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, -0.05, -0.05, -1.])
     ABS_POSE_RANGE_LIMITS = np.array([0.36, 0.83])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
@@ -98,8 +98,7 @@ class RobotiqCameraConfigFinalTests(RobotiqCameraConfigFinal):
     RANDOM_RZ_RANGE = (0.0,)
 
     RESET_Q = np.array([
-        # [ 0.0421, -1.3161,  1.9649, -2.2358, -1.3221, -1.5237],     # schräge position
-        [0.1882, -1.2777,  1.9699, -2.2983, -1.5567, -1.384]        # gerade pos
+        # [ 0.0421, -1.3161,  1.9649, -2.2358, -1.3221, -1.5237 + 0 * np.pi/2.],     # schräge position
+        # [0.1882, -1.2777, 1.9699, -2.2983, -1.5567, -1.384 + 2 * np.pi / 2],  # gerade pos
+        [0.7431341409683228, -1.0744208258441468, 1.6481602827655237, -2.1433049641051234, -1.5655501524554651, 0.7431478500366211 + 0 * np.pi/2],  # LEGO box
     ])
-    ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 3.2, 0.3, 3.2])
-    ABS_POSE_LIMIT_LOW = np.array([-0.7, -0.85, -0.006, 2.6, -0.3, -3.2])

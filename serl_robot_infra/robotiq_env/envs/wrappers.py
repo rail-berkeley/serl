@@ -6,7 +6,7 @@ from robotiq_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 import time
 from scipy.spatial.transform import Rotation as R
 
-from robotiq_env.utils.rotations import quat_2_euler
+from robotiq_env.utils.rotations import quat_2_euler, quat_2_mrp
 
 sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
@@ -34,7 +34,8 @@ class SpacemouseIntervention(gym.ActionWrapper):
         """
         expert_a = self.get_deadspace_action()
 
-        if np.linalg.norm(expert_a) > 0.001 or self.left.any() or self.right.any():  # also read buttons with no movement
+        if np.linalg.norm(
+                expert_a) > 0.001 or self.left.any() or self.right.any():  # also read buttons with no movement
             self.last_intervene = time.time()
 
         if self.gripper_enabled:
@@ -54,7 +55,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         negative = np.clip((expert_a + self.deadspace) / (1. - self.deadspace), a_min=-1.0, a_max=0.0)
         expert_a = positive + negative
 
-        self.left, self.right = np.roll(self.left, -1), np.roll(self.right, -1)     # shift them one to the left
+        self.left, self.right = np.roll(self.left, -1), np.roll(self.right, -1)  # shift them one to the left
         self.left[-1], self.right[-1] = tuple(buttons)
 
         return np.array(expert_a, dtype=np.float32)
@@ -107,6 +108,27 @@ class Quat2EulerWrapper(gym.ObservationWrapper):
         tcp_pose = observation["state"]["tcp_pose"]
         observation["state"]["tcp_pose"] = np.concatenate(
             (tcp_pose[:3], quat_2_euler(tcp_pose[3:]))
+        )
+        return observation
+
+
+class Quat2MrpWrapper(gym.ObservationWrapper):
+    """
+    Convert the quaternion representation of the tcp pose to euler angles
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        # from xyz + quat to xyz + euler
+        self.observation_space["state"]["tcp_pose"] = gym.spaces.Box(
+            -np.inf, np.inf, shape=(6,)
+        )
+
+    def observation(self, observation):
+        # convert tcp pose from quat to euler
+        tcp_pose = observation["state"]["tcp_pose"]
+        observation["state"]["tcp_pose"] = np.concatenate(
+            (tcp_pose[:3], quat_2_mrp(tcp_pose[3:]))
         )
         return observation
 

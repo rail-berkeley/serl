@@ -20,7 +20,6 @@ from robotiq_env.camera.rs_capture import RSCapture
 from robotiq_env.camera.utils import PointCloudFusion, CalibrationTread
 
 from robotiq_env.utils.real_time_plotter import DataClient
-from robotiq_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2quat, pose2rotvec
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
 from serl_launcher.utils.numpy_utils import bool_2_int8
@@ -164,7 +163,7 @@ class RobotiqEnv(gym.Env):
             config.ABS_POSE_RANGE_LIMITS[1],
             dtype=np.float64,
         )
-        self.rpy_bounding_box = gym.spaces.Box(
+        self.mrp_bounding_box = gym.spaces.Box(
             config.ABS_POSE_LIMIT_LOW[3:],
             config.ABS_POSE_LIMIT_HIGH[3:],
             dtype=np.float64,
@@ -279,31 +278,18 @@ class RobotiqEnv(gym.Env):
 
                 self.calibrate_pointcloud_fusion(visualize=True)
 
-    def clip_safety_box(self,
-                        next_pos: np.ndarray) -> np.ndarray:  # TODO make better, no euler -> quat -> euler -> quat
+    def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:
         """Clip the pose to be within the safety box."""
         next_pos[:3] = np.clip(
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
-        xy_range = np.clip(np.linalg.norm(next_pos[:2], 2), self.xy_range.low, self.xy_range.high)
-        next_pos[:2] = next_pos[:2] / np.linalg.norm(next_pos[:2]) * xy_range
-
-        euler = R.from_quat(next_pos[3:]).as_euler("xyz")
-
-        # Clip first euler angle separately due to discontinuity from pi to -pi
-        sign = np.sign(euler[0])
-        euler[0] = sign * (
-            np.clip(
-                np.abs(euler[0]),
-                self.rpy_bounding_box.low[0],
-                self.rpy_bounding_box.high[0],
-            )
+        orientation_diff = (R.from_quat(next_pos[3:]) * R.from_quat(self.curr_reset_pose[3:]).inv()).as_mrp()
+        print(self.curr_reset_pose[3:], next_pos[3:], orientation_diff, end=" ")
+        orientation_diff = np.clip(
+            orientation_diff, self.mrp_bounding_box.low, self.mrp_bounding_box.high
         )
-
-        euler[1:] = np.clip(
-            euler[1:], self.rpy_bounding_box.low[1:], self.rpy_bounding_box.high[1:]
-        )
-        next_pos[3:] = R.from_euler("xyz", euler).as_quat()
+        next_pos[3:] = (R.from_mrp(orientation_diff) * R.from_quat(self.curr_reset_pose[3:])).as_quat()
+        print(orientation_diff, next_pos[3:])
 
         return next_pos
 
@@ -323,10 +309,9 @@ class RobotiqEnv(gym.Env):
         next_pos = self.curr_pos.copy()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0]
 
-        # orientation
         next_pos[3:] = (
-                R.from_quat(next_pos[3:]) * R.from_euler("xyz", action[3:6] * self.action_scale[1])
-        ).as_quat()
+                R.from_mrp(action[3:6] * self.action_scale[1] / 4.) * R.from_quat(next_pos[3:])
+        ).as_quat()             # c * r  --> applies c after r
 
         gripper_action = action[6] * self.action_scale[2]
 

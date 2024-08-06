@@ -100,7 +100,8 @@ class RelativeFrame(gym.Wrapper):
         using the rotation matrix
         """
         action = np.array(action)  # in case action is a jax read-only array
-        action[:3] = self.rotation_matrix @ action[:3]
+        action[:3] = self.rotation_matrix_reset @ action[:3]
+        action[3:6] = self.rotation_matrix_reset @ action[3:6]
         return action
 
     def transform_action_inv(self, action: np.ndarray):
@@ -109,5 +110,6 @@ class RelativeFrame(gym.Wrapper):
         using the rotation matrix.
         """
         action = np.array(action)
-        action[:3] = self.rotation_matrix.transpose() @ action[:3]
+        action[:3] = self.rotation_matrix_reset.transpose() @ action[:3]
+        action[3:6] = self.rotation_matrix_reset.transpose() @ action[3:6]
         return action
