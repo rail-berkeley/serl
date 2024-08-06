@@ -40,7 +40,7 @@ from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
 from serl_launcher.wrappers.observation_statistics_wrapper import ObservationStatisticsWrapper
 from robotiq_env.envs.relative_env import RelativeFrame
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 from serl_launcher.vision.data_augmentations import batched_random_rot90_state, batched_random_rot90_voxel, \
     batched_random_rot90_action
 
@@ -441,7 +441,7 @@ def main(_):
     # if FLAGS.actor:
     #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
-    env = Quat2EulerWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = ScaleObservationWrapper(env)  # scale obs space (after quat2euler, but before serlobswr)
     env = ObservationStatisticsWrapper(env)
     env = SERLObsWrapper(env)
@@ -471,7 +471,7 @@ def main(_):
     # plot_conv3d_kernels(agent.state.params)
 
     # add ScaleObservationWrapper scales to the agent here (needed in batch rotation augmentation)
-    agent.config["activate_batch_rotation"] = False     # deactivate for now
+    agent.config["activate_batch_rotation"] = 90     # deactivate for now
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
