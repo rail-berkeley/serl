@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Optional
 
 from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
 from serl_launcher.common.encoding import EncodingWrapper
+from serl_launcher.utils.jax_utils import are_trees_identical
 from flax.core.frozen_dict import freeze, unfreeze
 
 
@@ -100,12 +101,25 @@ def load_classifier_func(
     Return: a function that takes in an observation
             and returns the logits of the classifier.
     """
+    checkpoint_path = "../serl"
+    step = 20
+    print("Loading classifier from", checkpoint_path, "at step", step)
     classifier = create_classifier(key, sample, image_keys)
+    pretrained_chkpt_params = classifier.params
     classifier = checkpoints.restore_checkpoint(
         checkpoint_path,
         target=classifier,
         step=step,
     )
+
+    # restore_checkpoint will not raise error if path not found: https://github.com/google/flax/issues/1631
+    # To check if checkpoint is loaded correctly
+    identical = are_trees_identical(pretrained_chkpt_params, classifier.params)
+    assert not identical, (
+        "newly loaded params should not be identical to pretrained"
+        "check if provided checkpoint is loaded correctly"
+    )
+
     func = lambda obs: classifier.apply_fn(
         {"params": classifier.params}, obs, train=False
     )

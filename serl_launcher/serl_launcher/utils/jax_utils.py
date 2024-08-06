@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 
 
 @jax.jit
@@ -44,6 +45,16 @@ def wrap_function_with_rng(rng):
         return wrapped
 
     return wrap_function
+
+
+def are_trees_identical(tree1, tree2) -> bool:
+    """Util function that compares two pytrees element-wise for equality"""
+
+    def compare_elements(x, y):
+        return jnp.array_equal(x, y)
+
+    comparison_results = jax.tree_util.tree_map(compare_elements, tree1, tree2)
+    return jax.tree_util.tree_all(comparison_results)
 
 
 def init_rng(seed):
