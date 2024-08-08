@@ -122,9 +122,9 @@ class VoxNet(nn.Module):
             strides=(2, 2, 2),
             name="conv_5x5x5",
         )(x)
-        x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, 32)
         # x = max_pool(x)
         x = nn.LayerNorm()(x)
+        x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, F)
 
         x = conv3d(
             features=64,
@@ -132,25 +132,29 @@ class VoxNet(nn.Module):
             strides=(1, 1, 1),
             name="conv_3x3x3"
         )(x)
-        x = l_relu(x)  # shape (B, (X-4)/4, (Y-4)/4, (Z-4)/4, F)
-        # x = max_pool(x)
+        x = max_pool(x)
         x = nn.LayerNorm()(x)
-
-        x = conv3d(
-            features=128,
-            kernel_size=(2, 2, 2),
-            strides=(2, 2, 2),
-            name="conv_2x2x2"
-        )(x)
-        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
-        x = nn.LayerNorm()(x)
+        x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, F)
 
         x = jax.lax.stop_gradient(x)        # do not change pretrained kernels for now
 
-        # x = jnp.mean(x, axis=(-2))      # average over z dim
+        # x = conv3d(
+        #     features=128,
+        #     kernel_size=(2, 2, 2),
+        #     strides=(2, 2, 2),
+        #     name="conv_2x2x2"
+        # )(x)      # if pretrained is used
 
-        x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
+        x = conv3d(
+            features=32,
+            kernel_size=(2, 2, 2),
+            strides=(2, 2, 2),
+            name="conv_2x2x2_custom"
+        )(x)
+        x = nn.LayerNorm()(x)
+        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
 
+        # x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
         # jax.debug.print("ssam {}", x)     # what , all 1s 0s or -1s???
 
         # reshape and dense (preserve batch dim)
