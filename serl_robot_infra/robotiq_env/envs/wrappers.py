@@ -8,7 +8,8 @@ from scipy.spatial.transform import Rotation as R
 
 from robotiq_env.utils.rotations import quat_2_euler, quat_2_mrp
 
-sigmoid = lambda x: 1 / (1 + np.exp(-x))
+ROT90 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+ROT_GENERAL = np.array([np.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
 
 
 class SpacemouseIntervention(gym.ActionWrapper):
@@ -91,7 +92,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         return obs, rew, done, truncated, info
 
 
-class Quat2EulerWrapper(gym.ObservationWrapper):
+class Quat2EulerWrapper(gym.ObservationWrapper):  # not used anymore (stay away from euler angles!)
     """
     Convert the quaternion representation of the tcp pose to euler angles
     """
@@ -133,23 +134,46 @@ class Quat2MrpWrapper(gym.ObservationWrapper):
         return observation
 
 
-class BinaryRewardClassifierWrapper(gym.Wrapper):
+def rotate_state(state: np.ndarray, num_rot: int):
+    assert len(state.shape) == 1 and state.shape[0] % 3 == 0
+    state = state.reshape((-1, 3)).transpose()
+    rotated = np.dot(ROT_GENERAL[num_rot % 4], state).transpose()
+    return rotated.reshape((-1))
+
+
+class ObservationRotationWrapper(gym.Wrapper):
     """
-    Compute reward with custom binary reward classifier fn
+    Convert every observation into the first quadrant of the Relative Frame
     """
 
-    def __init__(self, env: gym.Env, reward_classifier_func):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
-        self.reward_classifier_func = reward_classifier_func
+        self.num_rot_quadrant = -1
 
-    def compute_reward(self, obs):
-        if self.reward_classifier_func is not None:
-            logit = self.reward_classifier_func(obs).item()
-            return (sigmoid(logit) >= 0.5) * 1
-        return 0
+    def step(self, action: np.ndarray):
+        action = self.rotate_action(action=action)
+        obs, reward, done, truncated, info = self.env.step(action)
+        print(self.num_rot_quadrant)
+        rotated_obs = self.rotate_observation(obs)
+        return rotated_obs, reward, done, truncated, info
 
-    def step(self, action):
-        obs, rew, done, truncated, info = self.env.step(action)
-        rew = self.compute_reward(obs)
-        done = done or rew
-        return obs, rew, done, truncated, info
+    def rotate_observation(self, observation):
+        x, y = (observation["state"]["tcp_pose"][:2])
+        self.num_rot_quadrant = int(x < 0.) * 2 + int(x * y < 0.)  # save quadrant info
+
+        for state in observation["state"].keys():
+            if state == "gripper_state":
+                continue
+            observation["state"][state][:] = rotate_state(observation["state"][state], self.num_rot_quadrant)  # rotate
+
+        for image_keys in observation["images"].keys():
+            observation["images"][image_keys][:] = np.rot90(
+                observation["images"][image_keys],
+                axes=(0, 1),
+                k=self.num_rot_quadrant
+            )
+        return observation
+
+    def rotate_action(self, action):
+        action[:6] = rotate_state(action[:6], 4 - self.num_rot_quadrant)        # rotate
+        return action
