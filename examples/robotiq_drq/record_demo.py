@@ -9,7 +9,7 @@ import threading
 from pynput import keyboard
 
 from robotiq_env.envs.relative_env import RelativeFrame
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
 from serl_launcher.wrappers.chunking import ChunkingWrapper
@@ -38,7 +38,7 @@ if __name__ == "__main__":
                    )
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
-    env = Quat2EulerWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = ScaleObservationWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)

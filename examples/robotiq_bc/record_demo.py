@@ -9,7 +9,7 @@ import gymnasium as gym
 from pprint import pprint
 from pynput import keyboard
 
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     env = gym.make("robotiq-grip-v1")
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
-    env = Quat2EulerWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = TransformReward(env, lambda r: 10. * r)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)

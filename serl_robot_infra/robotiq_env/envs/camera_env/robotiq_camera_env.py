@@ -27,7 +27,8 @@ class RobotiqCameraEnv(RobotiqEnv):
         max_pose_diff = 0.03  # set to 3cm
         pos_diff = obs["state"]["tcp_pose"][:2] - self.curr_reset_pose[:2]
         position_cost = 10. * np.sum(
-            np.where(np.abs(pos_diff) > max_pose_diff, np.abs(pos_diff - np.sign(pos_diff) * max_pose_diff), 0.0))
+            np.where(np.abs(pos_diff) > max_pose_diff, np.abs(pos_diff - np.sign(pos_diff) * max_pose_diff), 0.0)
+        )
 
         cost_info = dict(
             action_cost=-action_cost,

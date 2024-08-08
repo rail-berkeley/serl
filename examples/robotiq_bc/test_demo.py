@@ -4,7 +4,7 @@ import pickle as pkl
 import gymnasium as gym
 from pynput import keyboard
 
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 
 exit_program = threading.Event()
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     env = gym.make("robotiq-grip-v1")
     env = SpacemouseIntervention(env)
     # env = RelativeFrame(env)
-    env = Quat2EulerWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 

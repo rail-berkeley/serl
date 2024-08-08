@@ -137,7 +137,6 @@ class RobotiqEnv(gym.Env):
         self.curr_torque = np.zeros((3,), dtype=np.float32)
 
         self.gripper_state = np.zeros((2,), dtype=np.float32)
-        self.last_sent = time.time()
         self.random_reset = config.RANDOM_RESET
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rz_range = config.RANDOM_RZ_RANGE
