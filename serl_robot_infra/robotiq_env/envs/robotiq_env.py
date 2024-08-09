@@ -211,6 +211,7 @@ class RobotiqEnv(gym.Env):
                 "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
                 # "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 # "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                # "curr_action": gym.spaces.Box(-1., 1., shape=self.action_space.shape)
             }
         )
 
@@ -339,7 +340,7 @@ class RobotiqEnv(gym.Env):
     def reached_goal_state(self, obs) -> bool:
         return False  # overwrite for each task
 
-    def go_to_rest(self, joint_reset=False):
+    def go_to_rest(self):
         """
         The concrete steps to perform reset should be
         implemented each subclass for the specific task.
@@ -383,12 +384,12 @@ class RobotiqEnv(gym.Env):
             self.curr_reset_pose[:] = reset_pose
             return np.zeros((2,))
 
-    def reset(self, joint_reset=False, **kwargs):
+    def reset(self, **kwargs):
         self.cycle_count += 1
         if self.save_video:
             self.save_video_recording()
 
-        shift = self.go_to_rest(joint_reset=joint_reset)
+        shift = self.go_to_rest()
         self.curr_path_length = 0
 
         obs = self._get_obs()
@@ -597,6 +598,7 @@ class RobotiqEnv(gym.Env):
             "gripper_state": self.gripper_state,
             # "tcp_force": self.curr_force,
             # "tcp_torque": self.curr_torque,
+            # "curr_action": np.zeros(self.action_space.shape)
         }
 
         if self.realtime_plot:

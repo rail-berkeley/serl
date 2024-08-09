@@ -209,7 +209,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     client.recv_network_callback(update_params)
 
     obs, _ = env.reset()
-    done = False
+    last_actions = np.zeros((7,))
 
     # training loop
     timer = Timer()
@@ -256,6 +256,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             if "intervene_action" in info:
                 actions = info.pop("intervene_action")
 
+            # next_obs["state"][:7][:] = actions          # add actions to obs (curr_actions)
+            # reward -= 0.3 * np.sum(np.power(actions - last_actions, 2))     # cave-man like but otherwise too complex
+
             reward = np.asarray(reward, dtype=np.float32)
             info = np.asarray(info)
             running_return = running_return * 0.99 + reward
@@ -270,6 +273,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             data_store.insert(transition)
 
             obs = next_obs
+            last_actions = actions
             if done or truncated:
                 stats = {"train": info}  # send stats to the learner to log
                 client.request("send-stats", stats)
@@ -442,9 +446,9 @@ def main(_):
     #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
-    env = ObservationRotationWrapper(env)       # new
     env = ScaleObservationWrapper(env)  # scale obs space (after quat2mrp, but before serlobs)
     env = ObservationStatisticsWrapper(env)
+    env = ObservationRotationWrapper(env)       # new
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)

@@ -19,6 +19,7 @@ class EncodingWrapper(nn.Module):
 
     encoder: nn.Module
     use_proprio: bool
+    # state_mask: jnp.ndarray           # TODO add mask to blent out uneccessary states
     proprio_latent_dim: int = 64
     enable_stacking: bool = False
     image_keys: Iterable[str] = ("image",)

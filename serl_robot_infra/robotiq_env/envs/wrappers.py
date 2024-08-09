@@ -153,7 +153,7 @@ class ObservationRotationWrapper(gym.Wrapper):
     def step(self, action: np.ndarray):
         action = self.rotate_action(action=action)
         obs, reward, done, truncated, info = self.env.step(action)
-        print(self.num_rot_quadrant)
+        # print("quadrant: ", self.num_rot_quadrant)
         rotated_obs = self.rotate_observation(obs)
         return rotated_obs, reward, done, truncated, info
 
@@ -162,7 +162,7 @@ class ObservationRotationWrapper(gym.Wrapper):
         self.num_rot_quadrant = int(x < 0.) * 2 + int(x * y < 0.)  # save quadrant info
 
         for state in observation["state"].keys():
-            if state == "gripper_state":
+            if state == "gripper_state" or state == "curr_action":
                 continue
             observation["state"][state][:] = rotate_state(observation["state"][state], self.num_rot_quadrant)  # rotate
 

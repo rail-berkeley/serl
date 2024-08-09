@@ -111,6 +111,7 @@ def make_drq_agent(
         sample_action,
         encoder_type=encoder_type,
         use_proprio=True,
+        proprio_latent_dim=64,
         image_keys=image_keys,
         policy_kwargs=dict(
             tanh_squash_distribution=True,

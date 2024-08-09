@@ -43,11 +43,11 @@ class SerlObsWrapperNoImages(gym.ObservationWrapper):
 
 
 class ScaleObservationWrapper(gym.ObservationWrapper):
-
     """
     This observation wrapper scales the observations with the provided hyperparams
     (to somewhat normalize the observations space)
     """
+
     def __init__(self,
                  env,
                  translation_scale=100.,

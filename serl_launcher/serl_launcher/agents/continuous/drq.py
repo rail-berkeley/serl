@@ -121,6 +121,7 @@ class DrQAgent(SACAgent):
             # Model architecture
             encoder_type: str = "small",
             use_proprio: bool = False,
+            proprio_latent_dim: int = 64,
             critic_network_kwargs: dict = {
                 "hidden_dims": [256, 256],
             },
@@ -274,7 +275,7 @@ class DrQAgent(SACAgent):
             use_proprio=use_proprio,
             enable_stacking=True,
             image_keys=image_keys,
-            proprio_latent_dim=64,
+            proprio_latent_dim=proprio_latent_dim,
         )
 
         encoders = {
