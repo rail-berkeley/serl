@@ -108,7 +108,7 @@ def make_drq_agent(
         sample_action,
         image_keys=("image",),
         encoder_type="small",
-        state_mask="none",
+        state_mask="no_ForceTorque",
         encoder_kwargs=None
 ):
     if encoder_kwargs is None:

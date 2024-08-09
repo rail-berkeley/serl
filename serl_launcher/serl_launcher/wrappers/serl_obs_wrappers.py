@@ -74,6 +74,6 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
         obs["state"]["tcp_pose"][3:] *= self.rotation_scale
         obs["state"]["tcp_vel"][:3] *= self.translation_scale
         obs["state"]["tcp_vel"][3:] *= self.rotation_scale
-        # obs["state"]["tcp_force"] *= self.force_scale
-        # obs["state"]["tcp_torque"] *= self.torque_scale
+        obs["state"]["tcp_force"] *= self.force_scale
+        obs["state"]["tcp_torque"] *= self.torque_scale
         return obs

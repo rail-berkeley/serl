@@ -209,8 +209,8 @@ class RobotiqEnv(gym.Env):
                 ),  # xyz + quat
                 "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                 "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
-                # "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
-                # "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
+                "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 # "curr_action": gym.spaces.Box(-1., 1., shape=self.action_space.shape)
             }
         )
@@ -596,8 +596,8 @@ class RobotiqEnv(gym.Env):
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
             "gripper_state": self.gripper_state,
-            # "tcp_force": self.curr_force,
-            # "tcp_torque": self.curr_torque,
+            "tcp_force": self.curr_force,
+            "tcp_torque": self.curr_torque,
             # "curr_action": np.zeros(self.action_space.shape)
         }
 

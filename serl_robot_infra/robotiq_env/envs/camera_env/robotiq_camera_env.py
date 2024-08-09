@@ -16,8 +16,6 @@ class RobotiqCameraEnv(RobotiqEnv):
         action_cost = 0.1 * np.sum(np.power(action, 2))
         step_cost = 0.1
 
-        # downward_force_cost = 0.1 * max(obs["state"]["tcp_force"][2] - 10., 0.)
-        downward_force_cost = 0.
         suction_reward = 0.3 * float(obs["state"]["gripper_state"][1] > 0.5)
         suction_cost = 3. * float(obs["state"]["gripper_state"][1] < -0.5)
 
@@ -33,12 +31,11 @@ class RobotiqCameraEnv(RobotiqEnv):
         cost_info = dict(
             action_cost=-action_cost,
             step_cost=-step_cost,
-            downward_force_cost=-downward_force_cost,
             suction_reward=suction_reward,
             suction_cost=-suction_cost,
             orientation_cost=-orientation_cost,
             position_cost=-position_cost,
-            total_cost=-action_cost - step_cost - downward_force_cost + suction_reward - suction_cost - orientation_cost - position_cost
+            total_cost=-action_cost - step_cost + suction_reward - suction_cost - orientation_cost - position_cost
         )
         for key, info in cost_info.items():
             self.cost_infos[key] = info + (0. if key not in self.cost_infos else self.cost_infos[key])
@@ -46,7 +43,7 @@ class RobotiqCameraEnv(RobotiqEnv):
         if self.reached_goal_state(obs):
             return 100. - action_cost - orientation_cost - position_cost
         else:
-            return 0. + suction_reward - action_cost - downward_force_cost - orientation_cost - position_cost - \
+            return 0. + suction_reward - action_cost - orientation_cost - position_cost - \
                 suction_cost - step_cost
 
     def reached_goal_state(self, obs) -> bool:

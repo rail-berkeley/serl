@@ -81,11 +81,11 @@ def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, only_180=
 
 
 def random_rot90_state(state, num_rot):
-    assert state.shape[-1] == 14  # modified for no FT
+    assert state.shape[-1] == 20
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
     # without force and torque: (gripper[0], pose[2], orientation[5], velocity[8], or vel[11])
-    indices = jnp.array([2, 5, 8, 11])
+    indices = jnp.array([2, 5, 8, 11, 14, 17])
 
     def rotate(i, state):
         part = lax.dynamic_slice(state, (indices[i],), (3,))
