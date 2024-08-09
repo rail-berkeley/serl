@@ -103,14 +103,24 @@ def make_sac_agent(seed, sample_obs, sample_action):
 
 
 def make_drq_agent(
-        seed, sample_obs, sample_action, image_keys=("image",), encoder_type="small"
+        seed,
+        sample_obs,
+        sample_action,
+        image_keys=("image",),
+        encoder_type="small",
+        state_mask="none",
+        encoder_kwargs=None
 ):
+    if encoder_kwargs is None:
+        encoder_kwargs = dict(bottleneck_dim=128)
+
     agent = DrQAgent.create_drq(
         jax.random.PRNGKey(seed),
         sample_obs,
         sample_action,
         encoder_type=encoder_type,
         use_proprio=True,
+        state_mask=state_mask,
         proprio_latent_dim=64,
         image_keys=image_keys,
         policy_kwargs=dict(
@@ -136,12 +146,13 @@ def make_drq_agent(
         backup_entropy=True,  # default: False
         critic_ensemble_size=10,
         critic_subsample_size=2,
-        encoder_kwargs=dict(
-            # pooling_method="spatial_softmax",        # default "spatial_learned_embeddings"
-            bottleneck_dim=128,
-            # num_spatial_blocks=8,
-            # num_kp=64,
-        ),
+        encoder_kwargs=encoder_kwargs,
+        # dict(
+        #     # pooling_method="spatial_softmax",        # default "spatial_learned_embeddings"
+        #     bottleneck_dim=128,
+        #     # num_spatial_blocks=8,
+        #     # num_kp=64,
+        # ),
         actor_optimizer_kwargs={
             "learning_rate": 3e-3,  # 3e-4
         },

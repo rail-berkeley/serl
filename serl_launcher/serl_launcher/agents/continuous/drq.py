@@ -10,7 +10,7 @@ from flax.core import frozen_dict
 
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
-from serl_launcher.common.encoding import EncodingWrapper
+from serl_launcher.common.encoding import EncodingWrapper, create_state_mask
 from serl_launcher.common.optimizers import make_optimizer
 from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
@@ -121,6 +121,7 @@ class DrQAgent(SACAgent):
             # Model architecture
             encoder_type: str = "small",
             use_proprio: bool = False,
+            state_mask: str = "all",
             proprio_latent_dim: int = 64,
             critic_network_kwargs: dict = {
                 "hidden_dims": [256, 256],
@@ -270,12 +271,14 @@ class DrQAgent(SACAgent):
         else:
             raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
 
+        state_mask_arr = create_state_mask(state_mask)
         encoder_def = EncodingWrapper(
             encoder=encoders,
             use_proprio=use_proprio,
             enable_stacking=True,
             image_keys=image_keys,
             proprio_latent_dim=proprio_latent_dim,
+            state_mask=state_mask_arr
         )
 
         encoders = {

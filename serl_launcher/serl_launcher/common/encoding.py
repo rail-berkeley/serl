@@ -7,6 +7,18 @@ import jax.numpy as jnp
 from einops import rearrange, repeat
 
 
+def create_state_mask(mask_str: str) -> jnp.ndarray:
+    all = jnp.ones((14,), dtype=jnp.bool)
+    masks = dict(
+        all=all,
+        none=jnp.zeros_like(all),
+        gripper=all.at[2:].set(0),
+        position_gripper=all.at[8:].set(0)
+    )
+    assert mask_str in masks
+    return masks[mask_str]
+
+
 class EncodingWrapper(nn.Module):
     """
     Encodes observations into a single flat encoding, adding additional
@@ -19,18 +31,18 @@ class EncodingWrapper(nn.Module):
 
     encoder: nn.Module
     use_proprio: bool
-    # state_mask: jnp.ndarray           # TODO add mask to blent out uneccessary states
+    state_mask: jnp.ndarray
     proprio_latent_dim: int = 64
     enable_stacking: bool = False
     image_keys: Iterable[str] = ("image",)
 
     @nn.compact
     def __call__(
-        self,
-        observations: Dict[str, jnp.ndarray],
-        train=False,
-        stop_gradient=False,
-        is_encoded=False,
+            self,
+            observations: Dict[str, jnp.ndarray],
+            train=False,
+            stop_gradient=False,
+            is_encoded=False,
     ) -> jnp.ndarray:
         # encode images with encoder
         if self.encoder is None:
@@ -72,24 +84,26 @@ class EncodingWrapper(nn.Module):
         if self.use_proprio:
             # project state to embeddings as well
             state = observations["state"]
-            if self.enable_stacking:
-                # Combine stacking and channels into a single dimension
-                if len(state.shape) == 2:
-                    state = rearrange(state, "T C -> (T C)")
-                    encoded = encoded.reshape(-1)
-                if len(state.shape) == 3:
-                    state = rearrange(state, "B T C -> B (T C)")
-            state = nn.Dense(
-                self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
-            )(state)
-            state = nn.LayerNorm()(state)
-            state = nn.tanh(state)
-            encoded = jnp.concatenate([encoded, state], axis=-1)
+            state = state[..., self.state_mask]      # ignore certain elements
+            if state.shape[-1] != 0:
+                if self.enable_stacking:
+                    # Combine stacking and channels into a single dimension
+                    if len(state.shape) == 2:
+                        state = rearrange(state, "T C -> (T C)")
+                        encoded = encoded.reshape(-1)
+                    if len(state.shape) == 3:
+                        state = rearrange(state, "B T C -> B (T C)")
+                state = nn.Dense(
+                    self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
+                )(state)
+                state = nn.LayerNorm()(state)
+                state = nn.tanh(state)
+                encoded = jnp.concatenate([encoded, state], axis=-1)
 
         return encoded
 
 
-class GCEncodingWrapper(nn.Module):         # never used
+class GCEncodingWrapper(nn.Module):  # never used
     """
     Encodes observations and goals into a single flat encoding. Handles all the
     logic about when/how to combine observations and goals.
@@ -111,8 +125,8 @@ class GCEncodingWrapper(nn.Module):         # never used
     stop_gradient: bool
 
     def __call__(
-        self,
-        observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
+            self,
+            observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
     ) -> jnp.ndarray:
         observations, goals = observations_and_goals
 
@@ -171,8 +185,8 @@ class LCEncodingWrapper(nn.Module):
     stop_gradient: bool
 
     def __call__(
-        self,
-        observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
+            self,
+            observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
     ) -> jnp.ndarray:
         observations, goals = observations_and_goals
 
