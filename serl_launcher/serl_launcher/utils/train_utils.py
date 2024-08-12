@@ -150,10 +150,22 @@ def load_pretrained_VoxNet_params(agent, image_keys=("pointcloud",)):
         for key, weights in to_replace.items():
             if key in new_encoder_params:
                 shape = new_encoder_params[key]["kernel"].shape
-                new_encoder_params[key]["kernel"].at[:].set(ckpt[weights][..., :shape[-1]])
+                new_encoder_params[key]["kernel"] = new_encoder_params[key]["kernel"].at[:].set(
+                    ckpt[weights][..., :shape[-1]])
                 replaced.append(f"{key}:{shape}")
 
         print(f"replaced {replaced} in {image_key}")
+
+        # replace LayerNorm params with pretrained BN ones
+        new_encoder_params["LayerNorm_0"]["bias"] = new_encoder_params["LayerNorm_0"]["bias"].at[:].set(
+            ckpt["voxnet/conv1/batch_normalization/beta:0"])
+        new_encoder_params["LayerNorm_0"]["scale"] = new_encoder_params["LayerNorm_0"]["scale"].at[:].set(
+            ckpt["voxnet/conv1/batch_normalization/gamma:0"])
+
+        new_encoder_params["LayerNorm_1"]["bias"] = new_encoder_params["LayerNorm_0"]["bias"].at[:].set(
+            ckpt["voxnet/conv2/batch_normalization/beta:0"])
+        new_encoder_params["LayerNorm_1"]["scale"] = new_encoder_params["LayerNorm_0"]["scale"].at[:].set(
+            ckpt["voxnet/conv2/batch_normalization/gamma:0"])
 
     agent = agent.replace(state=agent.state.replace(params=new_params))
     return agent
