@@ -25,7 +25,6 @@ from serl_launcher.utils.train_utils import (
     plot_feature_kernel_histogram,
     find_zero_weights,
     plot_conv3d_kernels,
-    load_pretrained_VoxNet_params
 )
 
 from agentlace.trainer import TrainerServer, TrainerClient
@@ -66,6 +65,18 @@ flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
+flags.DEFINE_string("state_mask", "no_ForceTorque",
+                    "if all the states should be considered, possible: (all, none, no_ForceTorque, gripper, position_gripper)")
+flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
+flags.DEFINE_integer("encoder_bottleneck_dim", 128, "bottleneck dimension of the encoder")
+flags.DEFINE_integer("proprio_latent_dim", 64,
+                    "the latent dimension for the state, will be concatenated with encoder bottleneck dim before being passed onward")
+flags.DEFINE_multi_string("encoder_kwargs", None, "Encoder kwargs in the form ['dict key', 'dict value']")
+flags.DEFINE_bool("enable_obs_rotation_wrapper", False,
+                  "Whether to enable observation rotation wrapper (train in one quaternion)")
+flags.DEFINE_bool("enable_obs_rotation_augmentation", False,
+                  "Whether to enable observation rotation augmentation (90 deg)")
+
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 10000,
                      "Replay buffer capacity.")  # quite low to forget demo trajectories
@@ -81,7 +92,6 @@ flags.DEFINE_integer("eval_period", 1000, "Evaluation period.")
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
-flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/robotiq_drq/checkpoints',
@@ -148,6 +158,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         agent = agent.replace(state=ckpt)
         print("finding zero weights")
         find_zero_weights(agent.state.params, print_all=False)
+        parameter_overview(agent)
 
         # examine model parameters if trajs==0
         if FLAGS.eval_n_trajs == 0:
@@ -235,7 +246,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
                 rotated_obs = copy.deepcopy(obs)
                 rotated_obs["state"] = batched_random_rot90_state(obs["state"], rot_rng, only_180=only_180)
-                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng, only_180=only_180)
+                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng,
+                                                                             only_180=only_180)
 
                 actions = agent.sample_actions(
                     observations=jax.device_put(rotated_obs),
@@ -243,7 +255,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     deterministic=False,
                 )
                 for _ in range(3):
-                    actions = batched_random_rot90_action(actions[None, ...], rot_rng, only_180=only_180)[0, ...]  # rotate back
+                    actions = batched_random_rot90_action(actions[None, ...], rot_rng, only_180=only_180)[
+                        0, ...]  # rotate back
 
                 actions = np.asarray(jax.device_get(actions))
                 # print(actions)
@@ -422,6 +435,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 break
 
     server.stop()
+    # parameter_overview(agent)
 
 
 ##############################################################################
@@ -430,7 +444,8 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
 def main(_):
     assert FLAGS.batch_size % num_devices == 0
     if FLAGS.checkpoint_path.split('/')[-1] == "checkpoints":
-        FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + datetime.now().strftime("%m%d-%H:%M")
+        FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + FLAGS.exp_name + " " + datetime.now().strftime(
+            "%m%d-%H:%M")
 
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
@@ -448,7 +463,8 @@ def main(_):
     env = Quat2MrpWrapper(env)
     env = ScaleObservationWrapper(env)  # scale obs space (after quat2mrp, but before serlobs)
     env = ObservationStatisticsWrapper(env)
-    env = ObservationRotationWrapper(env)       # new
+    if FLAGS.enable_obs_rotation_wrapper:
+        env = ObservationRotationWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -457,12 +473,21 @@ def main(_):
     print(f"image keys: {image_keys}")
 
     rng, sampling_rng = jax.random.split(rng)
+
+    assert FLAGS.encoder_kwargs is None or len(FLAGS.encoder_kwargs) % 2 == 0
+    encoder_kwargs = {
+        "bottleneck_dim": FLAGS.encoder_bottleneck_dim,
+        **(dict(zip(*[iter(FLAGS.encoder_kwargs)] * 2)) if FLAGS.encoder_kwargs else {}),
+    }
     agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
         sample_action=env.action_space.sample(),
         image_keys=image_keys,
         encoder_type=FLAGS.encoder_type,
+        state_mask=FLAGS.state_mask,
+        proprio_latent_dim=FLAGS.proprio_latent_dim,
+        encoder_kwargs=encoder_kwargs
     )
 
     # replicate agent across devices
@@ -473,10 +498,10 @@ def main(_):
 
     # print useful info
     print_agent_params(agent, image_keys)
+    parameter_overview(agent)
     # plot_conv3d_kernels(agent.state.params)
 
-    # add ScaleObservationWrapper scales to the agent here (needed in batch rotation augmentation)
-    agent.config["activate_batch_rotation"] = False     # deactivate for now
+    agent.config["activate_batch_rotation"] = FLAGS.enable_obs_rotation_augmentation  # obs batch rotation control
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
@@ -537,6 +562,7 @@ def main(_):
             # Wrap up the learner loop
             env.close()
             print("Learner loop finished")
+            print_agent_params(agent, image_keys)
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
