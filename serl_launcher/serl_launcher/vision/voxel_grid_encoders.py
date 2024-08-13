@@ -94,6 +94,7 @@ class VoxNet(nn.Module):
     use_conv_bias: bool = False
     bottleneck_dim: Optional[int] = None
     final_activation: Callable[[jnp.ndarray], jnp.ndarray] | str = nn.tanh
+    pretrained: bool = False
     scale_factor: float = 1.
 
     @nn.compact
@@ -117,45 +118,39 @@ class VoxNet(nn.Module):
 
         x = observations
         x = conv3d(
-            features=64,
+            features=32,
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
             name="conv_5x5x5",
         )(x)
-        # x = max_pool(x)
         x = nn.LayerNorm()(x)
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, F)
 
         x = conv3d(
-            features=64,
+            features=16,
             kernel_size=(3, 3, 3),
             strides=(1, 1, 1),
             name="conv_3x3x3"
         )(x)
         x = max_pool(x)
+
+        if self.pretrained:
+            x = jax.lax.stop_gradient(x)  # unfortunately also cuts gradients of the LayerNorm above
+
         x = nn.LayerNorm()(x)
         x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, F)
 
-        x = jax.lax.stop_gradient(x)        # do not change pretrained kernels for now
-
-        # x = conv3d(
-        #     features=128,
-        #     kernel_size=(2, 2, 2),
-        #     strides=(2, 2, 2),
-        #     name="conv_2x2x2"
-        # )(x)      # if pretrained is used
-
         x = conv3d(
-            features=32,
+            features=8,            # if pretrained, only uses [..] out of 128 pretrained params as initial weights
             kernel_size=(2, 2, 2),
             strides=(2, 2, 2),
-            name="conv_2x2x2_custom"
+            name="conv_2x2x2"
         )(x)
         x = nn.LayerNorm()(x)
         x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
 
         # x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
-        # jax.debug.print("ssam {}", x)     # what , all 1s 0s or -1s???
+        # jax.debug.print("ssam {}", x)
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
