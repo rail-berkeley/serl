@@ -134,7 +134,7 @@ def main(_):
 
     import pickle as pkl
 
-    with open("/home/nico/real-world-rl/serl/examples/robotiq_drq/pcb_insert_20_demos_mai3_streamlined.pkl", "rb") as f:
+    with open("/examples/robotiq_drq/old_demos/pcb_insert_20_demos_mai3_streamlined.pkl", "rb") as f:
         trajs = pkl.load(f)
         for traj in trajs:
             demo_buffer.insert(traj)

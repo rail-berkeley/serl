@@ -102,9 +102,9 @@ class PointCloudFusion:
 
     def load_finetuned(self):
         from os.path import exists
-        if not exists("PointCloudFusionFinetuned.npy"):
+        if not exists("/home/nico/real-world-rl/serl/examples/robotiq_drq/PointCloudFusionFinetuned.npy"):
             return False
-        with open("PointCloudFusionFinetuned.npy", "rb") as f:
+        with open("/home/nico/real-world-rl/serl/examples/robotiq_drq/PointCloudFusionFinetuned.npy", "rb") as f:
             t_finetuned = np.load(f)
             self.t1 = t_finetuned[0, ...]
             self.t2 = t_finetuned[1, ...]

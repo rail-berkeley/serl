@@ -256,13 +256,13 @@ class DrQAgent(SACAgent):
                 )
                 for image_key in image_keys
             }
-        elif encoder_type == "voxnet" or encoder_type == "voxnet-semi-pretrained":
+        elif encoder_type == "voxnet" or encoder_type == "voxnet-pretrained":
             encoders = {
                 image_key: VoxNet(
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                     use_conv_bias=False,
                     final_activation=nn.tanh,
-                    scale_factor=1.  # if down-sampling from more refined grid_shape is used, otherwise 1.
+                    pretrained=encoder_type == "voxnet-pretrained",
                 )
                 for image_key in image_keys
             }
@@ -272,6 +272,7 @@ class DrQAgent(SACAgent):
             raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
 
         state_mask_arr = create_state_mask(state_mask)
+        print(f"state_mask: {state_mask}  {state_mask_arr}")
         encoder_def = EncodingWrapper(
             encoder=encoders,
             use_proprio=use_proprio,
@@ -328,7 +329,7 @@ class DrQAgent(SACAgent):
 
             agent = load_resnet10_params(agent, image_keys)
 
-        if encoder_type == "voxnet-semi-pretrained":
+        if encoder_type == "voxnet-pretrained":
             from serl_launcher.utils.train_utils import load_pretrained_VoxNet_params
 
             agent = load_pretrained_VoxNet_params(agent, image_keys)

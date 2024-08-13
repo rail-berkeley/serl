@@ -148,6 +148,7 @@ class ObservationRotationWrapper(gym.Wrapper):
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
+        print("Observation Rotation Wrapper enabled!")
         self.num_rot_quadrant = -1
 
     def step(self, action: np.ndarray):

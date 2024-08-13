@@ -84,7 +84,6 @@ def random_rot90_state(state, num_rot):
     assert state.shape[-1] == 20
 
     # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
-    # without force and torque: (gripper[0], pose[2], orientation[5], velocity[8], or vel[11])
     indices = jnp.array([2, 5, 8, 11, 14, 17])
 
     def rotate(i, state):

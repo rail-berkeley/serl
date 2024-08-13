@@ -40,7 +40,7 @@ if __name__ == "__main__":
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
     env = ScaleObservationWrapper(env)
-    env = ObservationRotationWrapper(env)
+    env = ObservationRotationWrapper(env)       # if it should be enabled
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
