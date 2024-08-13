@@ -13,5 +13,5 @@ python drq_policy_robotiq.py "$@" \
     --utd_ratio 8 \
     --batch_size 128 \
     --eval_period 2500 \
-    --encoder_type voxnet \
+    --encoder_type voxnet-pretrained \
 #    --debug
