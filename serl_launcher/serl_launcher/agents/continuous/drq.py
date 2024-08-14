@@ -260,7 +260,7 @@ class DrQAgent(SACAgent):
             encoders = {
                 image_key: VoxNet(
                     bottleneck_dim=encoder_kwargs["bottleneck_dim"],
-                    use_conv_bias=False,
+                    use_conv_bias=True,
                     final_activation=nn.tanh,
                     pretrained=encoder_type == "voxnet-pretrained",
                 )

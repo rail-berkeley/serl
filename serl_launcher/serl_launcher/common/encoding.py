@@ -11,12 +11,14 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
     all = jnp.ones((20,), dtype=jnp.bool)
     gripper = all.at[2:].set(False)
     no_ForceTorque = all.at[2:5].set(False).at[11:14].set(False)
+    gripper_Zinfo = gripper.at[7].set(True)
     masks = dict(
         all=all,
         none=jnp.zeros_like(all),
         gripper=gripper,
         position_gripper=gripper.at[5:11].set(True),
-        no_ForceTorque=no_ForceTorque
+        no_ForceTorque=no_ForceTorque,
+        gripper_Zinfo=gripper_Zinfo,
     )
     assert mask_str in masks
     return masks[mask_str]
@@ -88,6 +90,7 @@ class EncodingWrapper(nn.Module):
             # project state to embeddings as well
             state = observations["state"]
             state = state[..., self.state_mask]      # ignore certain elements
+            # jax.debug.print("state {}", state)
             if state.shape[-1] != 0:
                 if self.enable_stacking:
                     # Combine stacking and channels into a single dimension

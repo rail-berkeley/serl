@@ -116,9 +116,14 @@ class VoxNet(nn.Module):
         l_relu = partial(nn.leaky_relu, negative_slope=0.1)
         max_pool = partial(nn.max_pool, window_shape=(2, 2, 2), strides=(2, 2, 2))
 
+        if self.pretrained:
+            feature_dimensions = (64, 64, 32)
+        else:
+            feature_dimensions = (32, 16, 8)
+
         x = observations
         x = conv3d(
-            features=32,
+            features=feature_dimensions[0],
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
             name="conv_5x5x5",
@@ -127,7 +132,7 @@ class VoxNet(nn.Module):
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, F)
 
         x = conv3d(
-            features=16,
+            features=feature_dimensions[1],
             kernel_size=(3, 3, 3),
             strides=(1, 1, 1),
             name="conv_3x3x3"
@@ -141,7 +146,7 @@ class VoxNet(nn.Module):
         x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, F)
 
         x = conv3d(
-            features=8,            # if pretrained, only uses [..] out of 128 pretrained params as initial weights
+            features=feature_dimensions[2],            # if pretrained, only uses [..] out of 128 pretrained params as initial weights
             kernel_size=(2, 2, 2),
             strides=(2, 2, 2),
             name="conv_2x2x2"
