@@ -60,7 +60,7 @@ class ObservationStatisticsWrapper(gym.Wrapper, gym.utils.RecordConstructorArgs)
             buff = {}
             for name, value in calc_buffs.items():
                 for i in range(value.shape[0]):
-                    buff[name + f"_{['x', 'y', 'z', 'rx', 'ry', 'rz'][i]}"] = value[i]
+                    buff[name + f"_{['x', 'y', 'z', 'rx', 'ry', 'rz', 'grip'][i]}"] = value[i]
             infos["obsStat"] = buff
             # print(buff)
 

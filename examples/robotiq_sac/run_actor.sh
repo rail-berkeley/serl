@@ -2,7 +2,7 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.3 && \
 python sac_policy_robotiq.py "$@" \
     --actor \
-    --env robotiq-grip-v1 \
+    --env robotiq_basic_env \
     --exp_name=sac_robotiq_policy \
     --max_traj_length 300 \
     --seed 42 \

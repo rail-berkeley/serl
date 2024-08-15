@@ -39,7 +39,7 @@ import robotiq_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "robotiq-grip-v1", "Name of environment.")
+flags.DEFINE_string("env", "robotiq_basic_env", "Name of environment.")
 flags.DEFINE_string("agent", "sac", "Name of agent.")
 flags.DEFINE_string("exp_name", "sac_robotiq_policy", "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")

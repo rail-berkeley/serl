@@ -2,7 +2,7 @@ from gymnasium.envs.registration import register
 import numpy as np
 
 register(
-    id="robotiq-grip-v1",
+    id="robotiq_basic_env",
     entry_point="robotiq_env.envs.basic_env:RobotiqBasicEnv",
     max_episode_steps=200,
 )
