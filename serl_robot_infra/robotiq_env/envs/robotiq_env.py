@@ -211,7 +211,7 @@ class RobotiqEnv(gym.Env):
                 "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
                 "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
-                # "curr_action": gym.spaces.Box(-1., 1., shape=self.action_space.shape)
+                "action": gym.spaces.Box(-1., 1., shape=self.action_space.shape)
             }
         )
 
@@ -319,7 +319,7 @@ class RobotiqEnv(gym.Env):
 
         self.curr_path_length += 1
 
-        obs = self._get_obs()
+        obs = self._get_obs(action)
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
@@ -392,7 +392,7 @@ class RobotiqEnv(gym.Env):
         shift = self.go_to_rest()
         self.curr_path_length = 0
 
-        obs = self._get_obs()
+        obs = self._get_obs(np.zeros_like(self.last_action))
         return obs, {"reset_shift": shift}
 
     def save_video_recording(self):
@@ -584,7 +584,7 @@ class RobotiqEnv(gym.Env):
     def _is_truncated(self):
         return self.controller.is_truncated()
 
-    def _get_obs(self) -> dict:
+    def _get_obs(self, action) -> dict:
         # get image before state observation, so they match better in time
 
         images = None
@@ -598,7 +598,7 @@ class RobotiqEnv(gym.Env):
             "gripper_state": self.gripper_state,
             "tcp_force": self.curr_force,
             "tcp_torque": self.curr_torque,
-            # "curr_action": np.zeros(self.action_space.shape)
+            "action": action
         }
 
         if self.realtime_plot:

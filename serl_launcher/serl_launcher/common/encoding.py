@@ -8,10 +8,13 @@ from einops import rearrange, repeat
 
 
 def create_state_mask(mask_str: str) -> jnp.ndarray:
-    all = jnp.ones((20,), dtype=jnp.bool)
-    gripper = all.at[2:].set(False)
-    no_ForceTorque = all.at[2:5].set(False).at[11:14].set(False)
-    gripper_Zinfo = gripper.at[7].set(True)
+    all = jnp.ones((27,), dtype=jnp.bool)
+    none = jnp.zeros_like(all)
+    no_action = all.at[:7].set(False)
+    gripper = none.at[0+7:2+7].set(True)
+    no_ForceTorque = no_action.at[7+2:7+5].set(False).at[7+11:7+14].set(False)
+    gripper_Zinfo = gripper.at[7+7].set(True)
+    action_only = none.at[:7].set(True)
     masks = dict(
         all=all,
         none=jnp.zeros_like(all),
@@ -19,6 +22,7 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
         position_gripper=gripper.at[5:11].set(True),
         no_ForceTorque=no_ForceTorque,
         gripper_Zinfo=gripper_Zinfo,
+        action_only=action_only,
     )
     assert mask_str in masks
     return masks[mask_str]

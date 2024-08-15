@@ -151,6 +151,11 @@ class ObservationRotationWrapper(gym.Wrapper):
         print("Observation Rotation Wrapper enabled!")
         self.num_rot_quadrant = -1
 
+    def reset(self, **kwargs):
+        obs, info = self.env.reset()
+        obs = self.rotate_observation(obs, random=True)     # rotate initial state random
+        return obs, info
+
     def step(self, action: np.ndarray):
         action = self.rotate_action(action=action)
         obs, reward, done, truncated, info = self.env.step(action)
@@ -158,14 +163,21 @@ class ObservationRotationWrapper(gym.Wrapper):
         rotated_obs = self.rotate_observation(obs)
         return rotated_obs, reward, done, truncated, info
 
-    def rotate_observation(self, observation):
-        x, y = (observation["state"]["tcp_pose"][:2])
-        self.num_rot_quadrant = int(x < 0.) * 2 + int(x * y < 0.)  # save quadrant info
+    def rotate_observation(self, observation, random=False):
+        if not random:
+            x, y = (observation["state"]["tcp_pose"][:2])
+            self.num_rot_quadrant = int(x < 0.) * 2 + int(x * y < 0.)  # save quadrant info
+        else:
+            self.num_rot_quadrant = np.random.randint(low=0, high=4)
 
         for state in observation["state"].keys():
-            if state == "gripper_state" or state == "curr_action":
+            if state == "gripper_state":
                 continue
-            observation["state"][state][:] = rotate_state(observation["state"][state], self.num_rot_quadrant)  # rotate
+            elif state == "action":
+                observation["state"][state][:6] = rotate_state(observation["state"][state][:6], self.num_rot_quadrant)
+            else:
+                observation["state"][state][:] = rotate_state(observation["state"][state],
+                                                              self.num_rot_quadrant)  # rotate
 
         for image_keys in observation["images"].keys():
             observation["images"][image_keys][:] = np.rot90(
@@ -177,5 +189,5 @@ class ObservationRotationWrapper(gym.Wrapper):
 
     def rotate_action(self, action):
         rotated_action = action.copy()
-        rotated_action[:6] = rotate_state(action[:6], 4 - self.num_rot_quadrant)        # rotate
+        rotated_action[:6] = rotate_state(action[:6], 4 - self.num_rot_quadrant)  # rotate
         return rotated_action

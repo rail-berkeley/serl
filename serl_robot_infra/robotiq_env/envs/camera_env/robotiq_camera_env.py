@@ -15,7 +15,7 @@ class RobotiqCameraEnv(RobotiqEnv):
 
     def compute_reward(self, obs, action) -> float:
         action_cost = 0.1 * np.sum(np.power(action, 2))
-        action_diff_cost = 0.1 * np.sum(np.power(action - self.last_action, 2))
+        action_diff_cost = 0.1 * np.sum(np.power(obs["state"]["action"] - self.last_action, 2))
         self.last_action[:] = action
         step_cost = 0.1
 
