@@ -4,10 +4,8 @@ import jax
 import jax.numpy as jnp
 import jax.lax as lax
 
-
 ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 ROT_GENERAL = jnp.array([jnp.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
-
 
 """     # not used anymore, since we are no longer using euler angles
 import jaxlie
@@ -49,12 +47,10 @@ def random_rot90_action(action: jnp.ndarray, num_rot: int):  # action is (x, y, 
     return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
 
 
-@partial(jax.jit, static_argnames="only_180")
-def batched_random_rot90_action(actions, rng, *, only_180=False):
+@jax.jit
+def batched_random_rot90_action(actions, rng):
     assert actions.shape[-1:] == (7,)
     num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
-    if only_180:
-        num_rot = (num_rot % 2) * 2
 
     # jax.debug.print("rotation: {}", num_rot[0])
 
@@ -65,13 +61,11 @@ def batched_random_rot90_action(actions, rng, *, only_180=False):
     return actions
 
 
-@partial(jax.jit, static_argnames=("num_batch_dims", "only_180"))
-def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, only_180=False):
+@partial(jax.jit, static_argnames="num_batch_dims")
+def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1):
     original_shape = state.shape
     state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
     num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
-    if only_180:
-        num_rot = (num_rot % 2) * 2
 
     state = jax.vmap(
         lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
@@ -81,10 +75,13 @@ def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1, only_180=
 
 
 def random_rot90_state(state, num_rot):
-    assert state.shape[-1] == 20
+    assert state.shape[-1] == 27
 
-    # indexes are (gripper[0], force[2], pose[5], orientation[8], torque[11], velocity[14], orientation velocity[17])
-    indices = jnp.array([2, 5, 8, 11, 14, 17])
+    """
+    indexes are (action[0:7], gripper[7:9], force[9:12], pose[12:15], orientation[15:18],
+    torque[18:21], velocity[21:24], orientation velocity[24:27])
+    """
+    indices = jnp.array([0, 3, 9, 12, 15, 18, 21, 24])
 
     def rotate(i, state):
         part = lax.dynamic_slice(state, (indices[i],), (3,))
@@ -96,14 +93,12 @@ def random_rot90_state(state, num_rot):
     return state
 
 
-@partial(jax.jit, static_argnames=("num_batch_dims", "only_180"))
-def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1, only_180=False):
+@partial(jax.jit, static_argnames="num_batch_dims")
+def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
     original_shape = voxel_grid.shape
     voxel_grid = jnp.reshape(voxel_grid, (-1, *voxel_grid.shape[num_batch_dims:]))
 
     num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
-    if only_180:
-        num_rot = (num_rot % 2) * 2
 
     voxel_grid = jax.vmap(
         lambda v, k: random_rot90_voxel(v, k), in_axes=(0, 0), out_axes=0

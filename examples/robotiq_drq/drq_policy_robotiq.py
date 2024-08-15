@@ -156,14 +156,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             step=FLAGS.eval_checkpoint_step,
         )
         agent = agent.replace(state=ckpt)
-        print("finding zero weights")
         find_zero_weights(agent.state.params, print_all=False)
-        parameter_overview(agent)
 
         # examine model parameters if trajs==0
         if FLAGS.eval_n_trajs == 0:
-            parameter_overview(agent)
-            plot_feature_kernel_histogram(agent)
+            # parameter_overview(agent)
+            # plot_feature_kernel_histogram(agent)
+            plot_conv3d_kernels(agent.state.params)
 
         for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
@@ -242,12 +241,10 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 actions = np.asarray(jax.device_get(actions))
             else:
                 sampling_rng, rot_rng, key = jax.random.split(sampling_rng, 3)
-                only_180 = agent.config["activate_batch_rotation"] == 180
 
                 rotated_obs = copy.deepcopy(obs)
-                rotated_obs["state"] = batched_random_rot90_state(obs["state"], rot_rng, only_180=only_180)
-                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng,
-                                                                             only_180=only_180)
+                rotated_obs["state"] = batched_random_rot90_state(obs["state"], rot_rng)
+                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng)
 
                 actions = agent.sample_actions(
                     observations=jax.device_put(rotated_obs),
@@ -255,11 +252,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     deterministic=False,
                 )
                 for _ in range(3):
-                    actions = batched_random_rot90_action(actions[None, ...], rot_rng, only_180=only_180)[
-                        0, ...]  # rotate back
+                    actions = batched_random_rot90_action(actions[None, ...], rot_rng)[0, ...]  # rotate back
 
                 actions = np.asarray(jax.device_get(actions))
-                # print(actions)
 
         # Step environment
         with timer.context("step_env"):
@@ -435,7 +430,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 break
 
     server.stop()
-    # parameter_overview(agent)
+    parameter_overview(agent)       # print end state
 
 
 ##############################################################################
@@ -502,6 +497,9 @@ def main(_):
     # plot_conv3d_kernels(agent.state.params)
 
     agent.config["activate_batch_rotation"] = FLAGS.enable_obs_rotation_augmentation  # obs batch rotation control
+    if FLAGS.enable_obs_rotation_augmentation:
+        print("Batch Observation Rotation enabled!")
+    assert not FLAGS.enable_obs_rotation_augmentation or not FLAGS.enable_obs_rotation_wrapper  # both is pointless
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
@@ -562,7 +560,6 @@ def main(_):
             # Wrap up the learner loop
             env.close()
             print("Learner loop finished")
-            print_agent_params(agent, image_keys)
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
