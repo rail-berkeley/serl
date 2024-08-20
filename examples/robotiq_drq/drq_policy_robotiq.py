@@ -69,8 +69,8 @@ flags.DEFINE_string("state_mask", "no_ForceTorque",
                     "if all the states should be considered, possible: (all, none, no_ForceTorque, gripper, position_gripper)")
 flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_integer("encoder_bottleneck_dim", 128, "bottleneck dimension of the encoder")
-flags.DEFINE_integer("proprio_latent_dim", 64,
-                    "the latent dimension for the state, will be concatenated with encoder bottleneck dim before being passed onward")
+# flags.DEFINE_integer("proprio_latent_dim", 64,
+#                     "the latent dimension for the state, will be concatenated with encoder bottleneck dim before being passed onward")
 flags.DEFINE_multi_string("encoder_kwargs", None, "Encoder kwargs in the form ['dict key', 'dict value']")
 flags.DEFINE_bool("enable_obs_rotation_wrapper", False,
                   "Whether to enable observation rotation wrapper (train in one quaternion)")
@@ -86,7 +86,8 @@ flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
 flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
-flags.DEFINE_integer("eval_period", 1000, "Evaluation period.")
+flags.DEFINE_integer("eval_period", 1000, "Evaluation period in seconds")
+flags.DEFINE_integer("eval_n_trajs", 10, "Number of trajectories for evaluation.")
 
 # flag to indicate if this is a leaner or a actor
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
@@ -98,8 +99,6 @@ flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/r
                     "Path to save checkpoints.")
 
 flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
-flags.DEFINE_integer("eval_n_trajs", 5, "Number of trajectories for evaluation.")
-
 flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/robotiq_drq/rlds',
                     "Path to save RLDS logs.")
 flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
@@ -164,7 +163,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             # plot_feature_kernel_histogram(agent)
             plot_conv3d_kernels(agent.state.params)
 
+        trajectories = []
         for episode in range(FLAGS.eval_n_trajs):
+            trajectory = []
             obs, _ = env.reset()
             done = False
             start_time = time.time()
@@ -176,16 +177,26 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 actions = np.asarray(jax.device_get(actions))
 
                 next_obs, reward, done, truncated, info = env.step(actions)
+                transition = dict(
+                    observations={"state": obs["state"].copy()},        # do not save voxel grid or images
+                    actions=actions,
+                    next_observations={"state": next_obs["state"].copy()},
+                    rewards=reward,
+                    masks=1.0 - done,
+                    dones=done,
+                )
+                trajectory.append(transition)
                 obs = next_obs
 
                 if done:
+                    dt = time.time() - start_time
                     if reward > 50.:
-                        dt = time.time() - start_time
                         time_list.append(dt)
                         print(f"time: {dt}")
 
                     success_counter += (reward > 50.)
                     print(f"{success_counter}/{episode + 1}")
+                    trajectories.append({"traj": trajectory, "time": dt, "success": (reward > 50.)})
 
             # if pause event is requested, pause the actor
             if PAUSE_EVENT_FLAG.is_set():
@@ -201,6 +212,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
         print(f"success rate: {success_counter / FLAGS.eval_n_trajs if FLAGS.eval_n_trajs else 0.}")
         print(f"average time: {np.mean(time_list)}")
+        with open("trajectories.pkl", "wb") as f:
+            import pickle
+            pickle.dump(trajectories, f)
         return  # after done eval, return and exit
 
     client = TrainerClient(
@@ -219,7 +233,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     client.recv_network_callback(update_params)
 
     obs, _ = env.reset()
-    last_actions = np.zeros((7,))
 
     # training loop
     timer = Timer()
@@ -264,9 +277,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             if "intervene_action" in info:
                 actions = info.pop("intervene_action")
 
-            # next_obs["state"][:7][:] = actions          # add actions to obs (curr_actions)
-            # reward -= 0.3 * np.sum(np.power(actions - last_actions, 2))     # cave-man like but otherwise too complex
-
             reward = np.asarray(reward, dtype=np.float32)
             info = np.asarray(info)
             running_return = running_return * 0.99 + reward
@@ -281,7 +291,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             data_store.insert(transition)
 
             obs = next_obs
-            last_actions = actions
             if done or truncated:
                 stats = {"train": info}  # send stats to the learner to log
                 client.request("send-stats", stats)
@@ -293,6 +302,16 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             client.update()
 
         timer.tock("total")
+
+        if step % FLAGS.eval_period == 0 and step:
+            with timer.context("eval"):
+                evaluate_info = evaluate(
+                    policy_fn=partial(agent.sample_actions, argmax=True),
+                    env=env,
+                    num_episodes=FLAGS.eval_n_trajs,
+                )
+            stats = {"eval": evaluate_info}
+            client.request("send-stats", stats)
 
         if step % FLAGS.log_period == 0:
             stats = {"timer": timer.get_average_times()}
@@ -481,7 +500,7 @@ def main(_):
         image_keys=image_keys,
         encoder_type=FLAGS.encoder_type,
         state_mask=FLAGS.state_mask,
-        proprio_latent_dim=FLAGS.proprio_latent_dim,
+        # proprio_latent_dim=FLAGS.proprio_latent_dim,
         encoder_kwargs=encoder_kwargs
     )
 
@@ -492,7 +511,7 @@ def main(_):
     )
 
     # print useful info
-    print_agent_params(agent, image_keys)
+    # print_agent_params(agent, image_keys)
     parameter_overview(agent)
     # plot_conv3d_kernels(agent.state.params)
 
@@ -510,7 +529,7 @@ def main(_):
         )
         # set up wandb and logging
         wandb_logger = make_wandb_logger(
-            project="drq_picking",
+            project="paper_experiments",
             description=FLAGS.exp_name or FLAGS.env,
             debug=FLAGS.debug,
         )
