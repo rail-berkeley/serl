@@ -272,13 +272,13 @@ class DrQAgent(SACAgent):
             raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
 
         state_mask_arr = create_state_mask(state_mask)
-        print(f"state_mask: {state_mask}  {state_mask_arr}")
+        print(f"state_mask: {state_mask}  {state_mask_arr.astype(jnp.int32)}")
         encoder_def = EncodingWrapper(
             encoder=encoders,
             use_proprio=use_proprio,
             enable_stacking=True,
             image_keys=image_keys,
-            proprio_latent_dim=proprio_latent_dim,
+            # proprio_latent_dim=proprio_latent_dim,
             state_mask=state_mask_arr
         )
 

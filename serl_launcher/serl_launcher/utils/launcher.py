@@ -109,7 +109,7 @@ def make_drq_agent(
         image_keys=("image",),
         encoder_type="small",
         state_mask="no_ForceTorque",
-        proprio_latent_dim=64,
+        # proprio_latent_dim=64,
         encoder_kwargs=None
 ):
     if encoder_kwargs is None:
@@ -122,7 +122,7 @@ def make_drq_agent(
         encoder_type=encoder_type,
         use_proprio=True,
         state_mask=state_mask,
-        proprio_latent_dim=proprio_latent_dim,
+        # proprio_latent_dim=proprio_latent_dim,
         image_keys=image_keys,
         policy_kwargs=dict(
             tanh_squash_distribution=True,

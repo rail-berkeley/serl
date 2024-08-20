@@ -179,12 +179,13 @@ class ObservationRotationWrapper(gym.Wrapper):
                 observation["state"][state][:] = rotate_state(observation["state"][state],
                                                               self.num_rot_quadrant)  # rotate
 
-        for image_keys in observation["images"].keys():
-            observation["images"][image_keys][:] = np.rot90(
-                observation["images"][image_keys],
-                axes=(0, 1),
-                k=self.num_rot_quadrant
-            )
+        if "images" in observation:
+            for image_keys in observation["images"].keys():
+                observation["images"][image_keys][:] = np.rot90(
+                    observation["images"][image_keys],
+                    axes=(0, 1),
+                    k=self.num_rot_quadrant
+                )
         return observation
 
     def rotate_action(self, action):
