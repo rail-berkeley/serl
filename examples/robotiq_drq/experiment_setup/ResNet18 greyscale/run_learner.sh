@@ -1,10 +1,10 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
-export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
+export XLA_PYTHON_CLIENT_MEM_FRACTION=.3 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
-    --actor \
+    --learner \
     --env robotiq_camera_env \
-    --exp_name="voxnet 1quat" \
-    --camera_mode pointcloud \
+    --exp_name="ResNet18 grayscale" \
+    --camera_mode grey \
     --max_traj_length 100 \
     --seed 1 \
     --max_steps 20000 \
@@ -12,10 +12,11 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --training_starts 500 \
     --utd_ratio 8 \
     --batch_size 128 \
-    --eval_period 1500 \
+    --checkpoint_period 2500 \
+    --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/ResNet18\ greyscale/checkpoints \
+    --demo_path TODO \
     \
-    --encoder_type voxnet \
+    --encoder_type resnet-pretrained-18 \
     --state_mask all \
     --encoder_bottleneck_dim 128 \
-    --enable_obs_rotation_wrapper \
 #    --debug
