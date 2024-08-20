@@ -85,7 +85,7 @@ class DefaultEnvConfig:
     RESET_Q = np.zeros((6,))
     RANDOM_RESET = (False,)
     RANDOM_XY_RANGE = (0.0,)
-    RANDOM_RZ_RANGE = (0.0,)
+    RANDOM_ROT_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
     ABS_POSE_RANGE_LIMITS = np.zeros((2,))
@@ -139,7 +139,7 @@ class RobotiqEnv(gym.Env):
         self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.random_reset = config.RANDOM_RESET
         self.random_xy_range = config.RANDOM_XY_RANGE
-        self.random_rz_range = config.RANDOM_RZ_RANGE
+        self.random_rot_range = config.RANDOM_ROT_RANGE
         self.hz = hz
 
         camera_mode = None if camera_mode.lower() == "none" else camera_mode
@@ -369,8 +369,11 @@ class RobotiqEnv(gym.Env):
             reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
             reset_pose[:2] += reset_shift
 
-            random_rz_rot = np.random.uniform(np.negative(self.random_rz_range), self.random_rz_range)[0]
-            reset_pose[3:][:] = (R.from_quat(reset_pose[3:]) * R.from_euler("xyz", [0., 0., random_rz_rot])).as_quat()
+            if self.random_rot_range[0] > 0.:
+                random_rot = np.random.triangular(np.negative(self.random_rot_range), 0., self.random_rot_range, size=(3,))
+            else:
+                random_rot = np.zeros((3,))
+            reset_pose[3:][:] = (R.from_quat(reset_pose[3:]) * R.from_mrp(random_rot)).as_quat()
 
             self.curr_reset_pose[:] = reset_pose
 
@@ -378,7 +381,6 @@ class RobotiqEnv(gym.Env):
             time.sleep(0.1)
             while self.controller.is_moving():
                 time.sleep(0.1)
-            # print(reset_shift, reset_pose)
             return reset_shift
         else:
             self.curr_reset_pose[:] = reset_pose

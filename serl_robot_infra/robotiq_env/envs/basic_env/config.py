@@ -14,7 +14,7 @@ class RobotiqCornerConfig(DefaultEnvConfig):
     ])
     RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.06,)
-    RANDOM_RZ_RANGE = (0.0,)
+    RANDOM_ROT_RANGE = (0.0,)
     # ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
     # ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
     ABS_POSE_LIMIT_HIGH = np.array([0.05, 0.1, 0.22, 3.2, 0.1, 3.2])
@@ -40,7 +40,7 @@ class RobotiqCornerConfigV1(DefaultEnvConfig):
     # TODO make multiple reset Q positions, one for each box to train on (randomize it)
     RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.06,)
-    RANDOM_RZ_RANGE = (0.0,)
+    RANDOM_ROT_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])
     ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
