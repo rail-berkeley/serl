@@ -303,7 +303,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
         timer.tock("total")
 
-        if step % FLAGS.eval_period == 0 and step:
+        if FLAGS.eval_period and step % FLAGS.eval_period == 0 and step:
             with timer.context("eval"):
                 evaluate_info = evaluate(
                     policy_fn=partial(agent.sample_actions, argmax=True),
