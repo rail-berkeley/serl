@@ -32,14 +32,14 @@ class RobotiqCameraEnv(RobotiqEnv):
         )
 
         cost_info = dict(
-            action_cost=-action_cost,
-            step_cost=-step_cost,
+            action_cost=action_cost,
+            step_cost=step_cost,
             suction_reward=suction_reward,
-            suction_cost=-suction_cost,
-            orientation_cost=-orientation_cost,
-            position_cost=-position_cost,
+            suction_cost=suction_cost,
+            orientation_cost=orientation_cost,
+            position_cost=position_cost,
             action_diff_cost=action_diff_cost,
-            total_cost=-action_cost - step_cost + suction_reward - suction_cost - orientation_cost - position_cost - action_diff_cost
+            total_cost=-(-action_cost - step_cost + suction_reward - suction_cost - orientation_cost - position_cost - action_diff_cost)
         )
         for key, info in cost_info.items():
             self.cost_infos[key] = info + (0. if key not in self.cost_infos else self.cost_infos[key])
