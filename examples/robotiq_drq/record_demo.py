@@ -61,7 +61,7 @@ if __name__ == "__main__":
     listener_2.start()
 
     uuid = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"pcb_insert_{success_needed}_demos_{uuid}.pkl"
+    file_name = f"box_picking_{success_needed}_demos_{uuid}.pkl"
     file_dir = os.path.dirname(os.path.realpath(__file__))  # same dir as this script
     file_path = os.path.join(file_dir, file_name)
 
