@@ -69,7 +69,7 @@ class RobotiqCameraConfigFinal(DefaultEnvConfig):  # config for 10 boxes
         [0.4391, - 1.5926, 2.3356, - 2.3129, - 1.5668, - 1.1115],
         [0.1815, - 1.2945, 1.8964, - 2.1719, - 1.5658, - 1.3841],
     ])
-    RANDOM_RESET = False
+    RANDOM_RESET = True
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_ROT_RANGE = (0.04,)
     ABS_POSE_LIMIT_HIGH = np.array([0.6, 0.1, 0.25, 0.05, 0.05, 0.2])

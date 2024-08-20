@@ -7,7 +7,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --camera_mode pointcloud \
     --batch_size 128 \
     --max_traj_length 100 \
-    --checkpoint_path "/home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/VoxNet_1quat/checkpoints voxnet only pure 32 16 8 noFT (else all) 0820-12:50"\
+    --checkpoint_path ""\
     --eval_checkpoint_step 10000 \
     --eval_n_trajs 10 \
     \

@@ -23,7 +23,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
         self.right = self.left.copy()
 
-        self.invert_axes = [-1, -1, 1, 1, 1, -1]
+        self.invert_axes = [-1, -1, 1, -1, -1, 1]
         self.deadspace = 0.15
 
     def action(self, action: np.ndarray) -> np.ndarray:
@@ -78,7 +78,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
 
         # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
-        action[3:6] = z_rot.inv().apply(action[3:6])  # z rotation invariant rotation
+        action[3:6] = z_rot.apply(action[3:6])  # z rotation invariant rotation
 
         return action
 

@@ -14,7 +14,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --batch_size 128 \
     --checkpoint_period 2500 \
     --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/VoxNet/checkpoints \
-    --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/pcb_insert_20_demos_jul29_noforcetorque.pkl \
+    --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/box_picking_20_demos_2024-08-20_voxelgrid.pkl \
     \
     --encoder_type voxnet \
     --state_mask none \
