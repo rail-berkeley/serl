@@ -12,8 +12,7 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
     none = jnp.zeros_like(all)
     no_action = all.at[:7].set(False)
     gripper = none.at[0+7:2+7].set(True)
-    no_ForceTorque = no_action.at[7+2:7+5].set(False).at[7+11:7+14].set(False)
-    gripper_Zinfo = gripper.at[7+7].set(True)
+    no_ForceTorque = all.at[7+2:7+5].set(False).at[7+11:7+14].set(False)
     action_only = none.at[:7].set(True)
     masks = dict(
         all=all,
@@ -21,7 +20,8 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
         gripper=gripper,
         position_gripper=gripper.at[5:11].set(True),
         no_ForceTorque=no_ForceTorque,
-        gripper_Zinfo=gripper_Zinfo,
+        no_ForceTorqueAction=jnp.bitwise_and(no_ForceTorque, no_action),
+        gripper_Zinfo=gripper.at[7+7].set(True),
         action_only=action_only,
     )
     assert mask_str in masks
@@ -41,7 +41,7 @@ class EncodingWrapper(nn.Module):
     encoder: nn.Module
     use_proprio: bool
     state_mask: jnp.ndarray
-    proprio_latent_dim: int = 64
+    # proprio_latent_dim: int = 64
     enable_stacking: bool = False
     image_keys: Iterable[str] = ("image",)
 
@@ -63,11 +63,11 @@ class EncodingWrapper(nn.Module):
                     state = rearrange(state, "T C -> (T C)")
                 if len(state.shape) == 3:
                     state = rearrange(state, "B T C -> B (T C)")
-            state = nn.Dense(
-                self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
-            )(state)
-            state = nn.LayerNorm()(state)
-            state = nn.tanh(state)
+            # state = nn.Dense(
+            #     self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
+            # )(state)
+            # state = nn.LayerNorm()(state)
+            # state = nn.tanh(state)
             return state
 
         encoded = []
@@ -103,11 +103,11 @@ class EncodingWrapper(nn.Module):
                         encoded = encoded.reshape(-1)
                     if len(state.shape) == 3:
                         state = rearrange(state, "B T C -> B (T C)")
-                state = nn.Dense(
-                    self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
-                )(state)
-                state = nn.LayerNorm()(state)
-                state = nn.tanh(state)
+                # state = nn.Dense(
+                #     self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
+                # )(state)
+                # state = nn.LayerNorm()(state)
+                # state = nn.tanh(state)
                 encoded = jnp.concatenate([encoded, state], axis=-1)
 
         return encoded
