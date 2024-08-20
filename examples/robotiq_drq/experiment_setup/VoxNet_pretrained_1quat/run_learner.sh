@@ -17,7 +17,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/box_picking_20_demos_2024-08-20_voxelgrid_1quat.pkl \
     \
     --encoder_type voxnet-pretrained \
-    --state_mask none \
+    --state_mask all \
     --encoder_bottleneck_dim 128 \
     --enable_obs_rotation_wrapper \
 #    --debug

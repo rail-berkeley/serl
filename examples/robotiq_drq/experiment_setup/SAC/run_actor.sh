@@ -12,7 +12,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --training_starts 500 \
     --utd_ratio 8 \
     --batch_size 2048 \
-    --eval_period 1500 \
+    --eval_period 0 \
     \
     --encoder_type none \
     --state_mask all \

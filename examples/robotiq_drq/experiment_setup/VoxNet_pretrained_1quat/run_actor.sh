@@ -12,10 +12,10 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --training_starts 500 \
     --utd_ratio 8 \
     --batch_size 128 \
-    --eval_period 1500 \
+    --eval_period 0 \
     \
     --encoder_type voxnet-pretrained \
-    --state_mask none \
+    --state_mask all \
     --encoder_bottleneck_dim 128 \
     --enable_obs_rotation_wrapper \
 #    --debug

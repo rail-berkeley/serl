@@ -7,7 +7,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --camera_mode depth \
     --max_traj_length 100 \
     --seed 1 \
-    --max_steps 20000 \
+    --max_steps 25000 \
     --random_steps 0 \
     --training_starts 500 \
     --utd_ratio 8 \
