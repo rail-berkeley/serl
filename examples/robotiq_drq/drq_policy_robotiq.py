@@ -493,6 +493,8 @@ def main(_):
         "bottleneck_dim": FLAGS.encoder_bottleneck_dim,
         **(dict(zip(*[iter(FLAGS.encoder_kwargs)] * 2)) if FLAGS.encoder_kwargs else {}),
     }
+    encoder_kwargs = {k: (int(v) if str(v).isdigit() else v) for k, v in encoder_kwargs.items()}
+
     agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
@@ -511,7 +513,7 @@ def main(_):
     )
 
     # print useful info
-    # print_agent_params(agent, image_keys)
+    print_agent_params(agent, image_keys)
     parameter_overview(agent)
     # plot_conv3d_kernels(agent.state.params)
 
