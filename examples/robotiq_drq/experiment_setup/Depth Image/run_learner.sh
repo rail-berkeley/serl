@@ -12,13 +12,14 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --training_starts 500 \
     --utd_ratio 8 \
     --batch_size 128 \
-    --checkpoint_period 2500 \
+    --checkpoint_period 1000 \
     --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/Depth\ Image/checkpoints \
     --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/box_picking_20_demos_2024-08-20_rgb_depth.pkl \
     \
     --encoder_type resnet-pretrained-18 \
     --state_mask all \
-    --encoder_bottleneck_dim 128 \
     --encoder_kwargs pooling_method \
-    --encoder_kwargs spatial_learned_embeddings \
+    --encoder_kwargs spatial_softmax \
+    --encoder_kwargs num_kp \
+    --encoder_kwargs 128 \
 #    --debug

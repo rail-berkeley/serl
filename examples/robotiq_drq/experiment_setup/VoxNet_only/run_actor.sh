@@ -3,7 +3,7 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
     --actor \
     --env robotiq_camera_env \
-    --exp_name="Voxnet" \
+    --exp_name="voxnet only" \
     --camera_mode pointcloud \
     --max_traj_length 100 \
     --seed 1 \
@@ -15,6 +15,6 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --eval_period 0 \
     \
     --encoder_type voxnet \
-    --state_mask all \
+    --state_mask none \
     --encoder_bottleneck_dim 128 \
 #    --debug
