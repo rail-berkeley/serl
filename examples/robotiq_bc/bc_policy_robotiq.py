@@ -27,9 +27,7 @@ from serl_launcher.data.data_store import (
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
 from serl_launcher.networks.reward_classifier import load_classifier_func
-# from franka_env.envs.relative_env import RelativeFrame
-from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2EulerWrapper
-
+from robotiq_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 from robotiq_env.envs.relative_env import RelativeFrame
 
 import robotiq_env
@@ -49,6 +47,7 @@ flags.DEFINE_integer("replay_buffer_capacity", 100000, "Replay buffer capacity."
 
 flags.DEFINE_multi_string("demo_paths", None, "paths to demos")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
+flags.DEFINE_integer("checkpoint_period", 10000, "Period to save checkpoints.")
 
 flags.DEFINE_integer(
     "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
@@ -74,14 +73,15 @@ def main(_):
     rng = jax.random.PRNGKey(FLAGS.seed)
 
     # create env and load dataset
-    print(FLAGS.env)
     env = gym.make(
         FLAGS.env,
         fake_env=not FLAGS.eval_checkpoint_step,
+        camera_mode="none",
+        max_episode_length=100,
     )
-    env = SpacemouseIntervention(env)
+    # env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
-    env = Quat2EulerWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
@@ -94,7 +94,7 @@ def main(_):
     )
 
     wandb_logger = make_wandb_logger(
-        project="real-world-rl",
+        project="paper_experiments",  # TODO only temporary
         description=FLAGS.exp_name or FLAGS.env,
         debug=FLAGS.debug,
     )
@@ -128,11 +128,11 @@ def main(_):
                 agent, info = agent.update(batch)
                 wandb_logger.log(info, step=step)
 
-                if (step + 1) % 10000 == 0 and FLAGS.save_model:
+                if step and step % FLAGS.checkpoint_period == 0 and FLAGS.save_model:
                     checkpoints.save_checkpoint(
                         FLAGS.checkpoint_path,
                         agent.state,
-                        step=step + 1,
+                        step=step,
                         keep=100,
                         overwrite=True,
                     )
