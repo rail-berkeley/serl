@@ -19,6 +19,7 @@ from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.utils.sampling_utils import TemporalActionEnsemble
 from serl_launcher.utils.train_utils import (
     print_agent_params,
     parameter_overview,
@@ -76,6 +77,8 @@ flags.DEFINE_bool("enable_obs_rotation_wrapper", False,
                   "Whether to enable observation rotation wrapper (train in one quaternion)")
 flags.DEFINE_bool("enable_obs_rotation_augmentation", False,
                   "Whether to enable observation rotation augmentation (90 deg)")
+flags.DEFINE_bool("enable_temporal_ensemble_sampling", False,
+                  "Whether to enable sampling the action from a temporal ensemble: action = 0.5*a0 + 0.3*a-1 + 0.2*a-2 + 0.1*a-3")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 10000,
@@ -156,6 +159,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         )
         agent = agent.replace(state=ckpt)
         find_zero_weights(agent.state.params, print_all=False)
+        action_ensemble = TemporalActionEnsemble(activated=FLAGS.enable_temporal_ensemble_sampling)
 
         # examine model parameters if trajs==0
         if FLAGS.eval_n_trajs == 0:
@@ -169,17 +173,18 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             obs, _ = env.reset()
             done = False
             start_time = time.time()
+            action_ensemble.reset()
             while not done:
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     argmax=True,
                 )
-                actions = np.asarray(jax.device_get(actions))
 
-                next_obs, reward, done, truncated, info = env.step(actions)
+                ensembled_action = action_ensemble.sample(actions)
+                next_obs, reward, done, truncated, info = env.step(ensembled_action)
                 transition = dict(
-                    observations={"state": obs["state"].copy()},        # do not save voxel grid or images
-                    actions=actions,
+                    observations={"state": obs["state"].copy()},  # do not save voxel grid or images
+                    actions=ensembled_action,
                     next_observations={"state": next_obs["state"].copy()},
                     rewards=reward,
                     masks=1.0 - done,
@@ -449,7 +454,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 break
 
     server.stop()
-    parameter_overview(agent)       # print end state
+    parameter_overview(agent)  # print end state
 
 
 ##############################################################################
