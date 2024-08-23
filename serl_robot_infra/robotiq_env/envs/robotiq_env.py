@@ -22,8 +22,6 @@ from robotiq_env.camera.utils import PointCloudFusion, CalibrationTread
 from robotiq_env.utils.real_time_plotter import DataClient
 from robot_controllers.robotiq_controller import RobotiqImpedanceController
 
-from serl_launcher.utils.numpy_utils import bool_2_int8
-
 
 class ImageDisplayer(threading.Thread):
     def __init__(self, queue):
@@ -493,10 +491,9 @@ class RobotiqEnv(gym.Env):
 
         if self.camera_mode in ["pointcloud"]:
             voxel_grid, voxel_indices = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
-            # images["wrist_pointcloud"] = bool_2_int8(voxel_grid)
-            vs = self.observation_space["images"]["wrist_pointcloud"].shape
 
             # downsample on 2x2x2 grid with sum of points (8 as max)
+            # vs = self.observation_space["images"]["wrist_pointcloud"].shape
             # voxel_grid = np.sum(np.reshape(voxel_grid, (vs[0], 2, vs[1], 2, vs[2], 2)), axis=(1, 3, 5))
             images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
             self.displayer.display(voxel_indices)

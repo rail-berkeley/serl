@@ -187,7 +187,11 @@ def print_agent_params(agent, image_keys=("image",)):
         pretrained_encoder_count = get_size(actor["encoder"][f"encoder_{image_keys[0]}"]["pretrained_encoder"])
     except Exception as e:
         pretrained_encoder_count = 0
-    encoder_count = get_size(actor["encoder"])
+
+    try:
+        encoder_count = get_size(actor["encoder"])
+    except Exception as e:
+        encoder_count = 0
 
     actor_count = get_size(actor)
     critic_count = get_size(critic)
