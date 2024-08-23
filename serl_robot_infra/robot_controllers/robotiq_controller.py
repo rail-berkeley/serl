@@ -90,11 +90,10 @@ class RobotiqImpedanceController(threading.Thread):
         if self.verbose:
             print(f"[RIC] Controller process spawned at {self.native_id}")
 
-    def print(self, msg, probability=1., both=False):
-        if np.random.random() < probability:
-            self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
-            if both:
-                print(msg)
+    def print(self, msg, both=False):
+        self.second_console.write(f'{datetime.datetime.now()} --> {msg}\n')
+        if both:
+            print(msg)
 
     async def start_robotiq_interfaces(self, gripper=True):
         self.robotiq_control = RTDEControlInterface(self.robot_ip)

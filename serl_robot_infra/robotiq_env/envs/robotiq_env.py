@@ -116,7 +116,7 @@ class RobotiqEnv(gym.Env):
             max_episode_length: int = 100,
             save_video: bool = False,
             realtime_plot: bool = False,
-            camera_mode: str = "rgb",  # one of (rgb, grey, depth, both, pointcloud, none)
+            camera_mode: str = "rgb",  # one of (rgb, grey, depth, both(rgb depth), pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
         self.curr_path_length = 0
@@ -139,6 +139,7 @@ class RobotiqEnv(gym.Env):
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rot_range = config.RANDOM_ROT_RANGE
         self.hz = hz
+        np.random.seed(1)        # fix seed for random initial rotations
 
         camera_mode = None if camera_mode.lower() == "none" else camera_mode
         if camera_mode is not None and save_video:
