@@ -13,7 +13,7 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --utd_ratio 8 \
     --batch_size 128 \
     --checkpoint_period 1000 \
-    --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/VoxNet_only_1quat/checkpoints \
+    --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/VoxNet_only/checkpoints \
     --demo_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/box_picking_20_demos_2024-08-20_voxelgrid_1quat.pkl \
     \
     --encoder_type voxnet \
