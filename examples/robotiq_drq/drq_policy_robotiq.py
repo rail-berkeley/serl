@@ -149,6 +149,11 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     global PAUSE_EVENT_FLAG
 
     if FLAGS.eval_checkpoint_step:
+        wandb_logger = make_wandb_logger(
+            project="paper_evaluation",
+            description=FLAGS.exp_name or FLAGS.env,
+            debug=FLAGS.debug,
+        )
         success_counter = 0
         time_list = []
 
@@ -163,7 +168,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
         # examine model parameters if trajs==0
         if FLAGS.eval_n_trajs == 0:
-            # parameter_overview(agent)
+            parameter_overview(agent)
             # plot_feature_kernel_histogram(agent)
             plot_conv3d_kernels(agent.state.params)
 
@@ -172,36 +177,48 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             trajectory = []
             obs, _ = env.reset()
             done = False
-            start_time = time.time()
             action_ensemble.reset()
+            start_time = time.time()
+
+            running_reward = 0.
             while not done:
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     argmax=True,
                 )
 
-                ensembled_action = action_ensemble.sample(actions)
+                ensembled_action = action_ensemble.sample(actions)      # will return actions if not activated
                 next_obs, reward, done, truncated, info = env.step(ensembled_action)
                 transition = dict(
-                    observations={"state": obs["state"].copy()},  # do not save voxel grid or images
+                    observations=obs["state"].copy(),  # do not save voxel grid or images
                     actions=ensembled_action,
-                    next_observations={"state": next_obs["state"].copy()},
+                    next_observations=next_obs["state"].copy(),
                     rewards=reward,
                     masks=1.0 - done,
                     dones=done,
                 )
                 trajectory.append(transition)
                 obs = next_obs
+                running_reward += reward
 
                 if done:
+                    print(f"{success_counter}/{episode + 1} ", end=' ')
                     dt = time.time() - start_time
                     if reward > 50.:
                         time_list.append(dt)
-                        print(f"time: {dt}")
+                        print(f"time: {dt:.3f}s  running_rew: {running_reward:.2f}")
+                    else:
+                        print("failed!")
 
                     success_counter += (reward > 50.)
-                    print(f"{success_counter}/{episode + 1}")
                     trajectories.append({"traj": trajectory, "time": dt, "success": (reward > 50.)})
+                    infos = {
+                        "running_reward": running_reward,
+                        "time": dt,
+                        "success": float(reward > 50.),
+                        "action_cost": np.linalg.norm(np.asarray([t["actions"] for t in trajectory]), axis=1, ord=2).mean()
+                    }
+                    wandb_logger.log(infos, step=episode)
 
             # if pause event is requested, pause the actor
             if PAUSE_EVENT_FLAG.is_set():
@@ -217,7 +234,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
         print(f"success rate: {success_counter / FLAGS.eval_n_trajs if FLAGS.eval_n_trajs else 0.}")
         print(f"average time: {np.mean(time_list)}")
-        with open("trajectories.pkl", "wb") as f:
+        with open(f"trajectories {datetime.now().strftime('%d-%m %H%M')}.pkl", "wb") as f:
             import pickle
             pickle.dump(trajectories, f)
         return  # after done eval, return and exit
