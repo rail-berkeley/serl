@@ -5,4 +5,4 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/BT/bt
     --env robotiq_camera_env \
     --exp_name=bt_robotiq_policy \
     --max_traj_length 100 \
-    --eval_n_trajs 20 \
+    --eval_n_trajs 30 \

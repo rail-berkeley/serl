@@ -8,6 +8,6 @@ python /home/nico/real-world-rl/serl/examples/robotiq_bc/bc_policy_robotiq.py "$
     --max_traj_length 100 \
     --batch_size 2048 \
     --checkpoint_path /home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/BC/checkpoints \
-    --eval_checkpoint_step 20000 \
-    --eval_n_trajs 20 \
+    --eval_checkpoint_step 8000 \
+    --eval_n_trajs 30 \
     --debug # wandb is disabled when debug
