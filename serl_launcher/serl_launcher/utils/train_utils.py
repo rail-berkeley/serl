@@ -142,16 +142,18 @@ def load_pretrained_VoxNet_params(agent, image_keys=("pointcloud",)):
             f"encoder_{image_key}"
         ]
         to_replace = {
-            "conv_5x5x5": "voxnet/conv1/conv3d/kernel:0",
-            "conv_3x3x3": "voxnet/conv2/conv3d/kernel:0",
-            "conv_2x2x2": "voxnet/conv3/conv3d/kernel:0"
+            "conv_5x5x5": "voxnet/conv1/conv3d/",
+            "conv_3x3x3": "voxnet/conv2/conv3d/",
+            "conv_2x2x2": "voxnet/conv3/conv3d/"
         }
         replaced = []
         for key, weights in to_replace.items():
             if key in new_encoder_params:
                 shape = new_encoder_params[key]["kernel"].shape
                 new_encoder_params[key]["kernel"] = new_encoder_params[key]["kernel"].at[:].set(
-                    ckpt[weights][..., :shape[-1]])
+                    ckpt[weights + "kernel:0"][..., :shape[-1]])
+                new_encoder_params[key]["bias"] = new_encoder_params[key]["bias"].at[:].set(
+                    ckpt[weights + "bias:0"][:shape[-1]])
                 replaced.append(f"{key}:{shape}")
 
         print(f"replaced {replaced} in {image_key}")
