@@ -153,18 +153,19 @@ class DrQAgent(SACAgent):
 
         if encoder_type == "small":
             from serl_launcher.vision.small_encoders import SmallEncoder
-
-            encoders = {
-                image_key: SmallEncoder(
-                    features=(32, 64, 128, 256),
+            small_encoder = SmallEncoder(
+                    features=(64, 64, 32, 32),
                     kernel_sizes=(3, 3, 3, 3),
-                    strides=(2, 2, 2, 2),
+                    strides=(2, 2, 1, 1),
                     padding="VALID",
-                    pool_method="avg",
-                    bottleneck_dim=256,
+                    pool_method="spatial_learned_embeddings",
+                    bottleneck_dim=128,
                     spatial_block_size=8,
-                    name=f"encoder_{image_key}",
+                    name=f"small_encoder",
                 )
+            # use the same encoder
+            encoders = {
+                image_key: small_encoder
                 for image_key in image_keys
             }
         elif encoder_type == "resnet":
