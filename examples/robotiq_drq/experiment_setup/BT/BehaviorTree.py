@@ -15,8 +15,8 @@ class TreeState():
 
     def re_sample(self):
         rand = np.random.rand(2, 2) - 0.5
-        self.random_direction[1:3] = rand[0] / np.linalg.norm(rand[0])
-        self.random_orientation[4:6] = rand[1] / np.linalg.norm(rand[1])
+        self.random_direction[0:2] = rand[0] / np.linalg.norm(rand[0])
+        self.random_orientation[3:5] = rand[1] / np.linalg.norm(rand[1])
 
     def reset(self):
         self.current = self.down
