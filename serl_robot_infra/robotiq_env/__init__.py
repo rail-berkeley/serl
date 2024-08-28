@@ -18,3 +18,9 @@ register(
     entry_point="robotiq_env.envs.camera_env:RobotiqCameraEnvTest",
     max_episode_steps=100,
 )
+
+register(
+    id="robotiq_camera_env_eval",
+    entry_point="robotiq_env.envs.camera_env:RobotiqCameraEnvEval",
+    max_episode_steps=100,
+)

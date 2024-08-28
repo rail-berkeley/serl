@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from robotiq_env.envs.robotiq_env import RobotiqEnv
-from robotiq_env.envs.camera_env.config import RobotiqCameraConfigFinal, RobotiqCameraConfigFinalTests
+from robotiq_env.envs.camera_env.config import RobotiqCameraConfigFinal, RobotiqCameraConfigFinalTests, RobotiqCameraConfigFinalEvaluation
 
 
 class RobotiqCameraEnv(RobotiqEnv):
@@ -63,3 +63,8 @@ class RobotiqCameraEnv(RobotiqEnv):
 class RobotiqCameraEnvTest(RobotiqCameraEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, load_config=False, config=RobotiqCameraConfigFinalTests)
+
+
+class RobotiqCameraEnvEval(RobotiqCameraEnv):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs, load_config=False, config=RobotiqCameraConfigFinalEvaluation)
