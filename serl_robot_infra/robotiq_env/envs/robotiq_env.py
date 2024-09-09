@@ -139,7 +139,7 @@ class RobotiqEnv(gym.Env):
         self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rot_range = config.RANDOM_ROT_RANGE
         self.hz = hz
-        np.random.seed(1)        # fix seed for random initial rotations
+        np.random.seed(0)        # fix seed for random initial rotations
 
         camera_mode = None if camera_mode.lower() == "none" else camera_mode
         if camera_mode is not None and save_video:
@@ -400,7 +400,7 @@ class RobotiqEnv(gym.Env):
         try:
             if len(self.recording_frames):
                 video_writer = cv2.VideoWriter(
-                    f'/home/nico/real-world-rl/spacemouse_tests/videos/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4',
+                    f'/home/nico/real-world-rl/serl/examples/robotiq_drq/experiment_setup/videos/{datetime.now().strftime("%m-%d_%H-%M")}.mp4',
                     cv2.VideoWriter_fourcc(*"mp4v"),
                     10,
                     self.recording_frames[0].shape[:2][::-1],
@@ -497,6 +497,7 @@ class RobotiqEnv(gym.Env):
             # vs = self.observation_space["images"]["wrist_pointcloud"].shape
             # voxel_grid = np.sum(np.reshape(voxel_grid, (vs[0], 2, vs[1], 2, vs[2], 2)), axis=(1, 3, 5))
             images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
+
             self.displayer.display(voxel_indices)
 
         # self.recording_frames.append(
