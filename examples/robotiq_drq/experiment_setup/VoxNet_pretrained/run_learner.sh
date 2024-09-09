@@ -19,4 +19,4 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --encoder_type voxnet-pretrained \
     --state_mask all \
     --encoder_bottleneck_dim 128 \
-#    --debug
+    --debug

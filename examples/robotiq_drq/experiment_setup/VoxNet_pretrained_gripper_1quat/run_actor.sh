@@ -3,7 +3,7 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
     --actor \
     --env robotiq_camera_env \
-    --exp_name="voxnet only 1quat" \
+    --exp_name="voxnet pretrained gripper_only 1quat" \
     --camera_mode pointcloud \
     --max_traj_length 100 \
     --seed 1 \
@@ -14,8 +14,8 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --batch_size 128 \
     --eval_period 0 \
     \
-    --encoder_type voxnet \
-    --state_mask none \
+    --encoder_type voxnet-pretrained \
+    --state_mask gripper \
     --encoder_bottleneck_dim 128 \
     --enable_obs_rotation_wrapper \
 #    --debug

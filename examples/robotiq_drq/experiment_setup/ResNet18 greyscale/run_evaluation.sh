@@ -2,7 +2,7 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
     --actor \
-    --env robotiq_camera_env \
+    --env robotiq_camera_env_eval \
     --exp_name="ResNet18 greyscale Evaluation" \
     --camera_mode grey \
     --batch_size 128 \

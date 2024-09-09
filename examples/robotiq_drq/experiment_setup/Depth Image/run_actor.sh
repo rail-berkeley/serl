@@ -3,7 +3,7 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=.1 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
     --actor \
     --env robotiq_camera_env \
-    --exp_name="Depth Image" \
+    --exp_name="Depth Image small encoder" \
     --camera_mode depth \
     --max_traj_length 100 \
     --seed 1 \
@@ -14,10 +14,6 @@ python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py 
     --batch_size 128 \
     --eval_period 0 \
     \
-    --encoder_type resnet-pretrained-18 \
+    --encoder_type small \
     --state_mask all \
-    --encoder_kwargs pooling_method \
-    --encoder_kwargs spatial_softmax \
-    --encoder_kwargs num_kp \
-    --encoder_kwargs 128 \
 #    --debug

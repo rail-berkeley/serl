@@ -2,8 +2,8 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
 export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
 python /home/nico/real-world-rl/serl/examples/robotiq_drq/drq_policy_robotiq.py "$@" \
     --actor \
-    --env robotiq_camera_env \
-    --exp_name="Voxnet Evaluation" \
+    --env robotiq_camera_env_eval \
+    --exp_name="Voxnet Evaluation unseen" \
     --camera_mode pointcloud \
     --batch_size 128 \
     --max_traj_length 100 \
