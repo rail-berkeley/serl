@@ -25,6 +25,9 @@ from robotiq_env.envs.wrappers import Quat2MrpWrapper, ObservationRotationWrappe
 
 import robotiq_env
 
+from serl_launcher.utils.launcher import make_wandb_logger
+from serl_launcher.utils.sampling_utils import TemporalActionEnsemble
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "robotiq_camera_env", "Name of environment.")
@@ -50,25 +53,38 @@ def main(_):
 
     agent = BehaviorTree()
 
+    wandb_logger = make_wandb_logger(
+        project="paper_evaluation_unseen",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=False,
+    )
+    action_ensemble = TemporalActionEnsemble(activated=False)
     success_counter = 0
-    time_list = []
+
     trajectories = []
+    traj_infos = []
     for episode in range(FLAGS.eval_n_trajs):
         trajectory = []
         obs, _ = env.reset()
-        agent.reset()
         done = False
+        action_ensemble.reset()
+
+        if len(trajectories) == 0:
+            input("ready? record robot view as well!")
+
         start_time = time.time()
+
         while not done:
             actions = agent.sample_actions(
-                observations=obs
+                observations=obs,
             )
 
-            next_obs, reward, done, truncated, info = env.step(actions)
+            ensembled_action = action_ensemble.sample(actions)  # will return actions if not activated
+            next_obs, reward, done, truncated, info = env.step(ensembled_action)
             transition = dict(
-                observations={"state": obs["state"].copy()},  # do not save voxel grid or images
-                actions=actions,
-                next_observations={"state": next_obs["state"].copy()},
+                observations=obs.copy(),  # do not save voxel grid or images
+                actions=ensembled_action,
+                next_observations=next_obs.copy(),
                 rewards=reward,
                 masks=1.0 - done,
                 dones=done,
@@ -76,15 +92,36 @@ def main(_):
             trajectory.append(transition)
             obs = next_obs
 
-            if done:
-                dt = time.time() - start_time
-                if reward > 50.:
-                    time_list.append(dt)
-                    print(f"time: {dt}")
-
+            if done or truncated:
                 success_counter += (reward > 50.)
-                print(f"{success_counter}/{episode + 1}")
+                dt = time.time() - start_time
+                running_reward = np.sum(np.asarray([t["rewards"] for t in trajectory]))
+                running_reward = max(running_reward, -100.)
+
+                print(f"{success_counter}/{episode + 1} ", end=' ')
+                print(f"time: {dt:.3f}s  running_rew: {running_reward:.2f}")
+
                 trajectories.append({"traj": trajectory, "time": dt, "success": (reward > 50.)})
+                infos = {
+                    "running_reward": running_reward,
+                    "time": dt,
+                    "success_rate": float(reward > 50.),
+                    "action_cost": np.linalg.norm(np.asarray([t["actions"] for t in trajectory]), axis=1, ord=2).mean()
+                }
+                traj_infos.append(infos)
+                wandb_logger.log(infos, step=episode)
+
+    traj_infos = {k: [d[k] for d in traj_infos] for k in traj_infos[0]}  # list of dicts to dict of lists
+    mean_infos = {"mean_" + key: np.mean(val) for key, val in traj_infos.items()}
+    wandb_logger.log(mean_infos)
+    for key, value in mean_infos.items():
+        print(f"{key}: {value:.3f}")
+
+    with open(f"trajectories {datetime.now().strftime('%m-%d %H%M')}.pkl", "wb") as f:
+        import pickle
+        pickle.dump(trajectories, f)
+
+    env.close()
 
 
 if __name__ == "__main__":
