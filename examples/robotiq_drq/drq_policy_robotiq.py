@@ -150,7 +150,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
     if FLAGS.eval_checkpoint_step:
         wandb_logger = make_wandb_logger(
-            project="paper_evaluation",
+            project="paper_evaluation_unseen" if "eval" in FLAGS.env else "paper_evaluation",
             description=FLAGS.exp_name or FLAGS.env,
             debug=FLAGS.debug,
         )
@@ -173,6 +173,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             plot_conv3d_kernels(agent.state.params)
 
         trajectories = []
+        traj_infos = []
         for episode in range(FLAGS.eval_n_trajs):
             trajectory = []
             obs, _ = env.reset()
@@ -180,12 +181,12 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             action_ensemble.reset()
             start_time = time.time()
 
-            running_reward = 0.
             while not done:
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     argmax=True,
                 )
+                actions = np.asarray(jax.device_get(actions))
 
                 ensembled_action = action_ensemble.sample(actions)      # will return actions if not activated
                 next_obs, reward, done, truncated, info = env.step(ensembled_action)
@@ -199,25 +200,24 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 )
                 trajectory.append(transition)
                 obs = next_obs
-                running_reward += reward
 
-                if done:
-                    print(f"{success_counter}/{episode + 1} ", end=' ')
-                    dt = time.time() - start_time
-                    if reward > 50.:
-                        time_list.append(dt)
-                        print(f"time: {dt:.3f}s  running_rew: {running_reward:.2f}")
-                    else:
-                        print("failed!")
-
+                if done or truncated:
                     success_counter += (reward > 50.)
+                    dt = time.time() - start_time
+                    running_reward = np.sum(np.asarray([t["rewards"] for t in trajectory]))
+                    running_reward = max(running_reward, -100.)     # -100 min value
+
+                    print(f"{success_counter}/{episode + 1} ", end=' ')
+                    print(f"time: {dt:.3f}s  running_rew: {running_reward:.2f}")
+
                     trajectories.append({"traj": trajectory, "time": dt, "success": (reward > 50.)})
                     infos = {
                         "running_reward": running_reward,
                         "time": dt,
-                        "success": float(reward > 50.),
+                        "success_rate": float(reward > 50.),
                         "action_cost": np.linalg.norm(np.asarray([t["actions"] for t in trajectory]), axis=1, ord=2).mean()
                     }
+                    traj_infos.append(infos)
                     wandb_logger.log(infos, step=episode)
 
             # if pause event is requested, pause the actor
@@ -232,9 +232,14 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print("Stopping actor eval")
                     break
 
-        print(f"success rate: {success_counter / FLAGS.eval_n_trajs if FLAGS.eval_n_trajs else 0.}")
-        print(f"average time: {np.mean(time_list)}")
-        with open(f"trajectories {datetime.now().strftime('%d-%m %H%M')}.pkl", "wb") as f:
+        traj_infos = {k: [d[k] for d in traj_infos] for k in traj_infos[0]}     # list of dicts to dict of lists
+        mean_infos = {"mean_" + key: np.mean(val) for key, val in traj_infos.items()}
+        wandb_logger.log(mean_infos)
+        for key, value in mean_infos.items():
+            print(f"{key}: {value:.3f}")
+
+        filename = f"trajectories {'temp_ens' if action_ensemble.is_activated() else ''} {datetime.now().strftime('%m-%d %H%M')}.pkl"
+        with open(filename, "wb") as f:
             import pickle
             pickle.dump(trajectories, f)
         return  # after done eval, return and exit
@@ -510,7 +515,7 @@ def main(_):
 
     rng, sampling_rng = jax.random.split(rng)
 
-    assert FLAGS.encoder_kwargs is None or len(FLAGS.encoder_kwargs) % 2 == 0
+    # assert FLAGS.encoder_kwargs is None or len(FLAGS.encoder_kwargs) % 2 == 0
     encoder_kwargs = {
         "bottleneck_dim": FLAGS.encoder_bottleneck_dim,
         **(dict(zip(*[iter(FLAGS.encoder_kwargs)] * 2)) if FLAGS.encoder_kwargs else {}),
