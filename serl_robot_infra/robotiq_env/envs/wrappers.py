@@ -168,7 +168,7 @@ class ObservationRotationWrapper(gym.Wrapper):
             x, y = (observation["state"]["tcp_pose"][:2])
             self.num_rot_quadrant = int(x < 0.) * 2 + int(x * y < 0.)  # save quadrant info
         else:
-            self.num_rot_quadrant = np.random.randint(low=0, high=4)
+            self.num_rot_quadrant = int(time.time_ns()) % 4  # do not mess with seeded np.random
 
         for state in observation["state"].keys():
             if state == "gripper_state":
