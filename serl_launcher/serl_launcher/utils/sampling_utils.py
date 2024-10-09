@@ -25,3 +25,6 @@ class TemporalActionEnsemble:
         self.buffer = np.roll(self.buffer, axis=0, shift=1)
         self.buffer[0, :] = curr_action
         return np.dot(self.ensemble, self.buffer)
+
+    def is_activated(self):
+        return self.activated
