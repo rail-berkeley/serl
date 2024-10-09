@@ -418,7 +418,7 @@ class ResNet(nn.Module):
 resnetv1_18_configs = {
     "resnetv1-18-frozen": functools.partial(
         ResNet, architecture='resnet18',
-        ckpt_dir="/home/nico/real-world-rl/serl/examples/robotiq_drq/resnet18_weights.h5",
+        ckpt_dir="/examples/box_picking_drq/resnet18_weights.h5",
         pre_pooling=True
     )
 }
