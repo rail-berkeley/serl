@@ -133,7 +133,6 @@ class UR5Env(gym.Env):
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((3,), dtype=np.float32)
         self.curr_torque = np.zeros((3,), dtype=np.float32)
-        self.last_action = np.zeros(self.action_space.shape)
 
         self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.random_reset = config.RANDOM_RESET
@@ -171,6 +170,8 @@ class UR5Env(gym.Env):
             np.ones((7,), dtype=np.float32) * -1,
             np.ones((7,), dtype=np.float32),
         )
+        self.last_action = np.zeros(self.action_space.shape)
+
 
         image_space_definition = {}
         if camera_mode in ["rgb", "grey", "both"]:
@@ -260,7 +261,7 @@ class UR5Env(gym.Env):
             # voxel_grid_shape[-1] *= 8     # do not use compacting for now
             # voxel_grid_shape *= 2
             print(f"pointcloud resolution set to: {voxel_grid_shape}")
-            self.pointcloud_fusion = PointCloudFusion(angle=31., x_distance=0.205, voxel_grid_shape=voxel_grid_shape)
+            self.pointcloud_fusion = PointCloudFusion(angle=30.5, x_distance=0.185, y_distance=-0.01, voxel_grid_shape=voxel_grid_shape)
 
             # load pre calibrated, else calibrate
             if not self.pointcloud_fusion.load_finetuned():
@@ -569,6 +570,12 @@ class UR5Env(gym.Env):
         assert self.camera_mode in ["pointcloud"]
         print("calibrating pointcloud fusion...")
         # calibrate pc fusion here
+
+        obs, reward, done, truncated, _ = self.step(np.zeros((7,)))
+        pc = o3d.geometry.PointCloud()
+        fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False, cropped=False)
+        pc.points = o3d.utility.Vector3dVector(fused)
+        o3d.visualization.draw_geometries([pc])
 
         # get samples
         for i in range(num_samples):
