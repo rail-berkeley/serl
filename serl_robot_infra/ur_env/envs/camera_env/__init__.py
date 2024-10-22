@@ -1,1 +1,1 @@
-from ur_env.envs.camera_env.box_picking_camera_env import UR5CameraEnv, UR5CameraEnvTest, UR5CameraEnvEval, UR5CameraEnvDemo
+from ur_env.envs.camera_env.box_picking_camera_env import BoxPickingCameraEnv

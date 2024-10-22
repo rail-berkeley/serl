@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from ur_env.envs.ur5_env import UR5Env
-from ur_env.envs.basic_env.config import UR5CornerConfig
+from ur_env.envs.basic_env.config import UR5BasicConfig
 
 
 # used for float value comparisons (pressure of vacuum-gripper)
@@ -12,7 +12,7 @@ def is_close(value, target):
 
 class BoxPickingBasicEnv(UR5Env):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, config=UR5CornerConfig)
+        super().__init__(**kwargs, config=UR5BasicConfig)
 
     def compute_reward(self, obs, action) -> float:
         # huge action gives negative reward (like in mountain car)

@@ -143,7 +143,7 @@ def rotate_state(state: np.ndarray, num_rot: int):
 
 class ObservationRotationWrapper(gym.Wrapper):
     """
-    Convert every observation into the first quadrant of the Relative Frame
+    Convert every observation into the first and 5th octant (first quadrant in Z top view) of the Relative Frame
     """
 
     def __init__(self, env: gym.Env):
@@ -159,7 +159,6 @@ class ObservationRotationWrapper(gym.Wrapper):
     def step(self, action: np.ndarray):
         action = self.rotate_action(action=action)
         obs, reward, done, truncated, info = self.env.step(action)
-        # print("\nquadrant: ", self.num_rot_quadrant)
         rotated_obs = self.rotate_observation(obs)
         return rotated_obs, reward, done, truncated, info
 

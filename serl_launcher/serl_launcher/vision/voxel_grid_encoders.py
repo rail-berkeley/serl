@@ -8,36 +8,6 @@ import jax.lax as lax
 import jax
 
 
-class MLPEncoder(nn.Module):
-    mlp: nn.module = None
-    bottleneck_dim: Optional[int] = None
-
-    @nn.compact
-    def __call__(
-            self,
-            observations: jnp.ndarray,
-            encode: bool = True,
-            train: bool = True,
-    ):
-        # add batch dim if missing
-        no_batch_dim = len(observations.shape) < 4
-        if no_batch_dim:
-            observations = observations[None]
-
-        # flatten but keep batch tim
-        x = jnp.reshape(observations, (observations.shape[0], -1))
-
-        if encode:
-            x = self.mlp(x, train=train)
-
-        if self.bottleneck_dim is not None:
-            x = nn.Dense(self.bottleneck_dim)(x)
-            x = nn.LayerNorm()(x)
-            x = nn.tanh(x)
-
-        return x[0] if no_batch_dim else x
-
-
 class SpatialSoftArgmax3D(nn.Module):
     """
     3D Implementation of Spatial Soft Argmax
@@ -88,7 +58,7 @@ class SpatialSoftArgmax3D(nn.Module):
 
 class VoxNet(nn.Module):
     """
-    Voxnet-like implementation: https://github.com/AutoDeep/VoxNet/blob/master/src/nets/voxNet.py
+    VoxNet-like implementation: https://github.com/AutoDeep/VoxNet/blob/master/src/nets/voxNet.py
     """
 
     use_conv_bias: bool = False
@@ -104,7 +74,7 @@ class VoxNet(nn.Module):
             encode: bool = True,
             train: bool = True,
     ):
-        # observations has shape (B, X, Y, Z) (boolean for now)
+        # observations has shape (B, X, Y, Z)
         no_batch_dim = len(observations.shape) < 4
         if no_batch_dim:
             observations = observations[None]
@@ -129,7 +99,7 @@ class VoxNet(nn.Module):
             name="conv_5x5x5",
         )(x)
         x = nn.LayerNorm()(x)
-        x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, F)
+        x = l_relu(x)
 
         x = conv3d(
             features=feature_dimensions[1],
@@ -143,19 +113,18 @@ class VoxNet(nn.Module):
             x = jax.lax.stop_gradient(x)  # unfortunately also cuts gradients of the LayerNorm above
 
         x = nn.LayerNorm()(x)
-        x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, F)
+        x = l_relu(x)
 
         x = conv3d(
-            features=feature_dimensions[2],            # if pretrained, only uses [..] out of 128 pretrained params as initial weights
+            features=feature_dimensions[2], # if pretrained, uses [..] out of 128 pretrained params as initial weights
             kernel_size=(2, 2, 2),
             strides=(2, 2, 2),
             name="conv_2x2x2"
         )(x)
         x = nn.LayerNorm()(x)
-        x = l_relu(x)  # shape (B, (X-5)/8, (Y-5)/8, (Z-5)/8, F)
+        x = l_relu(x)
 
-        # x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
-        # jax.debug.print("ssam {}", x)
+        # x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)  # not used for now
 
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))

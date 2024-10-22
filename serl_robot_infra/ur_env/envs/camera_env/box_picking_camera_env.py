@@ -2,13 +2,13 @@ import numpy as np
 from typing import Tuple
 
 from ur_env.envs.ur5_env import UR5Env
-from ur_env.envs.camera_env.config import UR5CameraConfigFinal, UR5CameraConfigFinalTests, UR5CameraConfigFinalEvaluation, UR5CameraConfigDemo
+from ur_env.envs.camera_env.config import UR5CameraConfig
 
 
-class UR5CameraEnv(UR5Env):
+class BoxPickingCameraEnv(UR5Env):
     def __init__(self, load_config=True, **kwargs):
         if load_config:
-            super().__init__(**kwargs, config=UR5CameraConfigFinal)
+            super().__init__(**kwargs, config=UR5CameraConfig)
         else:
             super().__init__(**kwargs)
 
@@ -57,17 +57,3 @@ class UR5CameraEnv(UR5Env):
 
     def close(self):
         super().close()
-
-
-class UR5CameraEnvTest(UR5CameraEnv):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, load_config=False, config=UR5CameraConfigFinalTests)
-
-
-class UR5CameraEnvEval(UR5CameraEnv):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, load_config=False, config=UR5CameraConfigFinalEvaluation)
-
-class UR5CameraEnvDemo(UR5CameraEnv):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, load_config=False, config=UR5CameraConfigDemo)

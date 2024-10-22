@@ -10,21 +10,15 @@ from flax.core import frozen_dict
 
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
-from serl_launcher.common.encoding import EncodingWrapper, create_state_mask
+from serl_launcher.common.encoding import MaskedEncodingWrapper, create_state_mask
 from serl_launcher.common.optimizers import make_optimizer
 from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
-from serl_launcher.vision.voxel_grid_encoders import MLPEncoder, VoxNet
+from serl_launcher.vision.voxel_grid_encoders import VoxNet
 from serl_launcher.utils.train_utils import _unpack, concat_batches
-from serl_launcher.vision.data_augmentations import (
-    batched_random_crop,
-    batched_random_shift_voxel,
-    batched_random_rot90_action,
-    batched_random_rot90_state,
-    batched_random_rot90_voxel
-)
+from serl_launcher.vision.data_augmentations import batched_random_crop, batched_random_shift_voxel
 
 
 class DrQAgent(SACAgent):
@@ -40,10 +34,10 @@ class DrQAgent(SACAgent):
             temperature_def: nn.Module,
             # Optimizer
             actor_optimizer_kwargs={
-                "learning_rate": 3e-4,  # 3e-4
+                "learning_rate": 3e-4,
             },
             critic_optimizer_kwargs={
-                "learning_rate": 3e-4,  # 3e-4
+                "learning_rate": 3e-4,
             },
             temperature_optimizer_kwargs={
                 "learning_rate": 3e-4,
@@ -113,16 +107,15 @@ class DrQAgent(SACAgent):
         )
 
     @classmethod
-    def create_drq(
+    def create_voxel_drq(
             cls,
             rng: PRNGKey,
             observations: Data,
             actions: jnp.ndarray,
             # Model architecture
-            encoder_type: str = "small",
+            encoder_type: str = "resnet",
             use_proprio: bool = False,
             state_mask: str = "all",
-            proprio_latent_dim: int = 64,
             critic_network_kwargs: dict = {
                 "hidden_dims": [256, 256],
             },
@@ -133,11 +126,7 @@ class DrQAgent(SACAgent):
                 "tanh_squash_distribution": True,
                 "std_parameterization": "uniform",
             },
-            encoder_kwargs: dict = {
-                "pooling_method": "spatial_learned_embeddings",
-                "num_spatial_blocks": 8,
-                "bottleneck_dim": 256,
-            },
+            encoder_kwargs: dict = {},
             critic_ensemble_size: int = 2,
             critic_subsample_size: Optional[int] = None,
             temperature_init: float = 1.0,
@@ -145,7 +134,7 @@ class DrQAgent(SACAgent):
             **kwargs,
     ):
         """
-        Create a new pixel-based agent.
+        Create a new voxel-based agent.
         """
 
         policy_network_kwargs["activate_final"] = True
@@ -189,16 +178,11 @@ class DrQAgent(SACAgent):
                 name="pretrained_encoder",
             )
 
-            use_single_channel = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (
-                128, 128, 1)
-            print(f"use single channel only: {use_single_channel}")
-
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
-                    use_single_channel=use_single_channel,
                     **encoder_kwargs
                 )
                 for image_key in image_keys
@@ -212,48 +196,12 @@ class DrQAgent(SACAgent):
                 name="pretrained_encoder",
             )
 
-            use_single_channel = [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (
-                128, 128, 1)
-            print(f"use single channel only: {use_single_channel}")
-
             encoders = {
                 image_key: PreTrainedResNetEncoder(
                     rng=rng,
                     pretrained_encoder=pretrained_encoder,
                     name=f"encoder_{image_key}",
-                    use_single_channel=use_single_channel,
                     **encoder_kwargs
-                )
-                for image_key in image_keys
-            }
-        elif encoder_type == "distance-sensor":
-            from serl_launcher.vision.range_sensor import RangeSensorEncoder
-            # use depth image as range-like sensor
-            assert [value for key, value in observations.items() if key != "state"][0].shape[-3:] == (128, 128, 1)
-            import numpy as np
-
-            # 3x3 points centered in the middle
-            keypoints = [tuple(k) for k in np.stack(np.meshgrid([32, 64, 96], [32, 64, 96])).reshape((-1, 2))]
-            keypoint_size = (5, 5)
-
-            encoders = {
-                image_key: RangeSensorEncoder(
-                    name=f"encoder_{image_key}",
-                    keypoints=keypoints,
-                    keypoint_size=keypoint_size,
-                )
-                for image_key in image_keys
-            }
-        elif encoder_type == "voxel-mlp":  # not used, too many weights...
-            encoders = {
-                image_key: MLPEncoder(
-                    mlp=MLP(
-                        hidden_dims=[64],
-                        activations=nn.relu,
-                        activate_final=True,
-                        use_layer_norm=True,
-                    ),
-                    bottleneck_dim=encoder_kwargs["bottleneck_dim"],
                 )
                 for image_key in image_keys
             }
@@ -274,12 +222,11 @@ class DrQAgent(SACAgent):
 
         state_mask_arr = create_state_mask(state_mask)
         print(f"state_mask: {state_mask}  {state_mask_arr.astype(jnp.int32)}")
-        encoder_def = EncodingWrapper(
+        encoder_def = MaskedEncodingWrapper(
             encoder=encoders,
             use_proprio=use_proprio,
             enable_stacking=True,
             image_keys=image_keys,
-            # proprio_latent_dim=proprio_latent_dim,
             state_mask=state_mask_arr
         )
 
@@ -337,46 +284,7 @@ class DrQAgent(SACAgent):
 
         return agent
 
-    def batch_augmentation_fn(self, observations, next_observations, actions, rng, activated=True):
-        if not activated:
-            return observations, next_observations, actions
-        for pixel_key in self.config["image_keys"]:
-            if not "pointcloud" in pixel_key:
-                continue  # skip if not pointcloud
-            only_180 = self.config["activate_batch_rotation"] == 180
-
-            # rotation of state, action and voxel grid (use the same rng for all of them, so same rotation)
-            # jax.debug.print("before {}  {}  {}", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
-            # jax.debug.print("voxel: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
-            # jax.debug.print("action: {}", actions[0, :])
-            observations = observations.copy(
-                add_or_replace={
-                    "state": batched_random_rot90_state(
-                        observations["state"], rng, num_batch_dims=2, only_180=only_180
-                    ),
-                    pixel_key: batched_random_rot90_voxel(
-                        observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
-                    ),
-                }
-            )
-            next_observations = next_observations.copy(
-                add_or_replace={
-                    "state": batched_random_rot90_state(
-                        next_observations["state"], rng, num_batch_dims=2, only_180=only_180
-                    ),
-                    pixel_key: batched_random_rot90_voxel(
-                        next_observations[pixel_key], rng, num_batch_dims=2, only_180=only_180
-                    )
-                }
-            )
-            actions = batched_random_rot90_action(actions, rng, only_180=only_180)
-
-            # jax.debug.print("after {}  {}  {}\n", observations["state"][0, 0, :], next_observations["state"][0, 0, :], actions[0, :])
-            # jax.debug.print("voxel after: \n{}", jnp.mean(observations[pixel_key][0, 0, ...].reshape((5, 10, 5, 10, 40)), axis=(1, 3, 4)))
-            # jax.debug.print("action after: {}", actions[0, :])
-            return observations, next_observations, actions
-
-    def image_augmentation_fn(self, obs_rng, observations, next_obs_rng, next_observations):
+    def data_augmentation_fn(self, rng, observations):
         # TODO make it configurable: see https://github.com/rail-berkeley/serl/pull/67
 
         for pixel_key in self.config["image_keys"]:
@@ -385,14 +293,7 @@ class DrQAgent(SACAgent):
                 observations = observations.copy(
                     add_or_replace={
                         pixel_key: batched_random_shift_voxel(
-                            observations[pixel_key], obs_rng, padding=3, num_batch_dims=2
-                        )
-                    }
-                )
-                next_observations = next_observations.copy(
-                    add_or_replace={
-                        pixel_key: batched_random_shift_voxel(
-                            next_observations[pixel_key], next_obs_rng, padding=3, num_batch_dims=2
+                            observations[pixel_key], rng, padding=3, num_batch_dims=2
                         )
                     }
                 )
@@ -402,18 +303,11 @@ class DrQAgent(SACAgent):
                 observations = observations.copy(
                     add_or_replace={
                         pixel_key: batched_random_crop(
-                            observations[pixel_key], obs_rng, padding=4, num_batch_dims=2
+                            observations[pixel_key], rng, padding=4, num_batch_dims=2
                         )
                     }
                 )
-                next_observations = next_observations.copy(
-                    add_or_replace={
-                        pixel_key: batched_random_crop(
-                            next_observations[pixel_key], next_obs_rng, padding=4, num_batch_dims=2
-                        )
-                    }
-                )
-        return observations, next_observations
+        return observations
 
     @partial(jax.jit, static_argnames=("utd_ratio", "pmap_axis"))
     def update_high_utd(
@@ -439,26 +333,13 @@ class DrQAgent(SACAgent):
             batch = _unpack(batch)
 
         rng = new_agent.state.rng
-        rng, obs_rng, next_obs_rng, rot90_rng = jax.random.split(rng, 4)
-        obs, next_obs = self.image_augmentation_fn(
-            obs_rng=obs_rng,
-            observations=batch["observations"],
-            next_obs_rng=next_obs_rng,
-            next_observations=batch["next_observations"]
-        )
-
-        obs, next_obs, actions = self.batch_augmentation_fn(
-            observations=obs,
-            next_observations=next_obs,
-            actions=batch["actions"],
-            rng=rot90_rng,
-            activated=self.config["activate_batch_rotation"] > 0,
-        )
+        rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
+        obs = self.data_augmentation_fn(obs_rng, batch["observations"])
+        next_obs = self.data_augmentation_fn(next_obs_rng, batch["next_observations"])
         batch = batch.copy(
             add_or_replace={
                 "observations": obs,
                 "next_observations": next_obs,
-                "actions": actions,
             }
         )
 
@@ -485,26 +366,13 @@ class DrQAgent(SACAgent):
         # TODO implement K=2 and M=2
 
         rng = new_agent.state.rng
-        rng, obs_rng, next_obs_rng, rot90_rng = jax.random.split(rng, 4)
-        obs, next_obs = self.image_augmentation_fn(
-            obs_rng=obs_rng,
-            observations=batch["observations"],
-            next_obs_rng=next_obs_rng,
-            next_observations=batch["next_observations"]
-        )
-        obs, next_obs, actions = self.batch_augmentation_fn(
-            observations=obs,
-            next_observations=next_obs,
-            actions=batch["actions"],
-            rng=rot90_rng,
-            activated=self.config["activate_batch_rotation"] > 0,
-        )
-
+        rng, obs_rng, next_obs_rng = jax.random.split(rng, 3)
+        obs = self.data_augmentation_fn(obs_rng, batch["observations"])
+        next_obs = self.data_augmentation_fn(next_obs_rng, batch["next_observations"])
         batch = batch.copy(
             add_or_replace={
                 "observations": obs,
                 "next_observations": next_obs,
-                "actions": actions,
             }
         )
 
@@ -519,36 +387,3 @@ class DrQAgent(SACAgent):
         del critic_infos["temperature"]
 
         return new_agent, critic_infos
-
-    def test_augmentation(self, batch: Batch):
-        if len(self.config["image_keys"]) and self.config["image_keys"][0] not in batch["next_observations"]:
-            batch = _unpack(batch)
-
-        obs_cp, next_obs_cp, actions_cp = batch["observations"].copy(), batch["next_observations"].copy(), batch[
-            "actions"].copy()
-
-        rng, rot90_rng = jax.random.split(self.state.rng, 2)
-        obs, next_obs, actions = self.batch_augmentation_fn(
-            observations=batch["observations"],
-            next_observations=batch["next_observations"],
-            actions=batch["actions"],
-            rng=rot90_rng,
-            activated=True,
-        )
-
-        for _ in range(3):
-            obs, next_obs, actions = self.batch_augmentation_fn(
-                observations=obs,
-                next_observations=next_obs,
-                actions=actions,
-                rng=rot90_rng,
-                activated=True,
-            )
-
-        # each instance of the batch is rotated by 0, 90, 180 or 270 degrees,
-        # 4 times these should all return to the original one
-        print("-" * 35, "\nAsugmentation check here!\n", "-" * 35)
-        jax.debug.print("obs {}", jnp.sum(jnp.abs(obs["state"] - obs_cp["state"])))
-        jax.debug.print("next_obs {}", jnp.sum(jnp.abs(next_obs["state"] - next_obs_cp["state"])))
-        jax.debug.print("actions {}", jnp.sum(jnp.abs(actions - actions_cp)))
-        # they are all in range 1e-6 to 1e-7, check done

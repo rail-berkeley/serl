@@ -28,7 +28,7 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
     return masks[mask_str]
 
 
-class EncodingWrapper(nn.Module):
+class MaskedEncodingWrapper(nn.Module):
     """
     Encodes observations into a single flat encoding, adding additional
     functionality for adding proprioception and stopping the gradient.
@@ -41,7 +41,6 @@ class EncodingWrapper(nn.Module):
     encoder: nn.Module
     use_proprio: bool
     state_mask: jnp.ndarray
-    # proprio_latent_dim: int = 64
     enable_stacking: bool = False
     image_keys: Iterable[str] = ("image",)
 
@@ -63,11 +62,7 @@ class EncodingWrapper(nn.Module):
                     state = rearrange(state, "T C -> (T C)")
                 if len(state.shape) == 3:
                     state = rearrange(state, "B T C -> B (T C)")
-            # state = nn.Dense(
-            #     self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
-            # )(state)
-            # state = nn.LayerNorm()(state)
-            # state = nn.tanh(state)
+            # do not use proprio latent dim
             return state
 
         encoded = []
@@ -93,8 +88,7 @@ class EncodingWrapper(nn.Module):
         if self.use_proprio:
             # project state to embeddings as well
             state = observations["state"]
-            state = state[..., self.state_mask]      # ignore certain elements
-            # jax.debug.print("state {}", state)
+            state = state[..., self.state_mask]      # only propagate non-zero mask entries
             if state.shape[-1] != 0:
                 if self.enable_stacking:
                     # Combine stacking and channels into a single dimension
@@ -103,11 +97,7 @@ class EncodingWrapper(nn.Module):
                         encoded = encoded.reshape(-1)
                     if len(state.shape) == 3:
                         state = rearrange(state, "B T C -> B (T C)")
-                # state = nn.Dense(
-                #     self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
-                # )(state)
-                # state = nn.LayerNorm()(state)
-                # state = nn.tanh(state)
+                # do not use proprio latent di
                 encoded = jnp.concatenate([encoded, state], axis=-1)
 
         return encoded

@@ -23,16 +23,13 @@ from serl_launcher.utils.sampling_utils import TemporalActionEnsemble
 from serl_launcher.utils.train_utils import (
     print_agent_params,
     parameter_overview,
-    plot_feature_kernel_histogram,
-    find_zero_weights,
-    plot_conv3d_kernels,
 )
 
 from agentlace.trainer import TrainerServer, TrainerClient
 from agentlace.data.data_store import QueuedDataStore
 
 from serl_launcher.utils.launcher import (
-    make_drq_agent,
+    make_voxel_drq_agent,
     make_trainer_config,
     make_wandb_logger,
 )
@@ -41,8 +38,6 @@ from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObserv
 from serl_launcher.wrappers.observation_statistics_wrapper import ObservationStatisticsWrapper
 from ur_env.envs.relative_env import RelativeFrame
 from ur_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper, ObservationRotationWrapper
-from serl_launcher.vision.data_augmentations import batched_random_rot90_state, batched_random_rot90_voxel, \
-    batched_random_rot90_action
 
 import ur_env
 
@@ -57,26 +52,22 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "box_picking_camera_env", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
-flags.DEFINE_string("exp_name", "DRQ agent", "Name of the experiment for wandb logging.")
+flags.DEFINE_string("exp_name", "box picking drq", "Name of the experiment for wandb logging.")
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
-flags.DEFINE_string("camera_mode", "rgb", "Camera mode, one of (rgb, depth, both)")
+flags.DEFINE_string("camera_mode", "rgb", "Camera mode, one of (rgb, depth, both, pointcloud)")
 
-flags.DEFINE_integer("seed", 42, "Random seed.")
+flags.DEFINE_integer("seed", 1, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
-flags.DEFINE_string("state_mask", "no_ForceTorque",
-                    "if all the states should be considered, possible: (all, none, no_ForceTorque, gripper, position_gripper)")
-flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
+flags.DEFINE_string("state_mask", "all",
+                    "if all the states should be considered, see serl_launcher/common/encoding for more info")
+flags.DEFINE_string("encoder_type", "voxnet-pretrained", "Encoder type.")
 flags.DEFINE_integer("encoder_bottleneck_dim", 128, "bottleneck dimension of the encoder")
-# flags.DEFINE_integer("proprio_latent_dim", 64,
-#                     "the latent dimension for the state, will be concatenated with encoder bottleneck dim before being passed onward")
 flags.DEFINE_multi_string("encoder_kwargs", None, "Encoder kwargs in the form ['dict key', 'dict value']")
 flags.DEFINE_bool("enable_obs_rotation_wrapper", False,
                   "Whether to enable observation rotation wrapper (train in one quaternion)")
-flags.DEFINE_bool("enable_obs_rotation_augmentation", False,
-                  "Whether to enable observation rotation augmentation (90 deg)")
 flags.DEFINE_bool("enable_temporal_ensemble_sampling", False,
                   "Whether to enable sampling the action from a temporal ensemble: action = 0.5*a0 + 0.3*a-1 + 0.2*a-2 + 0.1*a-3")
 
@@ -155,7 +146,6 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             debug=FLAGS.debug,
         )
         success_counter = 0
-        time_list = []
 
         ckpt = checkpoints.restore_checkpoint(
             FLAGS.checkpoint_path,
@@ -163,14 +153,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             step=FLAGS.eval_checkpoint_step,
         )
         agent = agent.replace(state=ckpt)
-        find_zero_weights(agent.state.params, print_all=False)
         action_ensemble = TemporalActionEnsemble(activated=FLAGS.enable_temporal_ensemble_sampling)
-
-        # examine model parameters if trajs==0
-        if FLAGS.eval_n_trajs == 0:
-            parameter_overview(agent)
-            # plot_feature_kernel_histogram(agent)
-            plot_conv3d_kernels(agent.state.params)
 
         trajectories = []
         traj_infos = []
@@ -271,29 +254,13 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         with timer.context("sample_actions"):
             if step < FLAGS.random_steps:
                 actions = env.action_space.sample()
-            elif not agent.config["activate_batch_rotation"]:
+            else:
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
                     seed=key,
                     deterministic=False,
                 )
-                actions = np.asarray(jax.device_get(actions))
-            else:
-                sampling_rng, rot_rng, key = jax.random.split(sampling_rng, 3)
-
-                rotated_obs = copy.deepcopy(obs)
-                rotated_obs["state"] = batched_random_rot90_state(obs["state"], rot_rng)
-                rotated_obs["wrist_pointcloud"] = batched_random_rot90_voxel(obs["wrist_pointcloud"], rot_rng)
-
-                actions = agent.sample_actions(
-                    observations=jax.device_put(rotated_obs),
-                    seed=key,
-                    deterministic=False,
-                )
-                for _ in range(3):
-                    actions = batched_random_rot90_action(actions[None, ...], rot_rng)[0, ...]  # rotate back
-
                 actions = np.asarray(jax.device_get(actions))
 
         # Step environment
@@ -522,14 +489,13 @@ def main(_):
     }
     encoder_kwargs = {k: (int(v) if str(v).isdigit() else v) for k, v in encoder_kwargs.items()}
 
-    agent: DrQAgent = make_drq_agent(
+    agent: DrQAgent = make_voxel_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
         sample_action=env.action_space.sample(),
         image_keys=image_keys,
         encoder_type=FLAGS.encoder_type,
         state_mask=FLAGS.state_mask,
-        # proprio_latent_dim=FLAGS.proprio_latent_dim,
         encoder_kwargs=encoder_kwargs
     )
 
@@ -542,9 +508,7 @@ def main(_):
     # print useful info
     print_agent_params(agent, image_keys)
     parameter_overview(agent)
-    # plot_conv3d_kernels(agent.state.params)
 
-    agent.config["activate_batch_rotation"] = FLAGS.enable_obs_rotation_augmentation  # obs batch rotation control
     if FLAGS.enable_obs_rotation_augmentation:
         print("Batch Observation Rotation enabled!")
     assert not FLAGS.enable_obs_rotation_augmentation or not FLAGS.enable_obs_rotation_wrapper  # both is pointless
@@ -583,12 +547,6 @@ def main(_):
                 for obs_name in to_pop:
                     traj["observations"].pop(obs_name)
                     traj["next_observations"].pop(obs_name)
-
-                # convert to grey here
-                if FLAGS.camera_mode == "grey":
-                    gray = np.array([0.2989, 0.5870, 0.1140])
-                    traj["observations"]["wrist"] = np.dot(traj["observations"]["wrist"], gray)[..., None]
-                    traj["next_observations"]["wrist"] = np.dot(traj["next_observations"]["wrist"], gray)[..., None]
 
                 replay_buffer.insert(traj)
         print(f"replay buffer size: {len(replay_buffer)}")

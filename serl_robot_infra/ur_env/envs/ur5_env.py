@@ -374,10 +374,8 @@ class UR5Env(gym.Env):
             time.sleep(0.1)
             while self.controller.is_moving():
                 time.sleep(0.1)
-            return reset_shift
         else:
             self.curr_reset_pose[:] = reset_pose
-            return np.zeros((2,))
 
     def go_to_detected_box(self):
         """"
@@ -447,11 +445,11 @@ class UR5Env(gym.Env):
         if self.save_video:
             self.save_video_recording()
 
-        shift = self.go_to_rest()
+        self.go_to_rest()
         self.curr_path_length = 0
 
         obs = self._get_obs(np.zeros_like(self.last_action))
-        return obs, {"reset_shift": shift}
+        return obs
 
     def save_video_recording(self):
         try:

@@ -60,8 +60,6 @@ class RelativeFrame(gym.Wrapper):
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
 
-        # obs['state']['tcp_pose'][:2] -= info['reset_shift']  # set rel pose to original reset pose (no random)
-
         self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
         self.rotation_matrix_reset = self.rotation_matrix.copy()
         if self.include_relative_pose:

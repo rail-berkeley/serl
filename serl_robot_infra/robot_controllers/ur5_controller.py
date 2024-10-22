@@ -3,8 +3,6 @@ import time
 import threading
 import asyncio
 import numpy as np
-import matplotlib.pyplot as plt
-from responses import target
 from scipy.spatial.transform import Rotation as R
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
@@ -33,7 +31,6 @@ class UrImpedanceController(threading.Thread):
             kd=2200,
             config=None,
             verbose=False,
-            plot=False,
             *args,
             **kwargs
     ):
@@ -50,7 +47,6 @@ class UrImpedanceController(threading.Thread):
         self.kd = kd
         self.gripper_timeout = {"timeout": config.GRIPPER_TIMEOUT, "last_grip": time.monotonic() - 1e6}
         self.verbose = verbose
-        self.do_plot = plot
 
         self.target_pos = np.zeros((7,), dtype=np.float32)  # new as quat to avoid +- problems with axis angle repr.
         self.target_grip = np.zeros((1,), dtype=np.float32)
@@ -242,35 +238,6 @@ class UrImpedanceController(threading.Thread):
 
         return np.concatenate((force_pos, torque))
 
-    def plot(self):
-        if self.horizon[0] < self.horizon[1]:
-            self.horizon[0] += 1
-            self.hist_data[0].append(self.curr_pos.copy())
-            self.hist_data[1].append(self.target_pos.copy())
-            return
-
-        self.ur_control.forceModeStop()
-
-        print("[RIC] plotting")
-        real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
-        target_pos = np.array([pose2rotvec(q) for q in self.hist_data[1]])
-
-        plt.figure()
-        fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 8), dpi=200)
-        ax_label = [{'x': f'time {self.frequency} [Hz]', 'y': ylabel} for ylabel in ["[mm]", "[rad]"]]
-        plot_label = "X Y Z RX RY RZ".split(' ')
-
-        for i in range(6):
-            ax = axes[i % 3, i // 3]
-            ax.plot(real_pos[:, i], 'b', label=plot_label[i])
-            ax.plot(target_pos[:, i], 'g')
-            ax.set(xlabel=ax_label[i // 3]['x'], ylabel=ax_label[i // 3]['y'])
-            ax.legend()
-
-        fig.suptitle(f"params-->  kp:{self.kp}  kd:{self.kd}")
-        plt.show(block=True)
-        self.stop()
-
     async def send_gripper_command(self, force_release=False):
         if force_release:
             await self.robotiq_gripper.automatic_release()
@@ -373,10 +340,6 @@ class UrImpedanceController(threading.Thread):
                 # update robot state and check for truncation
                 await self._update_robot_state()
                 self._truncate_check()
-
-                # only used for plotting
-                if self.do_plot:
-                    self.plot()
 
                 # calculate force
                 force = self._calculate_force()

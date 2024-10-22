@@ -10,9 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow as tf
 import wandb
-import matplotlib.pyplot as plt
 from flax.core import frozen_dict
-from jaxlib.xla_extension import ArrayImpl
 
 
 def concat_batches(offline_batch, online_batch, axis=1):
@@ -208,75 +206,3 @@ def print_agent_params(agent, image_keys=("image",)):
 def parameter_overview(agent):
     from clu import parameter_overview
     print(parameter_overview.get_parameter_overview(agent.state.params))
-
-
-def plot_feature_kernel_histogram(agent):
-    import matplotlib.pyplot as plt
-
-    feature_kernel = agent.state.params["modules_actor"]["network"]["Dense_0"]["kernel"]
-    feature_bias = agent.state.params["modules_actor"]["network"]["Dense_0"]["bias"]
-    print(f"kernel has shape: {feature_kernel.shape}")
-
-    plots = feature_kernel.shape[0] // 256 + 1
-    fig, axes = plt.subplots(nrows=plots, ncols=1, sharex=True, sharey=True, figsize=(5, 3 * plots))
-
-    feature_kernel = feature_kernel.mean(axis=1)
-
-    for p in range(plots):
-        legend = f"image {p}" if p < plots - 1 else "observations"
-        print(f"{legend} mean and std:   ",
-              [feature_kernel[p * 256:(p + 1) * 256].mean(), feature_kernel[p * 256:(p + 1) * 256].std()])
-        axes[p].hist(feature_kernel[p * 256:(p + 1) * 256], bins=50)
-        axes[p].set_title(legend)
-    plt.show()
-
-
-def find_zero_weights(params, print_str="", print_all=False):
-    if isinstance(params, dict):
-        for key in params.keys():
-            find_zero_weights(params[key], print_str=print_str + " " + key, print_all=print_all)
-    else:
-        if print_all:
-            print(f"{print_str}  m:{params.mean()}  s:{params.std()}")
-            return
-        if abs(params.mean()) < 1e-5:
-            print(f" zero weights--> {print_str}    std: {params.std()}")
-        else:
-            print(".", end='')
-
-
-def plot_3d_kernel(kernel, nr):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    x_len, y_len, z_len = kernel.shape
-
-    x = np.arange(x_len)
-    y = np.arange(y_len)
-    z = np.arange(z_len)
-    x, y, z = np.meshgrid(x, y, z, indexing='ij')
-
-    # Normalize the values for color mapping
-    norm = plt.Normalize(kernel.min(), kernel.max())
-    colors = plt.cm.viridis(norm(kernel))
-    alpha = np.clip(np.abs(kernel) * 9, 0., 1.)
-    alpha = np.clip(np.where(alpha < 0.17, 0., alpha), 0., 1.)
-
-    for i in range(x_len):
-        for j in range(y_len):
-            for k in range(z_len):
-                ax.bar3d(i, j, k, .9, .9, .9, color=colors[i, j, k], alpha=alpha[i, j, k])
-
-    ax.set_title(str(nr))
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
-    ax.set_zticklabels([])
-    plt.show()
-
-
-def plot_conv3d_kernels(params):
-    kernels = params["modules_actor"]["encoder"]["encoder_wrist_pointcloud"]["conv_5x5x5"]["kernel"]
-    # shape (5, 5, 5, 1, 32)
-    for i in range(kernels.shape[-1]):
-        print(kernels[..., 0, i].mean(), kernels[..., 0, i].std())
-        plot_3d_kernel(kernels[..., 0, i], i)

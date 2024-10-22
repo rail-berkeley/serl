@@ -6,7 +6,6 @@ import copy
 import pickle as pkl
 from tqdm import tqdm
 import gymnasium as gym
-from pprint import pprint
 from pynput import keyboard
 
 from ur_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
@@ -83,7 +82,6 @@ if __name__ == "__main__":
                 )
             )
             transitions.append(transition)
-            # pprint(transition)
 
             obs = next_obs
 

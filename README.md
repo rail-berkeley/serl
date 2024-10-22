@@ -18,7 +18,7 @@
 2. Use the [config](https://github.com/nisutte/voxel-serl/blob/develop/serl_robot_infra/ur_env/envs/camera_env/config.py) file to configure all the robot-arm specific parameters, as well as gripper and camera infos.
 3. Go to the [box picking](https://github.com/nisutte/voxel-serl/blob/develop/examples/box_picking_drq) folder and modify the bash files ```run_learner.py``` and ```run_actor.py```. If no images are used, set ```camera_mode``` to ```none``` . WandB logging can be deactivated if ```debug``` is set to True.
 4. Record 20 demostrations using [record_demo.py](https://github.com/nisutte/voxel-serl/blob/develop/examples/box_picking_drq/record_demo.py) in the same folder. Double check that the ```camera_mode``` and all environment-wrappers are identical to [drq_policy.py](https://github.com/nisutte/voxel-serl/blob/develop/examples/box_picking_drq/drq_policy.py).
-5. Execute ```run_learner.py``` and ```run_actor.py``` simultaneously to start the RL training.
+5. Update the demonstrations path in the ```run_learner.py``` and execute it and ```run_actor.py``` simultaneously to start the RL training.
 6. To evaluate on a policy, modify and execute ```run_evaluation.py``` with the specified checkpoint path and step. 
 
 ## Modaliy examples
@@ -30,3 +30,6 @@
 - [ ] improve readme
 - [ ] add paper link
 - [ ] document how to use in a real setting
+
+## Notes
+- clu needs to be installed for a parameter overview of the model

@@ -331,7 +331,6 @@ class PreTrainedResNetEncoder(nn.Module):
     num_kp: int = 64        # for Spatial Softmax
     bottleneck_dim: Optional[int] = None
     pretrained_encoder: nn.module = None
-    use_single_channel: bool = False
 
     @nn.compact
     def __call__(
@@ -341,11 +340,6 @@ class PreTrainedResNetEncoder(nn.Module):
             train: bool = True,
     ):
         x = observations
-
-        # if we want to use single channel image data (grayscale)
-        if self.use_single_channel:
-            assert x.shape[-3:] == (128, 128, 1)  # check shape
-            x = jnp.repeat(x, 3, axis=-1)
 
         if encode:
             x = self.pretrained_encoder(x, train=train)
