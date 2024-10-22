@@ -3,7 +3,7 @@
 import time
 from functools import partial
 
-import gymnasium as gym
+import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -20,7 +20,7 @@ from serl_launcher.utils.launcher import (
     make_replay_buffer,
 )
 
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
@@ -36,14 +36,14 @@ flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 8, "UTD ratio.")
+flags.DEFINE_integer("critic_actor_ratio", 8, "critic to actor update ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 1000000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 30, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
@@ -168,10 +168,17 @@ def actor(agent: SACAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=None):
+def learner(rng, agent: SACAgent, replay_buffer, replay_iterator):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
 
@@ -207,6 +214,14 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
+
+    # show replay buffer progress bar during training
+    pbar = tqdm.tqdm(
+        total=FLAGS.replay_buffer_capacity,
+        initial=len(replay_buffer),
+        desc="replay buffer",
+    )
+
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
         # Train the networks
         with timer.context("sample_replay_buffer"):
@@ -229,6 +244,7 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator, wandb_logger=N
                 FLAGS.checkpoint_path, agent.state, step=update_steps, keep=20
             )
 
+        pbar.update(len(replay_buffer) - pbar.n)  # update replay buffer bar
         update_steps += 1
 
 
@@ -266,7 +282,8 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = make_replay_buffer(
             env,
             capacity=FLAGS.replay_buffer_capacity,
@@ -274,21 +291,9 @@ def main(_):
             type="replay_buffer",
             preload_rlds_path=FLAGS.preload_rlds_path,
         )
-
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
         replay_iterator = replay_buffer.get_iterator(
             sample_args={
-                "batch_size": FLAGS.batch_size * FLAGS.utd_ratio,
+                "batch_size": FLAGS.batch_size * FLAGS.critic_actor_ratio,
             },
             device=sharding.replicate(),
         )
@@ -299,12 +304,11 @@ def main(_):
             agent,
             replay_buffer,
             replay_iterator=replay_iterator,
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
-        data_store = QueuedDataStore(50000)  # the queue size on the actor
+        data_store = QueuedDataStore(2000)  # the queue size on the actor
 
         # actor loop
         print_green("starting actor loop")

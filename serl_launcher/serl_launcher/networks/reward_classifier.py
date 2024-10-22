@@ -5,11 +5,12 @@ import flax.linen as nn
 from flax.training.train_state import TrainState
 from flax.training import checkpoints
 import optax
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 
 from serl_launcher.vision.resnet_v1 import resnetv1_configs, PreTrainedResNetEncoder
 from serl_launcher.common.encoding import EncodingWrapper
+from flax.core.frozen_dict import freeze, unfreeze
 
 
 class BinaryClassifier(nn.Module):
@@ -57,6 +58,7 @@ def create_classifier(
     classifier_def = BinaryClassifier(encoder_def=encoder_def)
     params = classifier_def.init(key, sample)["params"]
     classifier_def = BinaryClassifier(encoder_def=encoder_def)
+    params = freeze(params)
     classifier = TrainState.create(
         apply_fn=classifier_def.apply,
         params=params,
@@ -69,6 +71,7 @@ def create_classifier(
     print(
         f"Loaded {param_count/1e6}M parameters from ResNet-10 pretrained on ImageNet-1K"
     )
+
     new_params = classifier.params.unfreeze()
     for image_key in image_keys:
         if "pretrained_encoder" in new_params["encoder_def"][f"encoder_{image_key}"]:
@@ -80,7 +83,6 @@ def create_classifier(
                         "pretrained_encoder"
                     ][k] = encoder_params[k]
                     print(f"replaced {k} in encoder_{image_key}")
-    from flax.core.frozen_dict import freeze
 
     new_params = freeze(new_params)
     classifier = classifier.replace(params=new_params)
@@ -92,6 +94,7 @@ def load_classifier_func(
     sample: Dict,
     image_keys: List[str],
     checkpoint_path: str,
+    step: Optional[int] = None,
 ) -> Callable[[Dict], jnp.ndarray]:
     """
     Return: a function that takes in an observation
@@ -101,7 +104,7 @@ def load_classifier_func(
     classifier = checkpoints.restore_checkpoint(
         checkpoint_path,
         target=classifier,
-        step=100,
+        step=step,
     )
     func = lambda obs: classifier.apply_fn(
         {"params": classifier.params}, obs, train=False

@@ -5,9 +5,7 @@ python async_sac_state_sim.py "$@" \
     --env PandaPickCube-v0 \
     --exp_name=serl_dev_sim_test \
     --seed 0 \
-    --random_steps 1000 \
     --training_starts 1000 \
-    --utd_ratio 8 \
+    --critic_actor_ratio 8 \
     --batch_size 256 \
-    --eval_period 2000 \
     --debug # wandb is disabled when debug

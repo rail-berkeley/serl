@@ -9,11 +9,12 @@ import tqdm
 from absl import app, flags
 from flax.training import checkpoints
 
-import gymnasium as gym
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+import pickle as pkl
+import os
+import gym
+from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 from serl_launcher.agents.continuous.drq import DrQAgent
-from serl_launcher.common.evaluation import evaluate
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 from serl_launcher.utils.train_utils import concat_batches
@@ -28,6 +29,7 @@ from serl_launcher.utils.launcher import (
     make_wandb_logger,
 )
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.networks.reward_classifier import load_classifier_func
 from franka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
     GripperCloseEnv,
@@ -47,14 +49,14 @@ flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
+flags.DEFINE_integer("critic_actor_ratio", 4, "critic to actor update ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 30, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
@@ -218,10 +220,17 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None):
+def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
 
@@ -276,7 +285,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
     for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="learner"):
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
-        for critic_step in range(FLAGS.utd_ratio - 1):
+        for critic_step in range(FLAGS.critic_actor_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
                 demo_batch = next(demo_iterator)
@@ -336,7 +345,6 @@ def main(_):
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
     if FLAGS.actor:
         # initialize the classifier and wrap the env
-        from serl_launcher.networks.reward_classifier import load_classifier_func
 
         if FLAGS.reward_classifier_ckpt_path is None:
             raise ValueError("reward_classifier_ckpt_path must be specified for actor")
@@ -365,37 +373,31 @@ def main(_):
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
         demo_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=10000,
             image_keys=image_keys,
         )
-        import pickle as pkl
 
-        with open(FLAGS.demo_path, "rb") as f:
-            trajs = pkl.load(f)
-            for traj in trajs:
-                demo_buffer.insert(traj)
-        print(f"demo buffer size: {len(demo_buffer)}")
+        if FLAGS.demo_path:
+            # Check if the file exists
+            if not os.path.exists(FLAGS.demo_path):
+                raise FileNotFoundError(f"File {FLAGS.demo_path} not found")
+
+            with open(FLAGS.demo_path, "rb") as f:
+                trajs = pkl.load(f)
+                for traj in trajs:
+                    demo_buffer.insert(traj)
+            print(f"demo buffer size: {len(demo_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
@@ -404,12 +406,11 @@ def main(_):
             agent,
             replay_buffer,
             demo_buffer=demo_buffer,
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
-        data_store = QueuedDataStore(50000)  # the queue size on the actor
+        data_store = QueuedDataStore(2000)  # the queue size on the actor
         # actor loop
         print_green("starting actor loop")
         actor(agent, data_store, env, sampling_rng)

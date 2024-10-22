@@ -1,8 +1,8 @@
 from collections import deque
 from typing import Optional
 
-import gymnasium as gym
-import gymnasium.spaces
+import gym
+import gym.spaces
 import jax
 import numpy as np
 
@@ -72,6 +72,6 @@ class ChunkingWrapper(gym.Wrapper):
         return (stack_obs(self.current_obs), reward, done, trunc, info)
 
     def reset(self, **kwargs):
-        obs, info = self.env.reset()
+        obs, info = self.env.reset(**kwargs)
         self.current_obs.extend([obs] * self.obs_horizon)
         return stack_obs(self.current_obs), info

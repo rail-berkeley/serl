@@ -11,8 +11,8 @@ from flax.training import checkpoints
 from copy import deepcopy
 from collections import OrderedDict
 
-import gymnasium as gym
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+import gym
+from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
@@ -49,14 +49,14 @@ flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
-flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
+flags.DEFINE_integer("critic_actor_ratio", 4, "critic to actor update ratio.")
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
 
 flags.DEFINE_integer("random_steps", 300, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 300, "Training starts after this step.")
-flags.DEFINE_integer("steps_per_update", 10, "Number of steps per update the server.")
+flags.DEFINE_integer("steps_per_update", 30, "Number of steps per update the server.")
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
@@ -293,10 +293,17 @@ def actor(
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None):
+def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
+    # set up wandb and logging
+    wandb_logger = make_wandb_logger(
+        project="serl_dev",
+        description=FLAGS.exp_name or FLAGS.env,
+        debug=FLAGS.debug,
+    )
+
     # To track the step in the training loop
     update_steps = 0
     env_steps = 0
@@ -367,7 +374,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer, wandb_logger=None)
             continue
         # run n-1 critic updates and 1 critic + actor update.
         # This makes training on GPU faster by reducing the large batch transfer time from CPU to GPU
-        for critic_step in range(FLAGS.utd_ratio - 1):
+        for critic_step in range(FLAGS.critic_actor_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
                 demo_batch = next(demo_iterator)
@@ -496,24 +503,14 @@ def main(_):
             jax.tree_map(jnp.array, agent), sharding.replicate()
         )
 
-    def create_replay_buffer_and_wandb_logger():
+    if FLAGS.learner:
+        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        # set up wandb and logging
-        wandb_logger = make_wandb_logger(
-            project="serl_dev_fwbw",
-            description=FLAGS.exp_name or FLAGS.env,
-            debug=FLAGS.debug,
-        )
-        return replay_buffer, wandb_logger
-
-    if FLAGS.learner:
-        sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
-        replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
         demo_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
@@ -535,13 +532,12 @@ def main(_):
             agent,
             replay_buffer,
             demo_buffer=demo_buffer,
-            wandb_logger=wandb_logger,
         )
 
     elif FLAGS.actor:
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
         data_stores = OrderedDict(
-            {name: QueuedDataStore(50000) for name in id_to_task.values()}
+            {name: QueuedDataStore(2000) for name in id_to_task.values()}
         )
         # actor loop
         print_green("starting actor loop")

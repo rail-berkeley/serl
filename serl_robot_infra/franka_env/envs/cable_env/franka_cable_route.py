@@ -19,6 +19,7 @@ class FrankaCableRoute(FrankaEnv):
         Move to the rest position defined in base class.
         Add a small z offset before going to rest to avoid collision with object.
         """
+        self._send_gripper_command(-1)
         self._update_currpos()
         self._send_pos_command(self.currpos)
         time.sleep(0.5)

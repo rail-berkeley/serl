@@ -31,12 +31,15 @@ From there you should be able to navigate to `serl_robot_infra` and then simply 
 ```bash
 conda activate serl
 
-# script to start http server and ros controller
+# Script to start http server and ros controller
 python serl_robot_infra/robot_servers/franka_server.py \
     --gripper_type=<Robotiq|Franka|None> \
     --robot_ip=<robot_IP> \
     --gripper_ip=<[Optional] Robotiq_gripper_IP> \
     --reset_joint_target=<[Optional] robot_joints_when_robot_resets>
+
+# Activate the gripper after running the franka_server if you are using a Robotiq gripper
+curl -X POST http://127.0.0.1:5000/activate_gripper
 ```
 
 This should start ROS node impedence controller and the HTTP server. You can test that things are running by trying to move the end effector around, if the impedence controller is running it should be compliant.
@@ -58,7 +61,7 @@ The HTTP server is used to communicate between the ROS controller and gym enviro
 | getjacobian | Return current zero-jacobian |
 | getstate | Return all robot states |
 | jointreset | Perform joint reset |
-| activate_gripper | Activate the gripper (Robotiq only) |
+| activate_gripper | Activate the gripper (Robotiq only). This needs to be run after starting franka_server to control the Robotiq gripper. |
 | reset_gripper | Reset the gripper (Robotiq only) |
 | get_gripper | Return current gripper position |
 | close_gripper | Close the gripper completely |
@@ -84,7 +87,7 @@ Lastly, we use a gym env interface to interact with the robot server, defined in
 
 Example Usage
 ```py
-import gymnasium as gym
+import gym
 import franka_env
 env = gym.make("FrankaEnv-Vision-v0")
 ```

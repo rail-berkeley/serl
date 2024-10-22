@@ -1,6 +1,6 @@
 """Gym Interface for Franka"""
 import numpy as np
-import gymnasium as gym
+import gym
 import cv2
 import copy
 from scipy.spatial.transform import Rotation
@@ -59,6 +59,9 @@ class DefaultEnvConfig:
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
     COMPLIANCE_PARAM: Dict[str, float] = {}
     PRECISION_PARAM: Dict[str, float] = {}
+    BINARY_GRIPPER_THREASHOLD: float = 0.5
+    APPLY_GRIPPER_PENALTY: bool = True
+    GRIPPER_PENALTY: float = 0.1
 
 
 ##############################################################################
@@ -94,6 +97,7 @@ class FrankaEnv(gym.Env):
         self.currjacobian = np.zeros((6, 7))
 
         self.curr_gripper_pos = 0
+        self.gripper_binary_state = 0  # 0 for open, 1 for closed
         self.lastsent = time.time()
         self.randomreset = config.RANDOM_RESET
         self.random_xy_range = config.RANDOM_XY_RANGE
@@ -201,7 +205,7 @@ class FrankaEnv(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        self._send_gripper_command(gripper_action)
+        gripper_action_effective = self._send_gripper_command(gripper_action)
         self._send_pos_command(self.clip_safety_box(self.nextpos))
 
         self.curr_path_length += 1
@@ -210,11 +214,12 @@ class FrankaEnv(gym.Env):
 
         self._update_currpos()
         ob = self._get_obs()
-        reward = self.compute_reward(ob)
-        done = self.curr_path_length >= self.max_episode_length or reward
-        return ob, int(reward), done, False, {}
+        reward = self.compute_reward(ob, gripper_action_effective)
+        done = self.curr_path_length >= self.max_episode_length or reward == 1
+        return ob, reward, done, False, {}
 
-    def compute_reward(self, obs) -> bool:
+    def compute_reward(self, obs, gripper_action_effective) -> bool:
+        """We are using a sparse reward function."""
         current_pose = obs["state"]["tcp_pose"]
         # convert from quat to euler first
         euler_angles = quat_2_euler(current_pose[3:])
@@ -222,10 +227,15 @@ class FrankaEnv(gym.Env):
         current_pose = np.hstack([current_pose[:3], euler_angles])
         delta = np.abs(current_pose - self._TARGET_POSE)
         if np.all(delta < self._REWARD_THRESHOLD):
-            return True
+            reward = 1
         else:
             # print(f'Goal not reached, the difference is {delta}, the desired threshold is {_REWARD_THRESHOLD}')
-            return False
+            reward = 0
+
+        if self.config.APPLY_GRIPPER_PENALTY and gripper_action_effective:
+            reward -= self.config.GRIPPER_PENALTY
+
+        return reward
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
@@ -378,12 +388,24 @@ class FrankaEnv(gym.Env):
     def _send_gripper_command(self, pos: float, mode="binary"):
         """Internal function to send gripper command to the robot."""
         if mode == "binary":
-            if (pos >= -1) and (pos <= -0.9):  # close gripper
+            if (
+                pos <= -self.config.BINARY_GRIPPER_THREASHOLD
+                and self.gripper_binary_state == 0
+            ):  # close gripper
                 requests.post(self.url + "close_gripper")
-            elif (pos >= 0.9) and (pos <= 1):  # open gripper
+                time.sleep(0.6)
+                self.gripper_binary_state = 1
+                return True
+            elif (
+                pos >= self.config.BINARY_GRIPPER_THREASHOLD
+                and self.gripper_binary_state == 1
+            ):  # open gripper
                 requests.post(self.url + "open_gripper")
+                time.sleep(0.6)
+                self.gripper_binary_state = 0
+                return True
             else:  # do nothing to the gripper
-                return
+                return False
         elif mode == "continuous":
             raise NotImplementedError("Continuous gripper control is optional")
 

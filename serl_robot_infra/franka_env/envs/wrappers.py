@@ -1,8 +1,8 @@
 import time
-from gymnasium import Env, spaces
-import gymnasium as gym
+from gym import Env, spaces
+import gym
 import numpy as np
-from gymnasium.spaces import Box
+from gym.spaces import Box
 import copy
 from franka_env.spacemouse.spacemouse_expert import SpaceMouseExpert
 from franka_env.utils.rotations import quat_2_euler
@@ -49,8 +49,9 @@ class FWBWFrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        rew = self.compute_reward(self.env.get_front_cam_obs())
-        done = done or rew
+        success = self.compute_reward(self.env.get_front_cam_obs())
+        rew += success
+        done = done or success
         return obs, rew, done, truncated, info
 
 
@@ -72,8 +73,9 @@ class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        rew = self.compute_reward(self.env.get_front_cam_obs())
-        done = done or rew
+        success = self.compute_reward(self.env.get_front_cam_obs())
+        rew += success
+        done = done or success
         return obs, rew, done, truncated, info
 
 
@@ -94,8 +96,9 @@ class BinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        rew = self.compute_reward(obs)
-        done = done or rew
+        success = self.compute_reward(obs)
+        rew += success
+        done = done or success
         return obs, rew, done, truncated, info
 
 

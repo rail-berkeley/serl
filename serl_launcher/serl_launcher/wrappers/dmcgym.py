@@ -6,7 +6,7 @@ import copy
 from typing import OrderedDict
 
 import dm_env
-import gymnasium as gym
+import gym
 import numpy as np
 from gym import spaces
 

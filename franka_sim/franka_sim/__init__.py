@@ -5,7 +5,7 @@ __all__ = [
     "GymRenderingSpec",
 ]
 
-from gymnasium.envs.registration import register
+from gym.envs.registration import register
 
 register(
     id="PandaPickCube-v0",
