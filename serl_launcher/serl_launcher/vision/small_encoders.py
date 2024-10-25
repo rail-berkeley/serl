@@ -7,7 +7,7 @@ from serl_launcher.vision.spatial import SpatialLearnedEmbeddings
 
 
 class SmallEncoder(nn.Module):
-    features: Sequence[int] = (32, 32, 32)
+    features: Sequence[int] = (16, 16, 16)
     kernel_sizes: Sequence[int] = (3, 3, 3)
     strides: Sequence[int] = (1, 1, 1)
     padding: Union[Sequence[int], str] = (1, 1, 1)
@@ -17,7 +17,9 @@ class SmallEncoder(nn.Module):
     num_kp: Optional[int] = 32
 
     @nn.compact
-    def __call__(self, observations: jnp.ndarray, train=False, encode=True) -> jnp.ndarray:
+    def __call__(
+        self, observations: jnp.ndarray, train=False, encode=True
+    ) -> jnp.ndarray:
         assert len(self.features) == len(self.strides)
 
         x = observations.astype(jnp.float32) / 255.0
@@ -45,13 +47,12 @@ class SmallEncoder(nn.Module):
                 raise ValueError(
                     "spatial_block_size must be set when using spatial_learned_embeddings"
                 )
-            x = nn.Conv(                # 512 to num_kp features (less complexity)
+            x = nn.Conv(  # 512 to num_kp features (less complexity)
                 features=self.num_kp,
                 kernel_size=1,
                 use_bias=False,
                 dtype=jnp.float32,
                 kernel_init=nn.initializers.kaiming_normal(),
-                name="SLE_1xconv",
             )(x)
             x = SpatialLearnedEmbeddings(*(x.shape[-3:]), self.spatial_block_size)(x)
             x = nn.Dropout(0.1, deterministic=not train)(x)

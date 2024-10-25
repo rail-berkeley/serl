@@ -117,13 +117,13 @@ def make_drq_agent(
 
 
 def make_voxel_drq_agent(
-        seed,
-        sample_obs,
-        sample_action,
-        image_keys=("image",),
-        encoder_type="voxnet",
-        state_mask="all",
-        encoder_kwargs=None
+    seed,
+    sample_obs,
+    sample_action,
+    image_keys=("image",),
+    encoder_type="voxnet",
+    state_mask="all",
+    encoder_kwargs=None,
 ):
     if encoder_kwargs is None:
         encoder_kwargs = dict(bottleneck_dim=128)
@@ -146,13 +146,13 @@ def make_voxel_drq_agent(
             activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.1
+            dropout_rate=0.1,
         ),
         policy_network_kwargs=dict(
             activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.1
+            dropout_rate=0.1,
         ),
         temperature_init=1e-2,
         discount=0.99,  # 0.99

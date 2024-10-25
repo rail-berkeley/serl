@@ -11,8 +11,8 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
     all = jnp.ones((27,), dtype=jnp.bool)
     none = jnp.zeros_like(all)
     no_action = all.at[:7].set(False)
-    gripper = none.at[0+7:2+7].set(True)
-    no_ForceTorque = all.at[7+2:7+5].set(False).at[7+11:7+14].set(False)
+    gripper = none.at[0 + 7 : 2 + 7].set(True)
+    no_ForceTorque = all.at[7 + 2 : 7 + 5].set(False).at[7 + 11 : 7 + 14].set(False)
     action_only = none.at[:7].set(True)
     masks = dict(
         all=all,
@@ -21,14 +21,14 @@ def create_state_mask(mask_str: str) -> jnp.ndarray:
         position_gripper=gripper.at[5:11].set(True),
         no_ForceTorque=no_ForceTorque,
         no_ForceTorqueAction=jnp.bitwise_and(no_ForceTorque, no_action),
-        gripper_Zinfo=gripper.at[7+7].set(True),
+        gripper_Zinfo=gripper.at[7 + 7].set(True),
         action_only=action_only,
     )
     assert mask_str in masks
     return masks[mask_str]
 
 
-class MaskedEncodingWrapper(nn.Module):
+class EncodingWrapper(nn.Module):
     """
     Encodes observations into a single flat encoding, adding additional
     functionality for adding proprioception and stopping the gradient.
@@ -40,17 +40,83 @@ class MaskedEncodingWrapper(nn.Module):
 
     encoder: nn.Module
     use_proprio: bool
+    proprio_latent_dim: int = 64
+    enable_stacking: bool = False
+    image_keys: Iterable[str] = ("image",)
+
+    @nn.compact
+    def __call__(
+        self,
+        observations: Dict[str, jnp.ndarray],
+        train=False,
+        stop_gradient=False,
+        is_encoded=False,
+    ) -> jnp.ndarray:
+        # encode images with encoder
+        encoded = []
+        for image_key in self.image_keys:
+            image = observations[image_key]
+            if not is_encoded:
+                if self.enable_stacking:
+                    # Combine stacking and channels into a single dimension
+                    if len(image.shape) == 4:
+                        image = rearrange(image, "T H W C -> H W (T C)")
+                    if len(image.shape) == 5:
+                        image = rearrange(image, "B T H W C -> B H W (T C)")
+
+            image = self.encoder[image_key](image, train=train, encode=not is_encoded)
+
+            if stop_gradient:
+                image = jax.lax.stop_gradient(image)
+
+            encoded.append(image)
+
+        encoded = jnp.concatenate(encoded, axis=-1)
+
+        if self.use_proprio:
+            # project state to embeddings as well
+            state = observations["state"]
+            if self.enable_stacking:
+                # Combine stacking and channels into a single dimension
+                if len(state.shape) == 2:
+                    state = rearrange(state, "T C -> (T C)")
+                    encoded = encoded.reshape(-1)
+                if len(state.shape) == 3:
+                    state = rearrange(state, "B T C -> B (T C)")
+            state = nn.Dense(
+                self.proprio_latent_dim, kernel_init=nn.initializers.xavier_uniform()
+            )(state)
+            state = nn.LayerNorm()(state)
+            state = nn.tanh(state)
+            encoded = jnp.concatenate([encoded, state], axis=-1)
+
+        return encoded
+
+
+class MaskedEncodingWrapper(nn.Module):
+    """
+    Encodes observations into a single flat encoding, adding additional
+    functionality for adding proprioception and stopping the gradient.
+
+    Args:
+        encoder: The encoder network.
+        use_proprio: Whether to concatenate proprioception (after encoding).
+        state_mask: Which proprioceptive states to propagate, and which to ignore
+    """
+
+    encoder: nn.Module
+    use_proprio: bool
     state_mask: jnp.ndarray
     enable_stacking: bool = False
     image_keys: Iterable[str] = ("image",)
 
     @nn.compact
     def __call__(
-            self,
-            observations: Dict[str, jnp.ndarray],
-            train=False,
-            stop_gradient=False,
-            is_encoded=False,
+        self,
+        observations: Dict[str, jnp.ndarray],
+        train=False,
+        stop_gradient=False,
+        is_encoded=False,
     ) -> jnp.ndarray:
         # encode images with encoder
         if self.encoder is None:
@@ -88,7 +154,7 @@ class MaskedEncodingWrapper(nn.Module):
         if self.use_proprio:
             # project state to embeddings as well
             state = observations["state"]
-            state = state[..., self.state_mask]      # only propagate non-zero mask entries
+            state = state[..., self.state_mask]  # only propagate non-zero mask entries
             if state.shape[-1] != 0:
                 if self.enable_stacking:
                     # Combine stacking and channels into a single dimension
@@ -103,7 +169,7 @@ class MaskedEncodingWrapper(nn.Module):
         return encoded
 
 
-class GCEncodingWrapper(nn.Module):  # never used
+class GCEncodingWrapper(nn.Module):
     """
     Encodes observations and goals into a single flat encoding. Handles all the
     logic about when/how to combine observations and goals.
@@ -125,8 +191,8 @@ class GCEncodingWrapper(nn.Module):  # never used
     stop_gradient: bool
 
     def __call__(
-            self,
-            observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
+        self,
+        observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
     ) -> jnp.ndarray:
         observations, goals = observations_and_goals
 
@@ -185,8 +251,8 @@ class LCEncodingWrapper(nn.Module):
     stop_gradient: bool
 
     def __call__(
-            self,
-            observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
+        self,
+        observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
     ) -> jnp.ndarray:
         observations, goals = observations_and_goals
 

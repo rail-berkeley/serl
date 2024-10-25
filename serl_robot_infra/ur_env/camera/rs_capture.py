@@ -9,7 +9,16 @@ class RSCapture:
         devices = rs.context().devices
         return [d.get_info(rs.camera_info.serial_number) for d in devices]
 
-    def __init__(self, name, serial_number, dim=(640, 480), fps=15, rgb=True, depth=False, pointcloud=False):
+    def __init__(
+        self,
+        name,
+        serial_number,
+        dim=(640, 480),
+        fps=15,
+        rgb=True,
+        depth=False,
+        pointcloud=False,
+    ):
         self.name = name
         # print(self.get_device_serial_numbers())
         assert serial_number in self.get_device_serial_numbers()
@@ -34,14 +43,17 @@ class RSCapture:
         if self.depth:
             depth_sensor = self.profile.get_device().first_depth_sensor()
             depth_scale = depth_sensor.get_depth_scale()
-            self.max_clipping_distance = 0.2 / depth_scale  # 0.15m max clipping distance
+            self.max_clipping_distance = (
+                0.2 / depth_scale
+            )  # 0.15m max clipping distance
 
         if self.pointcloud:
             self.pc = rs.pointcloud()
-            self.threshold_filter = rs.threshold_filter(min_dist=0., max_dist=0.25)
-            self.decimation_filter = rs.decimation_filter(magnitude=2.)  # 2 or 4
-            self.temporal_filter = rs.temporal_filter(smooth_alpha=0.53, smooth_delta=24.,
-                                                      persistence_control=2)  # standard values
+            self.threshold_filter = rs.threshold_filter(min_dist=0.0, max_dist=0.25)
+            self.decimation_filter = rs.decimation_filter(magnitude=2.0)  # 2 or 4
+            self.temporal_filter = rs.temporal_filter(
+                smooth_alpha=0.53, smooth_delta=24.0, persistence_control=2
+            )  # standard values
 
         # for some weird reason, these values have to be set in order for the image to appear with good lightning
         # for firmware >5.13, auto_exposure False & auto_white_balance True, below only auto_exposure True
@@ -77,9 +89,13 @@ class RSCapture:
             if depth_frame.is_depth_frame():
                 depth = np.asanyarray(depth_frame.get_data())
                 # clip max
-                depth = np.where((depth > self.max_clipping_distance), 0., self.max_clipping_distance - depth)
+                depth = np.where(
+                    (depth > self.max_clipping_distance),
+                    0.0,
+                    self.max_clipping_distance - depth,
+                )
 
-                depth = (depth * (256. / self.max_clipping_distance)).astype(np.uint8)
+                depth = (depth * (256.0 / self.max_clipping_distance)).astype(np.uint8)
                 depth = depth[..., None]
 
         if self.pointcloud:
@@ -88,7 +104,9 @@ class RSCapture:
             depth_frame = self.temporal_filter.process(depth_frame)
             if depth_frame.is_depth_frame():
                 points = self.pc.calculate(depth_frame)
-                pointcloud = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+                pointcloud = (
+                    np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+                )
 
         if isinstance(image, np.ndarray) and isinstance(depth, np.ndarray):
             return True, np.concatenate((image, depth), axis=-1)

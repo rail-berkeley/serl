@@ -2,7 +2,7 @@ import jax.lax
 import jax.numpy as jnp
 import flax.linen as nn
 import functools
-from typing import (Any, Callable, Iterable, Optional, Tuple, Union)
+from typing import Any, Callable, Iterable, Optional, Tuple, Union
 import h5py
 import warnings
 
@@ -21,22 +21,26 @@ Dtype = Any
 # ---------------------------------------------------------------#
 # Normalization
 # ---------------------------------------------------------------#
-def batch_norm(x, train, epsilon=1e-05, momentum=0.99, params=None, dtype='float32'):
+def batch_norm(x, train, epsilon=1e-05, momentum=0.99, params=None, dtype="float32"):
     # we do not use running average in the implementation (set to False)
     if params is None:
-        x = BatchNorm(epsilon=epsilon,
-                      momentum=momentum,
-                      use_running_average=False,        # was not train
-                      dtype=dtype)(x)
+        x = BatchNorm(
+            epsilon=epsilon,
+            momentum=momentum,
+            use_running_average=False,  # was not train
+            dtype=dtype,
+        )(x)
     else:
-        x = BatchNorm(epsilon=epsilon,
-                      momentum=momentum,
-                      bias_init=lambda *_: jnp.array(params['bias']),
-                      scale_init=lambda *_: jnp.array(params['scale']),
-                      mean_init=lambda *_: jnp.array(params['mean']),
-                      var_init=lambda *_: jnp.array(params['var']),
-                      use_running_average=False,        # was not train
-                      dtype=dtype)(x)
+        x = BatchNorm(
+            epsilon=epsilon,
+            momentum=momentum,
+            bias_init=lambda *_: jnp.array(params["bias"]),
+            scale_init=lambda *_: jnp.array(params["scale"]),
+            mean_init=lambda *_: jnp.array(params["mean"]),
+            var_init=lambda *_: jnp.array(params["var"]),
+            use_running_average=False,  # was not train
+            dtype=dtype,
+        )(x)
     return x
 
 
@@ -70,6 +74,7 @@ class BatchNorm(nn.Module):
                        the examples on the first two and last two devices. See `jax.lax.psum`
                        for more details.
     """
+
     use_running_average: Optional[bool] = None
     axis: int = -1
     momentum: float = 0.99
@@ -102,7 +107,8 @@ class BatchNorm(nn.Module):
             Normalized inputs (the same shape as inputs).
         """
         use_running_average = merge_param(
-            'use_running_average', self.use_running_average, use_running_average)
+            "use_running_average", self.use_running_average, use_running_average
+        )
         x = jnp.asarray(x, jnp.float32)
         axis = self.axis if isinstance(self.axis, tuple) else (self.axis,)
         axis = _absolute_dims(x.ndim, axis)
@@ -111,15 +117,15 @@ class BatchNorm(nn.Module):
         reduction_axis = tuple(i for i in range(x.ndim) if i not in axis)
 
         # see NOTE above on initialization behavior
-        initializing = self.is_mutable_collection('params')
+        initializing = self.is_mutable_collection("params")
 
         if use_running_average:
-            ra_mean = self.variable('batch_stats', 'mean',
-                                    self.mean_init,
-                                    reduced_feature_shape)
-            ra_var = self.variable('batch_stats', 'var',
-                                   self.var_init,
-                                   reduced_feature_shape)
+            ra_mean = self.variable(
+                "batch_stats", "mean", self.mean_init, reduced_feature_shape
+            )
+            ra_var = self.variable(
+                "batch_stats", "var", self.var_init, reduced_feature_shape
+            )
             mean, var = ra_mean.value, ra_var.value
         else:
             mean = jnp.mean(x, axis=reduction_axis, keepdims=False)
@@ -130,26 +136,29 @@ class BatchNorm(nn.Module):
                     lax.pmean(
                         concatenated_mean,
                         axis_name=self.axis_name,
-                        axis_index_groups=self.axis_index_groups), 2)
+                        axis_index_groups=self.axis_index_groups,
+                    ),
+                    2,
+                )
             var = mean2 - lax.square(mean)
 
         y = x - mean.reshape(feature_shape)
         mul = lax.rsqrt(var + self.epsilon)
         if self.use_scale:
-            scale = self.param('scale',
-                               self.scale_init,
-                               reduced_feature_shape).reshape(feature_shape)
+            scale = self.param("scale", self.scale_init, reduced_feature_shape).reshape(
+                feature_shape
+            )
             mul = mul * scale
         y = y * mul
         if self.use_bias:
-            bias = self.param('bias',
-                              self.bias_init,
-                              reduced_feature_shape).reshape(feature_shape)
+            bias = self.param("bias", self.bias_init, reduced_feature_shape).reshape(
+                feature_shape
+            )
             y = y + bias
         return jnp.asarray(y, self.dtype)
 
 
-LAYERS = {'resnet18': [2, 2, 2, 2]}
+LAYERS = {"resnet18": [2, 2, 2, 2]}
 
 
 class BasicBlock(nn.Module):
@@ -168,6 +177,7 @@ class BasicBlock(nn.Module):
         block_name (str): Name of block.
         dtype (str): Data type.
     """
+
     features: int
     kernel_size: Union[int, Iterable[int]] = (3, 3)
     downsample: bool = False
@@ -176,7 +186,7 @@ class BasicBlock(nn.Module):
     kernel_init: functools.partial = nn.initializers.lecun_normal()
     bias_init: functools.partial = nn.initializers.zeros
     block_name: str = None
-    dtype: str = 'float32'
+    dtype: str = "float32"
 
     @nn.compact
     def __call__(self, x, act, train=True):
@@ -193,54 +203,73 @@ class BasicBlock(nn.Module):
         """
         residual = x
 
-        x = nn.Conv(features=self.features,
-                    kernel_size=self.kernel_size,
-                    strides=(2, 2) if self.downsample else (1, 1),
-                    padding=((1, 1), (1, 1)),
-                    kernel_init=self.kernel_init if self.param_dict is None else lambda *_: jnp.array(
-                        self.param_dict['conv1']['weight']),
-                    use_bias=False,
-                    dtype=self.dtype)(x)
+        x = nn.Conv(
+            features=self.features,
+            kernel_size=self.kernel_size,
+            strides=(2, 2) if self.downsample else (1, 1),
+            padding=((1, 1), (1, 1)),
+            kernel_init=self.kernel_init
+            if self.param_dict is None
+            else lambda *_: jnp.array(self.param_dict["conv1"]["weight"]),
+            use_bias=False,
+            dtype=self.dtype,
+        )(x)
 
-        x = batch_norm(x,
-                       train=train,
-                       epsilon=1e-05,
-                       momentum=0.1,
-                       params=None if self.param_dict is None else self.param_dict['bn1'],
-                       dtype=self.dtype)
+        x = batch_norm(
+            x,
+            train=train,
+            epsilon=1e-05,
+            momentum=0.1,
+            params=None if self.param_dict is None else self.param_dict["bn1"],
+            dtype=self.dtype,
+        )
         x = nn.relu(x)
 
-        x = nn.Conv(features=self.features,
-                    kernel_size=self.kernel_size,
-                    strides=(1, 1),
-                    padding=((1, 1), (1, 1)),
-                    kernel_init=self.kernel_init if self.param_dict is None else lambda *_: jnp.array(
-                        self.param_dict['conv2']['weight']),
-                    use_bias=False,
-                    dtype=self.dtype)(x)
+        x = nn.Conv(
+            features=self.features,
+            kernel_size=self.kernel_size,
+            strides=(1, 1),
+            padding=((1, 1), (1, 1)),
+            kernel_init=self.kernel_init
+            if self.param_dict is None
+            else lambda *_: jnp.array(self.param_dict["conv2"]["weight"]),
+            use_bias=False,
+            dtype=self.dtype,
+        )(x)
 
-        x = batch_norm(x,
-                       train=train,
-                       epsilon=1e-05,
-                       momentum=0.1,
-                       params=None if self.param_dict is None else self.param_dict['bn2'],
-                       dtype=self.dtype)
+        x = batch_norm(
+            x,
+            train=train,
+            epsilon=1e-05,
+            momentum=0.1,
+            params=None if self.param_dict is None else self.param_dict["bn2"],
+            dtype=self.dtype,
+        )
 
         if self.downsample:
-            residual = nn.Conv(features=self.features,
-                               kernel_size=(1, 1),
-                               strides=(2, 2),
-                               kernel_init=self.kernel_init if self.param_dict is None else lambda *_: jnp.array(
-                                   self.param_dict['downsample']['conv']['weight']),
-                               use_bias=False,
-                               dtype=self.dtype)(residual)
+            residual = nn.Conv(
+                features=self.features,
+                kernel_size=(1, 1),
+                strides=(2, 2),
+                kernel_init=self.kernel_init
+                if self.param_dict is None
+                else lambda *_: jnp.array(
+                    self.param_dict["downsample"]["conv"]["weight"]
+                ),
+                use_bias=False,
+                dtype=self.dtype,
+            )(residual)
 
-            residual = batch_norm(residual,
-                                  train=train,
-                                  epsilon=1e-05,
-                                  momentum=0.1,
-                                  params=None if self.param_dict is None else self.param_dict['downsample']['bn'],
-                                  dtype=self.dtype)
+            residual = batch_norm(
+                residual,
+                train=train,
+                epsilon=1e-05,
+                momentum=0.1,
+                params=None
+                if self.param_dict is None
+                else self.param_dict["downsample"]["bn"],
+                dtype=self.dtype,
+            )
 
         x += residual
         x = nn.relu(x)
@@ -283,23 +312,24 @@ class ResNet(nn.Module):
             If this argument is None, the weights will be saved to a temp directory.
         dtype (str): Data type.
     """
-    output: str = 'softmax'
-    pretrained: str = 'imagenet'
+
+    output: str = "softmax"
+    pretrained: str = "imagenet"
     normalize: bool = True
-    architecture: str = 'resnet18'
+    architecture: str = "resnet18"
     num_classes: int = 1000
     block: nn.Module = BasicBlock
     kernel_init: functools.partial = nn.initializers.lecun_normal()
     bias_init: functools.partial = nn.initializers.zeros
     ckpt_dir: str = None
-    dtype: str = 'float32'
+    dtype: str = "float32"
     pre_pooling: bool = True  # skip pooling
 
     def setup(self):
         # self.param_dict = None
-        if self.pretrained == 'imagenet':
+        if self.pretrained == "imagenet":
             # ckpt_file = utils.download(self.ckpt_dir, URLS[self.architecture])
-            self.param_dict = h5py.File(self.ckpt_dir, 'r')
+            self.param_dict = h5py.File(self.ckpt_dir, "r")
             # print(f"loaded pretrained weights from {self.ckpt_dir}")
 
     @nn.compact
@@ -320,77 +350,110 @@ class ResNet(nn.Module):
             std = jnp.array([0.229, 0.224, 0.225]).reshape(1, 1, 1, -1)
             x = (observations.astype(jnp.float32) / 255.0 - mean) / std
 
-        if self.pretrained == 'imagenet':
+        if self.pretrained == "imagenet":
             if self.num_classes != 1000:
-                warnings.warn(f'The user specified parameter \'num_classes\' was set to {self.num_classes} '
-                              'but will be overwritten with 1000 to match the specified pretrained checkpoint \'imagenet\', if ',
-                              UserWarning)
+                warnings.warn(
+                    f"The user specified parameter 'num_classes' was set to {self.num_classes} "
+                    "but will be overwritten with 1000 to match the specified pretrained checkpoint 'imagenet', if ",
+                    UserWarning,
+                )
             num_classes = 1000
         else:
             num_classes = self.num_classes
 
         act = {}
 
-        x = nn.Conv(features=64,
-                    kernel_size=(7, 7),
-                    kernel_init=self.kernel_init if self.param_dict is None else lambda *_: jnp.array(
-                        self.param_dict['conv1']['weight']),
-                    strides=(2, 2),
-                    padding=((3, 3), (3, 3)),
-                    use_bias=False,
-                    dtype=self.dtype)(x)
-        act['conv1'] = x
+        x = nn.Conv(
+            features=64,
+            kernel_size=(7, 7),
+            kernel_init=self.kernel_init
+            if self.param_dict is None
+            else lambda *_: jnp.array(self.param_dict["conv1"]["weight"]),
+            strides=(2, 2),
+            padding=((3, 3), (3, 3)),
+            use_bias=False,
+            dtype=self.dtype,
+        )(x)
+        act["conv1"] = x
 
-        x = batch_norm(x,
-                       train=train,
-                       epsilon=1e-05,
-                       momentum=0.1,
-                       params=None if self.param_dict is None else self.param_dict['bn1'],
-                       dtype=self.dtype)
+        x = batch_norm(
+            x,
+            train=train,
+            epsilon=1e-05,
+            momentum=0.1,
+            params=None if self.param_dict is None else self.param_dict["bn1"],
+            dtype=self.dtype,
+        )
         x = nn.relu(x)
-        x = nn.max_pool(x, window_shape=(3, 3), strides=(2, 2), padding=((1, 1), (1, 1)))
+        x = nn.max_pool(
+            x, window_shape=(3, 3), strides=(2, 2), padding=((1, 1), (1, 1))
+        )
 
         # Layer 1
-        down = self.block.__name__ == 'Bottleneck'
+        down = self.block.__name__ == "Bottleneck"
         for i in range(LAYERS[self.architecture][0]):
-            params = None if self.param_dict is None else self.param_dict['layer1'][f'block{i}']
-            x = self.block(features=64,
-                           kernel_size=(3, 3),
-                           downsample=i == 0 and down,
-                           stride=i != 0,
-                           param_dict=params,
-                           block_name=f'block1_{i}',
-                           dtype=self.dtype)(x, act, train)
+            params = (
+                None
+                if self.param_dict is None
+                else self.param_dict["layer1"][f"block{i}"]
+            )
+            x = self.block(
+                features=64,
+                kernel_size=(3, 3),
+                downsample=i == 0 and down,
+                stride=i != 0,
+                param_dict=params,
+                block_name=f"block1_{i}",
+                dtype=self.dtype,
+            )(x, act, train)
 
         # Layer 2
         for i in range(LAYERS[self.architecture][1]):
-            params = None if self.param_dict is None else self.param_dict['layer2'][f'block{i}']
-            x = self.block(features=128,
-                           kernel_size=(3, 3),
-                           downsample=i == 0,
-                           param_dict=params,
-                           block_name=f'block2_{i}',
-                           dtype=self.dtype)(x, act, train)
+            params = (
+                None
+                if self.param_dict is None
+                else self.param_dict["layer2"][f"block{i}"]
+            )
+            x = self.block(
+                features=128,
+                kernel_size=(3, 3),
+                downsample=i == 0,
+                param_dict=params,
+                block_name=f"block2_{i}",
+                dtype=self.dtype,
+            )(x, act, train)
 
         # Layer 3
         for i in range(LAYERS[self.architecture][2]):
-            params = None if self.param_dict is None else self.param_dict['layer3'][f'block{i}']
-            x = self.block(features=256,
-                           kernel_size=(3, 3),
-                           downsample=i == 0,
-                           param_dict=params,
-                           block_name=f'block3_{i}',
-                           dtype=self.dtype)(x, act, train)
+            params = (
+                None
+                if self.param_dict is None
+                else self.param_dict["layer3"][f"block{i}"]
+            )
+            x = self.block(
+                features=256,
+                kernel_size=(3, 3),
+                downsample=i == 0,
+                param_dict=params,
+                block_name=f"block3_{i}",
+                dtype=self.dtype,
+            )(x, act, train)
 
         # Layer 4
         for i in range(LAYERS[self.architecture][3]):
-            params = None if self.param_dict is None else self.param_dict['layer4'][f'block{i}']
-            x = self.block(features=512,
-                           kernel_size=(3, 3),
-                           downsample=i == 0,
-                           param_dict=params,
-                           block_name=f'block4_{i}',
-                           dtype=self.dtype)(x, act, train)
+            params = (
+                None
+                if self.param_dict is None
+                else self.param_dict["layer4"][f"block{i}"]
+            )
+            x = self.block(
+                features=512,
+                kernel_size=(3, 3),
+                downsample=i == 0,
+                param_dict=params,
+                block_name=f"block4_{i}",
+                dtype=self.dtype,
+            )(x, act, train)
 
         # if we want the pre_pooling output, return here
         if self.pre_pooling:
@@ -398,27 +461,32 @@ class ResNet(nn.Module):
 
         # Classifier
         x = jnp.mean(x, axis=(1, 2))
-        x = nn.Dense(features=num_classes,
-                     kernel_init=self.kernel_init if self.param_dict is None else lambda *_: jnp.array(
-                         self.param_dict['fc']['weight']),
-                     bias_init=self.bias_init if self.param_dict is None else lambda *_: jnp.array(
-                         self.param_dict['fc']['bias']),
-                     dtype=self.dtype)(x)
-        act['fc'] = x
+        x = nn.Dense(
+            features=num_classes,
+            kernel_init=self.kernel_init
+            if self.param_dict is None
+            else lambda *_: jnp.array(self.param_dict["fc"]["weight"]),
+            bias_init=self.bias_init
+            if self.param_dict is None
+            else lambda *_: jnp.array(self.param_dict["fc"]["bias"]),
+            dtype=self.dtype,
+        )(x)
+        act["fc"] = x
 
-        if self.output == 'softmax':
+        if self.output == "softmax":
             return nn.softmax(x)
-        if self.output == 'log_softmax':
+        if self.output == "log_softmax":
             return nn.log_softmax(x)
-        if self.output == 'activations':
+        if self.output == "activations":
             return act
         return x
 
 
 resnetv1_18_configs = {
     "resnetv1-18-frozen": functools.partial(
-        ResNet, architecture='resnet18',
-        ckpt_dir="/examples/box_picking_drq/resnet18_weights.h5",   # download from #TODO
-        pre_pooling=True
+        ResNet,
+        architecture="resnet18",
+        ckpt_dir="/examples/box_picking_drq/resnet18_weights.h5",  # download from #TODO
+        pre_pooling=True,
     )
 }

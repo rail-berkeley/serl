@@ -31,13 +31,14 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
     (to somewhat normalize the observations space)
     """
 
-    def __init__(self,
-                 env,
-                 translation_scale=100.,
-                 rotation_scale=10.,
-                 force_scale=1.,
-                 torque_scale=10.
-                 ):
+    def __init__(
+        self,
+        env,
+        translation_scale=100.0,
+        rotation_scale=10.0,
+        force_scale=1.0,
+        torque_scale=10.0,
+    ):
         super().__init__(env)
         self.translation_scale = translation_scale
         self.rotation_scale = rotation_scale
@@ -49,7 +50,7 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
             translation_scale=self.translation_scale,
             rotation_scale=self.rotation_scale,
             force_scale=self.force_scale,
-            torque_scale=self.torque_scale
+            torque_scale=self.torque_scale,
         )
 
     def observation(self, obs):

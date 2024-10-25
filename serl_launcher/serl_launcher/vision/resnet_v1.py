@@ -63,7 +63,7 @@ class SpatialSoftmax(nn.Module):
             batch_size, num_featuremaps, self.height * self.width
         )
 
-        softmax_attention = nn.softmax(features / temperature, axis=-1)
+        softmax_attention = nn.softmax(features / temperature)
         expected_x = jnp.sum(
             self.pos_x * softmax_attention, axis=2, keepdims=True
         ).reshape(batch_size, num_featuremaps)
@@ -138,8 +138,8 @@ class ResNetBlock(nn.Module):
 
     @nn.compact
     def __call__(
-            self,
-            x,
+        self,
+        x,
     ):
         residual = x
         y = self.conv(self.filters, (3, 3), self.strides)(x)
@@ -208,16 +208,14 @@ class ResNetEncoder(nn.Module):
 
     @nn.compact
     def __call__(
-            self,
-            observations: jnp.ndarray,
-            train: bool = True,
-            cond_var=None,
-            stop_gradient=False,
+        self,
+        observations: jnp.ndarray,
+        train: bool = True,
+        cond_var=None,
+        stop_gradient=False,
     ):
         # put inputs in [-1, 1]
         # x = observations.astype(jnp.float32) / 127.5 - 1.0
-
-        assert observations.shape[-3:] == (128, 128, 3)  # check for shape
 
         # imagenet mean and std
         mean = jnp.array([0.485, 0.456, 0.406])
@@ -263,7 +261,7 @@ class ResNetEncoder(nn.Module):
             for j in range(block_size):
                 stride = (2, 2) if i > 0 and j == 0 else (1, 1)
                 x = self.block_cls(
-                    self.num_filters * 2 ** i,
+                    self.num_filters * 2**i,
                     strides=stride,
                     conv=conv,
                     norm=norm,
@@ -271,12 +269,12 @@ class ResNetEncoder(nn.Module):
                 )(x)
                 if self.use_film:
                     assert (
-                            cond_var is not None
+                        cond_var is not None
                     ), "Cond var is None, nothing to condition on"
                     x = FilmConditioning()(x, cond_var)
                 if self.use_multiplicative_cond:
                     assert (
-                            cond_var is not None
+                        cond_var is not None
                     ), "Cond var is None, nothing to condition on"
                     cond_out = nn.Dense(
                         x.shape[-1], kernel_init=nn.initializers.xavier_normal()
@@ -328,24 +326,22 @@ class PreTrainedResNetEncoder(nn.Module):
     pooling_method: str = "avg"
     softmax_temperature: float = 1.0
     num_spatial_blocks: int = 8
-    num_kp: int = 64        # for Spatial Softmax
+    num_kp: Optional[int] = None  # for Spatial Softmax
     bottleneck_dim: Optional[int] = None
     pretrained_encoder: nn.module = None
 
     @nn.compact
     def __call__(
-            self,
-            observations: jnp.ndarray,
-            encode: bool = True,
-            train: bool = True,
+        self,
+        observations: jnp.ndarray,
+        encode: bool = True,
+        train: bool = True,
     ):
         x = observations
-
         if encode:
             x = self.pretrained_encoder(x, train=train)
 
         if self.pooling_method == "spatial_learned_embeddings":
-            # TODO maybe make the same as in spatial softmax
             height, width, channel = x.shape[-3:]
             x = SpatialLearnedEmbeddings(
                 height=height,
@@ -355,20 +351,20 @@ class PreTrainedResNetEncoder(nn.Module):
             )(x)
             x = nn.Dropout(0.1, deterministic=not train)(x, rng=self.rng)
         elif self.pooling_method == "spatial_softmax":
-            """ 
-            implemented as in https://github.com/huggingface/lerobot/blob/ff8f6aa6cde2957f08547eb081aac12ca4669b6a/lerobot/common/policies/diffusion/modeling_diffusion.py#L316
-            In this case it would result in 512 keypoints (corresponding to the 512 input channels). We can optionally
-            provide num_kp != None to control the number of keypoints. This is achieved by a first applying a learnable
-            linear mapping (in_channels, H, W) -> (num_kp, H, W).
-            """
-            x = nn.Conv(
-                features=self.num_kp,
-                kernel_size=1,
-                use_bias=False,
-                dtype=jnp.float32,
-                kernel_init=nn.initializers.kaiming_normal(),
-                name="spatial_softmax_conv",
-            )(x)
+            if self.num_kp is not None:
+                """
+                implemented as in https://github.com/huggingface/lerobot/blob/ff8f6aa6cde2957f08547eb081aac12ca4669b6a/lerobot/common/policies/diffusion/modeling_diffusion.py#L316
+                In this case it would result in 512 keypoints (corresponding to the 512 input channels). We can optionally
+                provide num_kp != None to control the number of keypoints.
+                """
+                x = nn.Conv(
+                    features=self.num_kp,
+                    kernel_size=1,
+                    use_bias=False,
+                    dtype=jnp.float32,
+                    kernel_init=nn.initializers.kaiming_normal(),
+                    name="spatial_softmax_conv",
+                )(x)
             height, width, channel = x.shape[-3:]
             pos_x, pos_y = jnp.meshgrid(
                 jnp.linspace(-1.0, 1.0, height), jnp.linspace(-1.0, 1.0, width)

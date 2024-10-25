@@ -15,17 +15,24 @@ def finetune_pointcloud_fusion(pc1: np.ndarray, pc2: np.ndarray):
     def pairwise_registration(source, target, max_correspondence_distance):
         # see https://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html
         icp = o3d.pipelines.registration.registration_icp(
-            source, target, max_correspondence_distance,
+            source,
+            target,
+            max_correspondence_distance,
             np.eye(4),
-            o3d.pipelines.registration.TransformationEstimationPointToPlane())
+            o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+        )
         transformation_icp = icp.transformation
-        information_icp = o3d.pipelines.registration.get_information_matrix_from_point_clouds(
-            source, target, max_correspondence_distance,
-            icp.transformation)
+        information_icp = (
+            o3d.pipelines.registration.get_information_matrix_from_point_clouds(
+                source, target, max_correspondence_distance, icp.transformation
+            )
+        )
         return transformation_icp, information_icp
 
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Error) as cm:
-        transformation, info = pairwise_registration(pcd1, pcd2, max_correspondence_distance=1e-3)
+        transformation, info = pairwise_registration(
+            pcd1, pcd2, max_correspondence_distance=1e-3
+        )
 
     r = R.from_matrix(transformation[:3, :3].copy()).as_euler("xyz")
     t = transformation[:3, 3].copy().flatten()
@@ -33,14 +40,25 @@ def finetune_pointcloud_fusion(pc1: np.ndarray, pc2: np.ndarray):
     return transformation
 
 
-def pointcloud_to_voxel_grid(points: np.ndarray, voxel_size: float, min_bounds: np.ndarray, max_bounds: np.ndarray):
-    points_filtered = crop_pointcloud(points, min_bounds=min_bounds, max_bounds=max_bounds)
+def pointcloud_to_voxel_grid(
+    points: np.ndarray,
+    voxel_size: float,
+    min_bounds: np.ndarray,
+    max_bounds: np.ndarray,
+):
+    points_filtered = crop_pointcloud(
+        points, min_bounds=min_bounds, max_bounds=max_bounds
+    )
     dimensions = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
     voxel_indices = ((points_filtered - min_bounds) / voxel_size).astype(int)
 
     voxel_grid = np.zeros(dimensions, dtype=np.bool_)
     valid_indices = np.all((voxel_indices >= 0) & (voxel_indices < dimensions), axis=1)
-    voxel_grid[voxel_indices[valid_indices, 0], voxel_indices[valid_indices, 1], voxel_indices[valid_indices, 2]] = True
+    voxel_grid[
+        voxel_indices[valid_indices, 0],
+        voxel_indices[valid_indices, 1],
+        voxel_indices[valid_indices, 2],
+    ] = True
     return voxel_grid, voxel_indices[valid_indices, :].astype(np.uint8)
 
 
@@ -62,7 +80,13 @@ def transform_point_cloud(points, transform_matrix):
 
 
 class PointCloudFusion:
-    def __init__(self, angle=30., x_distance=0.195, y_distance=-0.0, voxel_grid_shape=(100, 100, 80)):
+    def __init__(
+        self,
+        angle=30.0,
+        x_distance=0.195,
+        y_distance=-0.0,
+        voxel_grid_shape=(100, 100, 80),
+    ):
         self.pcd1, self.pcd2 = None, None
 
         # 10cm width and 8cm height for the box
@@ -78,15 +102,15 @@ class PointCloudFusion:
         self.fine_transformed = False
 
         t1 = np.eye(4)
-        t1[:3, :3] = R.from_euler("xyz", [angle, 0., 0.], degrees=True).as_matrix()
-        t1[1, 3] = x_distance / 2.
-        t1[0, 3] = y_distance / 2.
+        t1[:3, :3] = R.from_euler("xyz", [angle, 0.0, 0.0], degrees=True).as_matrix()
+        t1[1, 3] = x_distance / 2.0
+        t1[0, 3] = y_distance / 2.0
         self.t1 = t1
 
         t2 = np.eye(4)
-        t2[:3, :3] = R.from_euler("xyz", [-angle, 0., 0.], degrees=True).as_matrix()
-        t2[1, 3] = -x_distance / 2.
-        t2[0, 3] = -y_distance / 2.
+        t2[:3, :3] = R.from_euler("xyz", [-angle, 0.0, 0.0], degrees=True).as_matrix()
+        t2[1, 3] = -x_distance / 2.0
+        t2[0, 3] = -y_distance / 2.0
         self.t2 = t2
 
     def save_finetuned(self):
@@ -98,13 +122,21 @@ class PointCloudFusion:
             np.save(f, t_finetuned)
 
     def get_voxelgrid_shape(self):
-        return np.ceil((self.max_bounds - self.min_bounds) / self.voxel_size).astype(int)
+        return np.ceil((self.max_bounds - self.min_bounds) / self.voxel_size).astype(
+            int
+        )
 
     def load_finetuned(self):
         from os.path import exists
-        if not exists("/home/nico/real-world-rl/spacemouse_tests/PointCloudFusionFinetuned.npy"):
+
+        if not exists(
+            "/home/nico/real-world-rl/spacemouse_tests/PointCloudFusionFinetuned.npy"
+        ):
             return False
-        with open("/home/nico/real-world-rl/spacemouse_tests/PointCloudFusionFinetuned.npy", "rb") as f:
+        with open(
+            "/home/nico/real-world-rl/spacemouse_tests/PointCloudFusionFinetuned.npy",
+            "rb",
+        ) as f:
             t_finetuned = np.load(f)
             self.t1 = t_finetuned[0, ...]
             self.t2 = t_finetuned[1, ...]
@@ -135,7 +167,7 @@ class PointCloudFusion:
     def set_fine_tuned_transformation(self, transformation):
         assert not self.fine_transformed
 
-        t = transformation.copy()[:3, 3] / 2.  # half the translation
+        t = transformation.copy()[:3, 3] / 2.0  # half the translation
         rot = np.zeros((2, 3, 3))
         rot[0, ...] = transformation[:3, :3]
         rot[1, ...] = np.eye(3)
@@ -162,16 +194,24 @@ class PointCloudFusion:
         assert not self.is_empty()
         self.pcd1 = transform_point_cloud(points=self.pcd1, transform_matrix=self.t1)
         if self.pcd2 is not None:
-            self.pcd2 = transform_point_cloud(points=self.pcd2, transform_matrix=self.t2)
+            self.pcd2 = transform_point_cloud(
+                points=self.pcd2, transform_matrix=self.t2
+            )
         self._is_transformed = True
 
     def voxelize(self, points: np.ndarray):
-        grid, indices = pointcloud_to_voxel_grid(points, voxel_size=self.voxel_size, min_bounds=self.min_bounds,
-                                                 max_bounds=self.max_bounds)
+        grid, indices = pointcloud_to_voxel_grid(
+            points,
+            voxel_size=self.voxel_size,
+            min_bounds=self.min_bounds,
+            max_bounds=self.max_bounds,
+        )
         return grid, indices
 
     def crop(self, points: np.ndarray):
-        return crop_pointcloud(points=points, min_bounds=self.min_bounds, max_bounds=self.max_bounds)
+        return crop_pointcloud(
+            points=points, min_bounds=self.min_bounds, max_bounds=self.max_bounds
+        )
 
     def get_pointcloud_representation(self, voxelize=True):
         if self.is_complete():
@@ -184,7 +224,11 @@ class PointCloudFusion:
             self._transform()
         swap = lambda x: np.moveaxis(x, 0, 1)
         fused = swap(np.hstack([swap(self.pcd1), swap(self.pcd2)]))
-        return self.voxelize(fused) if voxelize else (self.crop(fused) if cropped else fused)
+        return (
+            self.voxelize(fused)
+            if voxelize
+            else (self.crop(fused) if cropped else fused)
+        )
 
     def get_first(self, voxelize=True):
         if not self._is_transformed:
@@ -205,7 +249,14 @@ class PointCloudFusion:
 
 
 class CalibrationTread(threading.Thread):
-    def __init__(self, pc_fusion: PointCloudFusion, num_samples=20, verbose=False, *args, **kwargs):
+    def __init__(
+        self,
+        pc_fusion: PointCloudFusion,
+        num_samples=20,
+        verbose=False,
+        *args,
+        **kwargs,
+    ):
         super(CalibrationTread, self).__init__(*args, **kwargs)
         self.pc_fusion = pc_fusion
         self.samples = np.zeros((num_samples, 4, 4))  # transformation matrix samples
@@ -234,7 +285,9 @@ class CalibrationTread(threading.Thread):
                 # visualize for testing
                 pc = self.pc_fusion.pcd1.copy()
                 pc2 = self.pc_fusion.pcd2.copy()
-                pc = transform_point_cloud(points=pc, transform_matrix=self.samples[i])  # transform
+                pc = transform_point_cloud(
+                    points=pc, transform_matrix=self.samples[i]
+                )  # transform
 
                 swap = lambda x: np.moveaxis(x, 0, 1)
                 fused = swap(np.hstack([swap(pc), swap(pc2)]))

@@ -1,6 +1,6 @@
 import numpy as np
 from collections import deque
-import gymnasium as gym
+import gym
 
 
 class ObservationStatisticsWrapper(gym.Wrapper, gym.utils.RecordConstructorArgs):
@@ -19,7 +19,9 @@ class ObservationStatisticsWrapper(gym.Wrapper, gym.utils.RecordConstructorArgs)
 
         # make buffer
         for name, space in self.env.observation_space["state"].items():
-            self.buffer[name] = np.zeros(shape=(self.max_episode_length, space.shape[0]))
+            self.buffer[name] = np.zeros(
+                shape=(self.max_episode_length, space.shape[0])
+            )
 
         # may not be used
         self.num_envs = getattr(env, "num_envs", 1)
@@ -51,16 +53,24 @@ class ObservationStatisticsWrapper(gym.Wrapper, gym.utils.RecordConstructorArgs)
         num_dones = np.sum(dones)
         if num_dones:
             calc_buffs = {}
-            calc_buffs.update({
-                name + "_mean": np.mean(obs[:self.curr_path_length], axis=0) for name, obs in self.buffer.items()
-            })
-            calc_buffs.update({
-                name + "_std": np.std(obs[:self.curr_path_length], axis=0) for name, obs in self.buffer.items()
-            })
+            calc_buffs.update(
+                {
+                    name + "_mean": np.mean(obs[: self.curr_path_length], axis=0)
+                    for name, obs in self.buffer.items()
+                }
+            )
+            calc_buffs.update(
+                {
+                    name + "_std": np.std(obs[: self.curr_path_length], axis=0)
+                    for name, obs in self.buffer.items()
+                }
+            )
             buff = {}
             for name, value in calc_buffs.items():
                 for i in range(value.shape[0]):
-                    buff[name + f"_{['x', 'y', 'z', 'rx', 'ry', 'rz', 'grip'][i]}"] = value[i]
+                    buff[
+                        name + f"_{['x', 'y', 'z', 'rx', 'ry', 'rz', 'grip'][i]}"
+                    ] = value[i]
             infos["obsStat"] = buff
             # print(buff)
 

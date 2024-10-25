@@ -1,10 +1,10 @@
 from scipy.spatial.transform import Rotation as R
-import gymnasium as gym
+import gym
 import numpy as np
 from gym import Env
 from franka_env.utils.transformations import (
     construct_homogeneous_matrix,
-    construct_rotation_matrix
+    construct_rotation_matrix,
 )
 
 
@@ -48,7 +48,9 @@ class RelativeFrame(gym.Wrapper):
 
         # this is to convert the spacemouse intervention action
         if "intervene_action" in info:
-            info["intervene_action"] = self.transform_action_inv(info["intervene_action"])
+            info["intervene_action"] = self.transform_action_inv(
+                info["intervene_action"]
+            )
 
         # Update rotation matrix
         self.rotation_matrix = construct_rotation_matrix(obs["state"]["tcp_pose"])
@@ -76,10 +78,18 @@ class RelativeFrame(gym.Wrapper):
         Transform observations from spatial(base) frame into body(end-effector) frame
         using the rotation and homogeneous matrix
         """
-        obs["state"]["tcp_vel"][:3] = self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][:3]
-        obs["state"]["tcp_vel"][3:6] = self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][3:6]
-        obs["state"]["tcp_force"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_force"]
-        obs["state"]["tcp_torque"] = self.rotation_matrix.transpose() @ obs["state"]["tcp_torque"]
+        obs["state"]["tcp_vel"][:3] = (
+            self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][:3]
+        )
+        obs["state"]["tcp_vel"][3:6] = (
+            self.rotation_matrix_reset.transpose() @ obs["state"]["tcp_vel"][3:6]
+        )
+        obs["state"]["tcp_force"] = (
+            self.rotation_matrix.transpose() @ obs["state"]["tcp_force"]
+        )
+        obs["state"]["tcp_torque"] = (
+            self.rotation_matrix.transpose() @ obs["state"]["tcp_torque"]
+        )
 
         if self.include_relative_pose:
             T_b_o = construct_homogeneous_matrix(obs["state"]["tcp_pose"])

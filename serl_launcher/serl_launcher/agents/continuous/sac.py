@@ -162,15 +162,23 @@ class SACAgent(flax.struct.PyTreeNode):
         chex.assert_shape(target_next_min_q, (batch_size,))
 
         target_q = (
-                batch["rewards"]
-                + self.config["discount"] * batch["masks"] * target_next_min_q
+            batch["rewards"]
+            + self.config["discount"] * batch["masks"] * target_next_min_q
         )
         chex.assert_shape(target_q, (batch_size,))
 
-        temperature = self.forward_temperature()
-        if self.config["backup_entropy"]:       # not the same as in original jaxrl_m SAC implementation: https://github.com/dibyaghosh/jaxrl_m/blob/main/examples/mujoco/sac.py
+        if self.config[
+            "backup_entropy"
+        ]:  # not the same as in original jaxrl_m SAC implementation: https://github.com/dibyaghosh/jaxrl_m/blob/main/examples/mujoco/sac.py
+            temperature = self.forward_temperature()
             # target_q = target_q - temperature * next_actions_log_probs        # serl original
-            target_q = target_q - self.config["discount"] * batch["masks"] * next_actions_log_probs * temperature  # as in jaxrl_m
+            target_q = (
+                target_q
+                - self.config["discount"]
+                * batch["masks"]
+                * next_actions_log_probs
+                * temperature
+            )  # as in jaxrl_m
 
         predicted_qs = self.forward_critic(
             batch["observations"], batch["actions"], rng=rng, grad_params=params
@@ -181,14 +189,12 @@ class SACAgent(flax.struct.PyTreeNode):
         )
         target_qs = target_q[None].repeat(self.config["critic_ensemble_size"], axis=0)
         chex.assert_equal_shape([predicted_qs, target_qs])
-        critic_loss = jnp.mean(jnp.sum((predicted_qs - target_qs) ** 2, axis=0))
+        critic_loss = jnp.mean((predicted_qs - target_qs) ** 2)
 
         info = {
             "critic_loss": critic_loss,
             "predicted_qs": jnp.mean(predicted_qs),
             "target_qs": jnp.mean(target_qs),
-            # "log_probs": jnp.mean(next_actions_log_probs),
-            # "temp_log_probs": jnp.mean(next_actions_log_probs * temperature * batch["masks"] * self.config["discount"]),
         }
 
         return critic_loss, info
@@ -388,14 +394,7 @@ class SACAgent(flax.struct.PyTreeNode):
         # Config
         assert not entropy_per_dim, "Not implemented"
         if target_entropy is None:
-            # target_entropy = -actions.shape[-1] / 2
-            print(f"actions shape: {actions.shape}")
-
-            # from https://github.com/NickKaparinos/OpenAI-Gym-Projects/blob/master/Classic%20Control/MountainCarContinuous/main.py:
-            # target_entropy = -np.prod(env.action_space.shape)
-            from numpy import prod
-            target_entropy = -prod(actions.shape)
-            print(f"target_entropy: {target_entropy}")
+            target_entropy = -actions.shape[-1]
 
         return cls(
             state=state,

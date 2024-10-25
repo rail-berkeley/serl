@@ -9,14 +9,12 @@ class RSCapture:
 
     def __init__(self, name, serial_number, dim=(640, 480), fps=15, depth=False):
         self.name = name
-        print(self.get_device_serial_numbers())
         assert serial_number in self.get_device_serial_numbers()
         self.serial_number = serial_number
         self.depth = depth
         self.pipe = rs.pipeline()
         self.cfg = rs.config()
         self.cfg.enable_device(self.serial_number)
-
         self.cfg.enable_stream(rs.stream.color, dim[0], dim[1], rs.format.bgr8, fps)
         if self.depth:
             self.cfg.enable_stream(rs.stream.depth, dim[0], dim[1], rs.format.z16, fps)

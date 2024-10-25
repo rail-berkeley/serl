@@ -54,7 +54,6 @@ def evaluate(policy_fn, env: gym.Env, num_episodes: int) -> Dict[str, float]:
         done = False
         while not done:
             action = policy_fn(observation)
-            action = np.asarray(jax.device_get(action))
             observation, _, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             add_to(stats, flatten(info))

@@ -186,10 +186,6 @@ class Policy(nn.Module):
         else:
             obs_enc = self.encoder(observations, train=train, stop_gradient=True)
 
-            # output the encoded obs, returning is not possible due to jax (on gpu)
-            # for i in range(obs_enc.shape[0]):
-            #     jax.debug.print("{}\n\n", obs_enc[i, ...])
-
         outputs = self.network(obs_enc, train=train)
 
         means = nn.Dense(self.action_dim, kernel_init=default_init())(outputs)

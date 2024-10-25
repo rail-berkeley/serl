@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 from tqdm import tqdm
 import numpy as np
 import copy
@@ -9,9 +9,16 @@ import threading
 from pynput import keyboard
 
 from ur_env.envs.relative_env import RelativeFrame
-from ur_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper, ObservationRotationWrapper
+from ur_env.envs.wrappers import (
+    SpacemouseIntervention,
+    Quat2MrpWrapper,
+    ObservationRotationWrapper,
+)
 
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import (
+    SERLObsWrapper,
+    ScaleObservationWrapper,
+)
 from serl_launcher.wrappers.chunking import ChunkingWrapper
 
 import ur_env
@@ -22,7 +29,7 @@ exit_program = threading.Event()
 def on_space(key, info_dict):
     if key == keyboard.Key.space:
         for key, item in info_dict.items():
-            print(f'{key}:  {item}', end='   ')
+            print(f"{key}:  {item}", end="   ")
         print()
 
 
@@ -32,10 +39,11 @@ def on_esc(key):
 
 
 if __name__ == "__main__":
-    env = gym.make("box_picking_camera_env",
-                   camera_mode="pointcloud",
-                   max_episode_length=100,
-                   )
+    env = gym.make(
+        "box_picking_camera_env",
+        camera_mode="pointcloud",
+        max_episode_length=100,
+    )
     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
@@ -52,9 +60,15 @@ if __name__ == "__main__":
     total_count = 0
     pbar = tqdm(total=success_needed)
 
-    info_dict = {'state': env.unwrapped.curr_pos, 'gripper_state': env.unwrapped.gripper_state,
-                 'force': env.unwrapped.curr_force, 'reset_pose': env.unwrapped.curr_reset_pose}
-    listener_1 = keyboard.Listener(daemon=True, on_press=lambda event: on_space(event, info_dict=info_dict))
+    info_dict = {
+        "state": env.unwrapped.curr_pos,
+        "gripper_state": env.unwrapped.gripper_state,
+        "force": env.unwrapped.curr_force,
+        "reset_pose": env.unwrapped.curr_reset_pose,
+    }
+    listener_1 = keyboard.Listener(
+        daemon=True, on_press=lambda event: on_space(event, info_dict=info_dict)
+    )
     listener_1.start()
 
     listener_2 = keyboard.Listener(on_press=on_esc, daemon=True)
@@ -69,7 +83,7 @@ if __name__ == "__main__":
         raise PermissionError(f"No permission to write to {file_dir}")
 
     try:
-        running_reward = 0.
+        running_reward = 0.0
         while success_count < success_needed:
             if exit_program.is_set():
                 raise KeyboardInterrupt  # stop program, but clean up before
@@ -101,14 +115,14 @@ if __name__ == "__main__":
                 pbar.update(int(rew > 0.99))
                 obs, _ = env.reset()
                 print("Reward total:", running_reward)
-                running_reward = 0.
+                running_reward = 0.0
 
         with open(file_path, "wb") as f:
             pkl.dump(transitions, f)
             print(f"saved {success_needed} demos to {file_path}")
 
     except KeyboardInterrupt as e:
-        print(f'\nProgram was interrupted, cleaning up...  ', e.__str__())
+        print(f"\nProgram was interrupted, cleaning up...  ", e.__str__())
 
     finally:
         pbar.close()

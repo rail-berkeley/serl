@@ -15,7 +15,7 @@ def quat_2_rotvec(quat):
 
 
 def quat_2_euler(quat):
-    return R.from_quat(quat).as_euler('xyz')
+    return R.from_quat(quat).as_euler("xyz")
 
 
 def quat_2_mrp(quat):

@@ -115,7 +115,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
 
 
 def _random_gaussian_blur(
-        image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
+    image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
 ):
     """Applies a random gaussian blur."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -180,22 +180,22 @@ def hsv_to_rgb(h, s, v):
     x = c * (1 - jnp.abs(fmodu - 1))
     hcat = jnp.floor(dh).astype(jnp.int32)
     rr = (
-            jnp.where(
-                (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
+        )
+        + m
     )
     gg = (
-            jnp.where(
-                (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
+        )
+        + m
     )
     bb = (
-            jnp.where(
-                (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
+        )
+        + m
     )
     return rr, gg, bb
 
@@ -256,17 +256,17 @@ def _to_grayscale(image):
 
 
 def color_transform(
-        image,
-        rng,
-        *,
-        brightness,
-        contrast,
-        saturation,
-        hue,
-        to_grayscale_prob,
-        color_jitter_prob,
-        apply_prob,
-        shuffle
+    image,
+    rng,
+    *,
+    brightness,
+    contrast,
+    saturation,
+    hue,
+    to_grayscale_prob,
+    color_jitter_prob,
+    apply_prob,
+    shuffle
 ):
     """Applies color jittering to a single image."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -338,7 +338,7 @@ def random_flip(image, rng):
 
 
 def gaussian_blur(
-        image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
+    image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
 ):
     """Applies gaussian blur to a batch of images.
     Args:

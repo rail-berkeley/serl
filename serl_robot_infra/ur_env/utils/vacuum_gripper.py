@@ -33,14 +33,19 @@ from typing import Union, Tuple, OrderedDict
 
 # TODO: add blocking to release, gripping
 
+
 class VacuumGripper:
     """
     Communicates with the gripper directly, via socket with string commands, leveraging string names for variables.
     """
 
     # WRITE VARIABLES (CAN ALSO READ)
-    ACT = "ACT"  # act : activate (1 while activated, can be reset to clear fault status)
-    GTO = "GTO"  # gto : go to (will perform go to with the actions set in pos, for, spe)
+    ACT = (
+        "ACT"  # act : activate (1 while activated, can be reset to clear fault status)
+    )
+    GTO = (
+        "GTO"  # gto : go to (will perform go to with the actions set in pos, for, spe)
+    )
     ATR = "ATR"  # atr : auto-release (emergency slow move)
     FOR = "FOR"  # for : vacuum minimum relative pressure (0-255)
     SPE = "SPE"  # spe : grip timeout/release delay
@@ -88,14 +93,16 @@ class VacuumGripper:
     async def connect(self) -> None:
         """Connects to a gripper on the provided address"""
         # print(self.hostname, self.port)
-        self.socket_reader, self.socket_writer = await asyncio.open_connection(self.hostname, self.port)
+        self.socket_reader, self.socket_writer = await asyncio.open_connection(
+            self.hostname, self.port
+        )
 
     async def disconnect(self) -> None:
         """Closes the connection with the gripper."""
         self.socket_writer.close()
         await self.socket_writer.wait_closed()
 
-    async def _set_vars(self, var_dict: 'OrderedDict[str, Union[int, float]]') -> bool:
+    async def _set_vars(self, var_dict: "OrderedDict[str, Union[int, float]]") -> bool:
         """Sends the appropriate command via socket to set the value of n variables, and waits for its 'ack' response.
 
         :param var_dict: Dictionary of variables to set (variable_name, value).
@@ -142,7 +149,9 @@ class VacuumGripper:
         # note some special variables (like FLT) may send 2 bytes, instead of an integer. We assume integer here
         var_name, value_str = data.decode(self.ENCODING).split()
         if var_name != variable:
-            raise ValueError(f"Unexpected response {data} ({data.decode(self.ENCODING)}): does not match '{variable}'")
+            raise ValueError(
+                f"Unexpected response {data} ({data.decode(self.ENCODING)}): does not match '{variable}'"
+            )
         value = int(value_str)
         return value
 
@@ -157,7 +166,7 @@ class VacuumGripper:
         """
         # stop the vacuum generator
         await self._set_var(self.GTO, 0)
-        #await self._set_var(self.GTO, 1)
+        # await self._set_var(self.GTO, 1)
 
         # to clear fault status
         await self._set_var(self.ACT, 0)
@@ -183,7 +192,7 @@ class VacuumGripper:
     async def get_fault_status(self) -> int:
         value = await self._get_var(self.FLT)
         return value
-    
+
     async def automatic_grip(self) -> bool:
         """Sends commands to grip using automatic mode.
         In automatic mode, the pressure byte is used to send a grip/release request
@@ -203,7 +212,7 @@ class VacuumGripper:
         await self._set_var(self.GTO, 1)
 
     async def advanced_grip(self, min_pressure, max_pressure, timeout) -> bool:
-        """ Sends commands to grip in advanced mode.
+        """Sends commands to grip in advanced mode.
         min pressure is [0, 99]
         max pressure is [10, 78]
         timeout is in ms [0, 255]
@@ -219,21 +228,24 @@ class VacuumGripper:
         clip_max_pressure = 100 - clip_val(10, max_pressure, 78)
         clip_timeout = clip_val(0, timeout, 255)
 
-        #val = await self.get_fault_status()
-        #print(val)
+        # val = await self.get_fault_status()
+        # print(val)
 
         # moves to the given position with the given speed and force
-        var_dict = OrderedDict([
-            (self.MOD, 1),
-            (self.POS, clip_max_pressure), 
-            (self.FOR, clip_min_pressure), 
-            (self.SPE, clip_timeout)])
+        var_dict = OrderedDict(
+            [
+                (self.MOD, 1),
+                (self.POS, clip_max_pressure),
+                (self.FOR, clip_min_pressure),
+                (self.SPE, clip_timeout),
+            ]
+        )
 
         await self._set_vars(var_dict)
         await self._set_var(self.GTO, 1)
 
     async def continuous_grip(self, timeout) -> bool:
-        """ Sends commands to grip in advanced mode.
+        """Sends commands to grip in advanced mode.
         min pressure is [0, 99]
         max pressure is [10, 78]
         timeout is in ms [0, 255]
@@ -245,25 +257,19 @@ class VacuumGripper:
         clip_timeout = clip_val(0, timeout, 255)
 
         # moves to the given position with the given speed and force
-        var_dict = OrderedDict([
-            (self.MOD, 1),
-            (self.POS, 0), 
-            (self.SPE, clip_timeout),
-            (self.GTO, 1)])
+        var_dict = OrderedDict(
+            [(self.MOD, 1), (self.POS, 0), (self.SPE, clip_timeout), (self.GTO, 1)]
+        )
 
         return await self._set_vars(var_dict)
 
     async def advanced_release(self, min_pressure, max_pressure, timeout) -> bool:
-        """ Sends commands to do advanced release. This allows to do a more controlled release than the automatic one.
-        """
-        var_dict = OrderedDict([
-            (self.POS, 255), 
-            (self.GTO, 1)])
+        """Sends commands to do advanced release. This allows to do a more controlled release than the automatic one."""
+        var_dict = OrderedDict([(self.POS, 255), (self.GTO, 1)])
 
         return await self._set_vars(var_dict)
 
     async def automatic_release(self) -> bool:
-        """ Sends commands to do automatic release. 
-        """
+        """Sends commands to do automatic release."""
         var_dict = OrderedDict([(self.ACT, 1), (self.ATR, 1)])
         return await self._set_vars(var_dict)

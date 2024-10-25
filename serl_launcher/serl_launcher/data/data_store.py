@@ -25,11 +25,11 @@ except ImportError:
 
 class ReplayBufferDataStore(ReplayBuffer, DataStoreBase):
     def __init__(
-            self,
-            observation_space: gym.Space,
-            action_space: gym.Space,
-            capacity: int,
-            rlds_logger: Optional[RLDSLogger] = None,
+        self,
+        observation_space: gym.Space,
+        action_space: gym.Space,
+        capacity: int,
+        rlds_logger: Optional[RLDSLogger] = None,
     ):
         ReplayBuffer.__init__(self, observation_space, action_space, capacity)
         DataStoreBase.__init__(self, capacity)
@@ -79,20 +79,15 @@ class ReplayBufferDataStore(ReplayBuffer, DataStoreBase):
     def get_latest_data(self, from_id: int):
         raise NotImplementedError  # TODO
 
-    def __del__(self):
-        if self._logger:
-            self._logger.close()
-            print("[ReplayBufferDataStore] RLDS logger closed successfully")
-
 
 class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStoreBase):
     def __init__(
-            self,
-            observation_space: gym.Space,
-            action_space: gym.Space,
-            capacity: int,
-            image_keys: Iterable[str] = ("image",),
-            rlds_logger: Optional[RLDSLogger] = None,
+        self,
+        observation_space: gym.Space,
+        action_space: gym.Space,
+        capacity: int,
+        image_keys: Iterable[str] = ("image",),
+        rlds_logger: Optional[RLDSLogger] = None,
     ):
         MemoryEfficientReplayBuffer.__init__(
             self, observation_space, action_space, capacity, pixel_keys=image_keys
@@ -150,9 +145,8 @@ class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStor
 
 
 def populate_data_store(
-        data_store: DataStoreBase,
-        demos_path: str,
-        reward_scaling: int = 1,
+    data_store: DataStoreBase,
+    demos_path: str,
 ):
     """
     Utility function to populate demonstrations data into data_store.
@@ -164,15 +158,14 @@ def populate_data_store(
         with open(demo_path, "rb") as f:
             demo = pkl.load(f)
             for transition in demo:
-                transition["rewards"] *= reward_scaling  # apply reward scaling
                 data_store.insert(transition)
         print(f"Loaded {len(data_store)} transitions.")
     return data_store
 
 
 def populate_data_store_with_z_axis_only(
-        data_store: DataStoreBase,
-        demos_path: str,
+    data_store: DataStoreBase,
+    demos_path: str,
 ):
     """
     Utility function to populate demonstrations data into data_store.

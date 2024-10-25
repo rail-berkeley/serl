@@ -13,7 +13,7 @@ class TemporalActionEnsemble:
             print(f"Temporal Action Ensemble enabled: {self.ensemble}")
 
     def reset(self):
-        self.buffer[...] = 0.
+        self.buffer[...] = 0.0
 
     def sample(self, curr_action: np.ndarray):
         if not self.activated:

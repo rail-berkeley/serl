@@ -12,8 +12,8 @@ from absl import app, flags
 from flax.training import checkpoints
 from datetime import datetime
 
-import gymnasium as gym
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+import gym
+from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.common.evaluation import evaluate
@@ -34,10 +34,19 @@ from serl_launcher.utils.launcher import (
     make_wandb_logger,
 )
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
-from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper, ScaleObservationWrapper
-from serl_launcher.wrappers.observation_statistics_wrapper import ObservationStatisticsWrapper
+from serl_launcher.wrappers.serl_obs_wrappers import (
+    SERLObsWrapper,
+    ScaleObservationWrapper,
+)
+from serl_launcher.wrappers.observation_statistics_wrapper import (
+    ObservationStatisticsWrapper,
+)
 from ur_env.envs.relative_env import RelativeFrame
-from ur_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper, ObservationRotationWrapper
+from ur_env.envs.wrappers import (
+    SpacemouseIntervention,
+    Quat2MrpWrapper,
+    ObservationRotationWrapper,
+)
 
 import ur_env
 
@@ -52,28 +61,46 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("env", "box_picking_camera_env", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
-flags.DEFINE_string("exp_name", "box picking drq", "Name of the experiment for wandb logging.")
+flags.DEFINE_string(
+    "exp_name", "box picking drq", "Name of the experiment for wandb logging."
+)
 flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
-flags.DEFINE_string("camera_mode", "rgb", "Camera mode, one of (rgb, depth, both, pointcloud)")
+flags.DEFINE_string(
+    "camera_mode", "rgb", "Camera mode, one of (rgb, depth, both, pointcloud)"
+)
 
 flags.DEFINE_integer("seed", 1, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("batch_size", 256, "Batch size.")
 flags.DEFINE_integer("utd_ratio", 4, "UTD ratio.")
 
-flags.DEFINE_string("state_mask", "all",
-                    "if all the states should be considered, see serl_launcher/common/encoding for more info")
+flags.DEFINE_string(
+    "state_mask",
+    "all",
+    "if all the states should be considered, see serl_launcher/common/encoding for more info",
+)
 flags.DEFINE_string("encoder_type", "voxnet-pretrained", "Encoder type.")
-flags.DEFINE_integer("encoder_bottleneck_dim", 128, "bottleneck dimension of the encoder")
-flags.DEFINE_multi_string("encoder_kwargs", None, "Encoder kwargs in the form ['dict key', 'dict value']")
-flags.DEFINE_bool("enable_obs_rotation_wrapper", False,
-                  "Whether to enable observation rotation wrapper (train in one quaternion)")
-flags.DEFINE_bool("enable_temporal_ensemble_sampling", False,
-                  "Whether to enable sampling the action from a temporal ensemble: action = 0.5*a0 + 0.3*a-1 + 0.2*a-2 + 0.1*a-3")
+flags.DEFINE_integer(
+    "encoder_bottleneck_dim", 128, "bottleneck dimension of the encoder"
+)
+flags.DEFINE_multi_string(
+    "encoder_kwargs", None, "Encoder kwargs in the form ['dict key', 'dict value']"
+)
+flags.DEFINE_bool(
+    "enable_obs_rotation_wrapper",
+    False,
+    "Whether to enable observation rotation wrapper (train in one quaternion)",
+)
+flags.DEFINE_bool(
+    "enable_temporal_ensemble_sampling",
+    False,
+    "Whether to enable sampling the action from a temporal ensemble: action = 0.5*a0 + 0.3*a-1 + 0.2*a-2 + 0.1*a-3",
+)
 
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
-flags.DEFINE_integer("replay_buffer_capacity", 10000,
-                     "Replay buffer capacity.")  # quite low to forget demo trajectories
+flags.DEFINE_integer(
+    "replay_buffer_capacity", 10000, "Replay buffer capacity."
+)  # quite low to forget demo trajectories
 
 flags.DEFINE_integer("random_steps", 0, "Sample random actions for this many steps.")
 flags.DEFINE_integer("training_starts", 0, "Training starts after this step.")
@@ -89,12 +116,20 @@ flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
-flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/box_picking_drq/checkpoints',
-                    "Path to save checkpoints.")
+flags.DEFINE_string(
+    "checkpoint_path",
+    "/home/nico/real-world-rl/serl/examples/box_picking_drq/checkpoints",
+    "Path to save checkpoints.",
+)
 
-flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
-flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/box_picking_drq/rlds',
-                    "Path to save RLDS logs.")
+flags.DEFINE_integer(
+    "eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step"
+)
+flags.DEFINE_string(
+    "log_rlds_path",
+    "/home/nico/real-world-rl/serl/examples/box_picking_drq/rlds",
+    "Path to save RLDS logs.",
+)
 flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 
 flags.DEFINE_boolean(
@@ -141,7 +176,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 
     if FLAGS.eval_checkpoint_step:
         wandb_logger = make_wandb_logger(
-            project="paper_evaluation_unseen" if "eval" in FLAGS.env else "paper_evaluation",
+            project="paper_evaluation_unseen"
+            if "eval" in FLAGS.env
+            else "paper_evaluation",
             description=FLAGS.exp_name or FLAGS.env,
             debug=FLAGS.debug,
         )
@@ -153,7 +190,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
             step=FLAGS.eval_checkpoint_step,
         )
         agent = agent.replace(state=ckpt)
-        action_ensemble = TemporalActionEnsemble(activated=FLAGS.enable_temporal_ensemble_sampling)
+        action_ensemble = TemporalActionEnsemble(
+            activated=FLAGS.enable_temporal_ensemble_sampling
+        )
 
         trajectories = []
         traj_infos = []
@@ -171,10 +210,14 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 )
                 actions = np.asarray(jax.device_get(actions))
 
-                ensembled_action = action_ensemble.sample(actions)      # will return actions if not activated
+                ensembled_action = action_ensemble.sample(
+                    actions
+                )  # will return actions if not activated
                 next_obs, reward, done, truncated, info = env.step(ensembled_action)
                 transition = dict(
-                    observations=obs["state"].copy(),  # do not save voxel grid or images
+                    observations=obs[
+                        "state"
+                    ].copy(),  # do not save voxel grid or images
                     actions=ensembled_action,
                     next_observations=next_obs["state"].copy(),
                     rewards=reward,
@@ -185,20 +228,28 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                 obs = next_obs
 
                 if done or truncated:
-                    success_counter += (reward > 50.)
+                    success_counter += reward > 50.0
                     dt = time.time() - start_time
-                    running_reward = np.sum(np.asarray([t["rewards"] for t in trajectory]))
-                    running_reward = max(running_reward, -100.)     # -100 min value
+                    running_reward = np.sum(
+                        np.asarray([t["rewards"] for t in trajectory])
+                    )
+                    running_reward = max(running_reward, -100.0)  # -100 min value
 
-                    print(f"{success_counter}/{episode + 1} ", end=' ')
+                    print(f"{success_counter}/{episode + 1} ", end=" ")
                     print(f"time: {dt:.3f}s  running_rew: {running_reward:.2f}")
 
-                    trajectories.append({"traj": trajectory, "time": dt, "success": (reward > 50.)})
+                    trajectories.append(
+                        {"traj": trajectory, "time": dt, "success": (reward > 50.0)}
+                    )
                     infos = {
                         "running_reward": running_reward,
                         "time": dt,
-                        "success_rate": float(reward > 50.),
-                        "action_cost": np.linalg.norm(np.asarray([t["actions"] for t in trajectory]), axis=1, ord=2).mean()
+                        "success_rate": float(reward > 50.0),
+                        "action_cost": np.linalg.norm(
+                            np.asarray([t["actions"] for t in trajectory]),
+                            axis=1,
+                            ord=2,
+                        ).mean(),
                     }
                     traj_infos.append(infos)
                     wandb_logger.log(infos, step=episode)
@@ -215,7 +266,9 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     print("Stopping actor eval")
                     break
 
-        traj_infos = {k: [d[k] for d in traj_infos] for k in traj_infos[0]}     # list of dicts to dict of lists
+        traj_infos = {
+            k: [d[k] for d in traj_infos] for k in traj_infos[0]
+        }  # list of dicts to dict of lists
         mean_infos = {"mean_" + key: np.mean(val) for key, val in traj_infos.items()}
         wandb_logger.log(mean_infos)
         for key, value in mean_infos.items():
@@ -224,6 +277,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         filename = f"trajectories {'temp_ens' if action_ensemble.is_activated() else ''} {datetime.now().strftime('%m-%d %H%M')}.pkl"
         with open(filename, "wb") as f:
             import pickle
+
             pickle.dump(trajectories, f)
         return  # after done eval, return and exit
 
@@ -393,7 +447,9 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
                 batch = next(replay_iterator)
 
             with timer.context("train_critics"):
-                agent, critics_info = agent.update_critics(batch, )
+                agent, critics_info = agent.update_critics(
+                    batch,
+                )
 
         with timer.context("train"):
             batch = next(replay_iterator)
@@ -451,9 +507,14 @@ def learner(rng, agent: DrQAgent, replay_buffer, wandb_logger=None):
 
 def main(_):
     assert FLAGS.batch_size % num_devices == 0
-    if FLAGS.checkpoint_path.split('/')[-1] == "checkpoints":
-        FLAGS.checkpoint_path = FLAGS.checkpoint_path + " " + FLAGS.exp_name + " " + datetime.now().strftime(
-            "%m%d-%H:%M")
+    if FLAGS.checkpoint_path.split("/")[-1] == "checkpoints":
+        FLAGS.checkpoint_path = (
+            FLAGS.checkpoint_path
+            + " "
+            + FLAGS.exp_name
+            + " "
+            + datetime.now().strftime("%m%d-%H:%M")
+        )
 
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
@@ -469,7 +530,9 @@ def main(_):
     #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
-    env = ScaleObservationWrapper(env)  # scale obs space (after quat2mrp, but before serlobs)
+    env = ScaleObservationWrapper(
+        env
+    )  # scale obs space (after quat2mrp, but before serlobs)
     env = ObservationStatisticsWrapper(env)
     if FLAGS.enable_obs_rotation_wrapper:
         env = ObservationRotationWrapper(env)
@@ -485,9 +548,13 @@ def main(_):
     # assert FLAGS.encoder_kwargs is None or len(FLAGS.encoder_kwargs) % 2 == 0
     encoder_kwargs = {
         "bottleneck_dim": FLAGS.encoder_bottleneck_dim,
-        **(dict(zip(*[iter(FLAGS.encoder_kwargs)] * 2)) if FLAGS.encoder_kwargs else {}),
+        **(
+            dict(zip(*[iter(FLAGS.encoder_kwargs)] * 2)) if FLAGS.encoder_kwargs else {}
+        ),
     }
-    encoder_kwargs = {k: (int(v) if str(v).isdigit() else v) for k, v in encoder_kwargs.items()}
+    encoder_kwargs = {
+        k: (int(v) if str(v).isdigit() else v) for k, v in encoder_kwargs.items()
+    }
 
     agent: DrQAgent = make_voxel_drq_agent(
         seed=FLAGS.seed,
@@ -496,7 +563,7 @@ def main(_):
         image_keys=image_keys,
         encoder_type=FLAGS.encoder_type,
         state_mask=FLAGS.state_mask,
-        encoder_kwargs=encoder_kwargs
+        encoder_kwargs=encoder_kwargs,
     )
 
     # replicate agent across devices
@@ -511,7 +578,10 @@ def main(_):
 
     if FLAGS.enable_obs_rotation_augmentation:
         print("Batch Observation Rotation enabled!")
-    assert not FLAGS.enable_obs_rotation_augmentation or not FLAGS.enable_obs_rotation_wrapper  # both is pointless
+    assert (
+        not FLAGS.enable_obs_rotation_augmentation
+        or not FLAGS.enable_obs_rotation_wrapper
+    )  # both is pointless
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(
@@ -533,6 +603,7 @@ def main(_):
         replay_buffer, wandb_logger = create_replay_buffer_and_wandb_logger()
 
         import pickle as pkl
+
         with open(FLAGS.demo_path, "rb") as f:
             trajs = pkl.load(f)
 

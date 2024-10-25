@@ -1,4 +1,4 @@
-from gymnasium.envs.registration import register
+from gym.envs.registration import register
 import numpy as np
 
 register(
@@ -12,4 +12,3 @@ register(
     entry_point="ur_env.envs.camera_env:BoxPickingCameraEnv",
     max_episode_steps=100,
 )
-
