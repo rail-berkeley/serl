@@ -5,7 +5,6 @@ from ur_env.envs.ur5_env import UR5Env
 from ur_env.envs.basic_env.config import UR5BasicConfig
 
 
-
 class BoxPickingBasicEnv(UR5Env):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, config=UR5BasicConfig)

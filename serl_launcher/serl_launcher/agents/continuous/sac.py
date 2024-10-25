@@ -167,9 +167,7 @@ class SACAgent(flax.struct.PyTreeNode):
         )
         chex.assert_shape(target_q, (batch_size,))
 
-        if self.config[
-            "backup_entropy"
-        ]:  # not the same as in original jaxrl_m SAC implementation: https://github.com/dibyaghosh/jaxrl_m/blob/main/examples/mujoco/sac.py
+        if self.config["backup_entropy"]:  # not the same as in original jaxrl_m SAC implementation: https://github.com/dibyaghosh/jaxrl_m/blob/main/examples/mujoco/sac.py
             temperature = self.forward_temperature()
             # target_q = target_q - temperature * next_actions_log_probs        # serl original
             target_q = (

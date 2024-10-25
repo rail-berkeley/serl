@@ -2,7 +2,6 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import jax.lax as lax
 
 
 @partial(jax.jit, static_argnames="padding")
@@ -98,7 +97,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
     radius = int(kernel_size / 2)
     kernel_size_ = 2 * radius + 1
     x = jnp.arange(-radius, radius + 1).astype(jnp.float32)
-    blur_filter = jnp.exp(-(x ** 2) / (2.0 * sigma ** 2))
+    blur_filter = jnp.exp(-(x**2) / (2.0 * sigma**2))
     blur_filter = blur_filter / jnp.sum(blur_filter)
     blur_v = jnp.reshape(blur_filter, [kernel_size_, 1, 1, 1])
     blur_h = jnp.reshape(blur_filter, [1, kernel_size_, 1, 1])

@@ -64,7 +64,6 @@ class Critic(nn.Module):
         inputs = jnp.concatenate([obs_enc, actions], -1)
         outputs = self.network(inputs, train)
         # train=train throws: "RuntimeWarning: kwargs are not supported in vmap, so "train" is(are) ignored"
-
         if self.init_final is not None:
             value = nn.Dense(
                 1,
