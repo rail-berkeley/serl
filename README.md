@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Static Badge](https://img.shields.io/badge/Project-Page-a)](https://serl-robot.github.io/)
 
-![](./docs/images/task-banner.gif)
+![](./docs/images/tasks-banner.gif)
 
 **Webpage: [https://serl-robot.github.io/](https://serl-robot.github.io/)**
 
