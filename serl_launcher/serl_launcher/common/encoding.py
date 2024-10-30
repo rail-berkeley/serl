@@ -7,6 +7,27 @@ import jax.numpy as jnp
 from einops import rearrange, repeat
 
 
+def create_state_mask(mask_str: str) -> jnp.ndarray:
+    all = jnp.ones((27,), dtype=jnp.bool)
+    none = jnp.zeros_like(all)
+    no_action = all.at[:7].set(False)
+    gripper = none.at[0 + 7 : 2 + 7].set(True)
+    no_ForceTorque = all.at[7 + 2 : 7 + 5].set(False).at[7 + 11 : 7 + 14].set(False)
+    action_only = none.at[:7].set(True)
+    masks = dict(
+        all=all,
+        none=jnp.zeros_like(all),
+        gripper=gripper,
+        position_gripper=gripper.at[5:11].set(True),
+        no_ForceTorque=no_ForceTorque,
+        no_ForceTorqueAction=jnp.bitwise_and(no_ForceTorque, no_action),
+        gripper_Zinfo=gripper.at[7 + 7].set(True),
+        action_only=action_only,
+    )
+    assert mask_str in masks
+    return masks[mask_str]
+
+
 class EncodingWrapper(nn.Module):
     """
     Encodes observations into a single flat encoding, adding additional
@@ -68,6 +89,82 @@ class EncodingWrapper(nn.Module):
             state = nn.LayerNorm()(state)
             state = nn.tanh(state)
             encoded = jnp.concatenate([encoded, state], axis=-1)
+
+        return encoded
+
+
+class MaskedEncodingWrapper(nn.Module):
+    """
+    Encodes observations into a single flat encoding, adding additional
+    functionality for adding proprioception and stopping the gradient.
+
+    Args:
+        encoder: The encoder network.
+        use_proprio: Whether to concatenate proprioception (after encoding).
+        state_mask: Which proprioceptive states to propagate, and which to ignore
+    """
+
+    encoder: nn.Module
+    use_proprio: bool
+    state_mask: jnp.ndarray
+    enable_stacking: bool = False
+    image_keys: Iterable[str] = ("image",)
+
+    @nn.compact
+    def __call__(
+        self,
+        observations: Dict[str, jnp.ndarray],
+        train=False,
+        stop_gradient=False,
+        is_encoded=False,
+    ) -> jnp.ndarray:
+        # encode images with encoder
+        if self.encoder is None:
+            # project state to embeddings as well
+            state = observations["state"]
+            if self.enable_stacking:
+                # Combine stacking and channels into a single dimension
+                if len(state.shape) == 2:
+                    state = rearrange(state, "T C -> (T C)")
+                if len(state.shape) == 3:
+                    state = rearrange(state, "B T C -> B (T C)")
+            # do not use proprio latent dim
+            return state
+
+        encoded = []
+        for image_key in self.image_keys:
+            image = observations[image_key]
+            if not is_encoded:
+                if self.enable_stacking:
+                    # Combine stacking and channels into a single dimension
+                    if len(image.shape) == 4:
+                        image = rearrange(image, "T H W C -> H W (T C)")
+                    if len(image.shape) == 5:
+                        image = rearrange(image, "B T H W C -> B H W (T C)")
+
+            image = self.encoder[image_key](image, train=train, encode=not is_encoded)
+
+            if stop_gradient:
+                image = jax.lax.stop_gradient(image)
+
+            encoded.append(image)
+
+        encoded = jnp.concatenate(encoded, axis=-1)
+
+        if self.use_proprio:
+            # project state to embeddings as well
+            state = observations["state"]
+            state = state[..., self.state_mask]  # only propagate non-zero mask entries
+            if state.shape[-1] != 0:
+                if self.enable_stacking:
+                    # Combine stacking and channels into a single dimension
+                    if len(state.shape) == 2:
+                        state = rearrange(state, "T C -> (T C)")
+                        encoded = encoded.reshape(-1)
+                    if len(state.shape) == 3:
+                        state = rearrange(state, "B T C -> B (T C)")
+                # do not use proprio latent di
+                encoded = jnp.concatenate([encoded, state], axis=-1)
 
         return encoded
 

@@ -116,6 +116,66 @@ def make_drq_agent(
     return agent
 
 
+def make_voxel_drq_agent(
+    seed,
+    sample_obs,
+    sample_action,
+    image_keys=("image",),
+    encoder_type="voxnet",
+    state_mask="all",
+    encoder_kwargs=None,
+):
+    if encoder_kwargs is None:
+        encoder_kwargs = dict(bottleneck_dim=128)
+
+    agent = DrQAgent.create_voxel_drq(
+        jax.random.PRNGKey(seed),
+        sample_obs,
+        sample_action,
+        encoder_type=encoder_type,
+        use_proprio=True,
+        state_mask=state_mask,
+        image_keys=image_keys,
+        policy_kwargs=dict(
+            tanh_squash_distribution=True,
+            std_parameterization="exp",
+            std_min=1e-5,
+            std_max=5,
+        ),
+        critic_network_kwargs=dict(
+            activations=nn.tanh,
+            use_layer_norm=True,
+            hidden_dims=[256, 256],
+            dropout_rate=0.1,
+        ),
+        policy_network_kwargs=dict(
+            activations=nn.tanh,
+            use_layer_norm=True,
+            hidden_dims=[256, 256],
+            dropout_rate=0.1,
+        ),
+        temperature_init=1e-2,
+        discount=0.99,  # 0.99
+        backup_entropy=True,
+        critic_ensemble_size=10,
+        critic_subsample_size=2,
+        encoder_kwargs=encoder_kwargs,
+        # dict(
+        #     # pooling_method="spatial_learned_embeddings",
+        #     bottleneck_dim=128,
+        #     # num_spatial_blocks=8,
+        #     # num_kp=64,
+        # ),
+        actor_optimizer_kwargs={
+            "learning_rate": 3e-3,
+        },
+        critic_optimizer_kwargs={
+            "learning_rate": 3e-3,
+        },
+    )
+    return agent
+
+
 def make_vice_agent(
     seed,
     sample_obs,

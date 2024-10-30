@@ -23,6 +23,14 @@ def construct_adjoint_matrix(tcp_pose):
     return adjoint_matrix
 
 
+def construct_rotation_matrix(tcp_pose):
+    """
+    Construct the adjoint matrix for a spatial velocity vector
+    :args: tcp_pose: (x, y, z, qx, qy, qz, qw)
+    """
+    return R.from_quat(tcp_pose[3:]).as_matrix()
+
+
 def construct_homogeneous_matrix(tcp_pose):
     """
     Construct the homogeneous transformation matrix from given pose.

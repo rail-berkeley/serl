@@ -10,14 +10,22 @@ from flax.core import frozen_dict
 
 from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
-from serl_launcher.common.encoding import EncodingWrapper
+from serl_launcher.common.encoding import (
+    EncodingWrapper,
+    MaskedEncodingWrapper,
+    create_state_mask,
+)
 from serl_launcher.common.optimizers import make_optimizer
 from serl_launcher.common.typing import Batch, Data, Params, PRNGKey
 from serl_launcher.networks.actor_critic_nets import Critic, Policy, ensemblize
 from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
+from serl_launcher.vision.voxel_grid_encoders import VoxNet
 from serl_launcher.utils.train_utils import _unpack, concat_batches
-from serl_launcher.vision.data_augmentations import batched_random_crop
+from serl_launcher.vision.data_augmentations import (
+    batched_random_crop,
+    batched_random_shift_voxel,
+)
 
 
 class DrQAgent(SACAgent):
@@ -86,7 +94,7 @@ class DrQAgent(SACAgent):
         # Config
         assert not entropy_per_dim, "Not implemented"
         if target_entropy is None:
-            target_entropy = -actions.shape[-1] / 2
+            target_entropy = -actions.shape[-1]
 
         return cls(
             state=state,
@@ -241,15 +249,203 @@ class DrQAgent(SACAgent):
 
         return agent
 
-    def data_augmentation_fn(self, rng, observations):
-        for pixel_key in self.config["image_keys"]:
-            observations = observations.copy(
-                add_or_replace={
-                    pixel_key: batched_random_crop(
-                        observations[pixel_key], rng, padding=4, num_batch_dims=2
-                    )
-                }
+    @classmethod
+    def create_voxel_drq(
+        cls,
+        rng: PRNGKey,
+        observations: Data,
+        actions: jnp.ndarray,
+        # Model architecture
+        encoder_type: str = "resnet",
+        use_proprio: bool = False,
+        state_mask: str = "all",
+        critic_network_kwargs: dict = {
+            "hidden_dims": [256, 256],
+        },
+        policy_network_kwargs: dict = {
+            "hidden_dims": [256, 256],
+        },
+        policy_kwargs: dict = {
+            "tanh_squash_distribution": True,
+            "std_parameterization": "uniform",
+        },
+        encoder_kwargs: dict = {},
+        critic_ensemble_size: int = 2,
+        critic_subsample_size: Optional[int] = None,
+        temperature_init: float = 1.0,
+        image_keys: Iterable[str] = ("image",),
+        **kwargs,
+    ):
+        """
+        Create a new voxel-based agent.
+        """
+
+        policy_network_kwargs["activate_final"] = True
+        critic_network_kwargs["activate_final"] = True
+
+        if encoder_type == "small":
+            from serl_launcher.vision.small_encoders import SmallEncoder
+
+            small_encoder = SmallEncoder(
+                features=(64, 64, 32, 32),
+                kernel_sizes=(3, 3, 3, 3),
+                strides=(2, 2, 1, 1),
+                padding="VALID",
+                pool_method="spatial_learned_embeddings",
+                bottleneck_dim=128,
+                spatial_block_size=8,
+                name=f"small_encoder",
             )
+            encoders = {image_key: small_encoder for image_key in image_keys}
+        elif encoder_type == "resnet":
+            from serl_launcher.vision.resnet_v1 import resnetv1_configs
+
+            encoders = {
+                image_key: resnetv1_configs["resnetv1-10"](
+                    name=f"encoder_{image_key}", **encoder_kwargs
+                )
+                for image_key in image_keys
+            }
+        elif encoder_type == "resnet-pretrained":
+            from serl_launcher.vision.resnet_v1 import (
+                PreTrainedResNetEncoder,
+                resnetv1_configs,
+            )
+
+            pretrained_encoder = resnetv1_configs["resnetv1-10-frozen"](
+                pre_pooling=True,
+                name="pretrained_encoder",
+            )
+
+            encoders = {
+                image_key: PreTrainedResNetEncoder(
+                    rng=rng,
+                    pretrained_encoder=pretrained_encoder,
+                    name=f"encoder_{image_key}",
+                    **encoder_kwargs,
+                )
+                for image_key in image_keys
+            }
+        elif encoder_type == "resnet-pretrained-18":
+            # pretrained ResNet18 from pytorch
+            from serl_launcher.vision.resnet_v1_18 import resnetv1_18_configs
+            from serl_launcher.vision.resnet_v1 import PreTrainedResNetEncoder
+
+            pretrained_encoder = resnetv1_18_configs["resnetv1-18-frozen"](
+                name="pretrained_encoder",
+            )
+
+            encoders = {
+                image_key: PreTrainedResNetEncoder(
+                    rng=rng,
+                    pretrained_encoder=pretrained_encoder,
+                    name=f"encoder_{image_key}",
+                    **encoder_kwargs,
+                )
+                for image_key in image_keys
+            }
+        elif encoder_type == "voxnet" or encoder_type == "voxnet-pretrained":
+            encoders = {
+                image_key: VoxNet(
+                    bottleneck_dim=encoder_kwargs["bottleneck_dim"],
+                    use_conv_bias=True,
+                    final_activation=nn.tanh,
+                    pretrained=encoder_type == "voxnet-pretrained",
+                )
+                for image_key in image_keys
+            }
+        elif encoder_type.lower() == "none":
+            encoders = None
+        else:
+            raise NotImplementedError(f"Unknown encoder type: {encoder_type}")
+
+        state_mask_arr = create_state_mask(state_mask)
+        print(f"state_mask: {state_mask}  {state_mask_arr.astype(jnp.int32)}")
+        encoder_def = MaskedEncodingWrapper(
+            encoder=encoders,
+            use_proprio=use_proprio,
+            enable_stacking=True,
+            image_keys=image_keys,
+            state_mask=state_mask_arr,
+        )
+
+        encoders = {
+            "critic": encoder_def,
+            "actor": encoder_def,
+        }
+
+        # Define networks
+        critic_backbone = partial(MLP, **critic_network_kwargs)
+        critic_backbone = ensemblize(critic_backbone, critic_ensemble_size)(
+            name="critic_ensemble"
+        )
+        critic_def = partial(
+            Critic, encoder=encoders["critic"], network=critic_backbone
+        )(name="critic")
+
+        policy_def = Policy(
+            encoder=encoders["actor"],
+            network=MLP(**policy_network_kwargs),
+            action_dim=actions.shape[-1],
+            **policy_kwargs,
+            name="actor",
+        )
+
+        temperature_def = GeqLagrangeMultiplier(
+            init_value=temperature_init,
+            constraint_shape=(),
+            constraint_type="geq",
+            name="temperature",
+        )
+
+        agent = cls.create(
+            rng,
+            observations,
+            actions,
+            actor_def=policy_def,
+            critic_def=critic_def,
+            temperature_def=temperature_def,
+            critic_ensemble_size=critic_ensemble_size,
+            critic_subsample_size=critic_subsample_size,
+            image_keys=image_keys,
+            **kwargs,
+        )
+
+        if encoder_type == "resnet-pretrained":  # load pretrained weights for ResNet-10
+            from serl_launcher.utils.train_utils import load_resnet10_params
+
+            agent = load_resnet10_params(agent, image_keys)
+
+        if encoder_type == "voxnet-pretrained":
+            from serl_launcher.utils.train_utils import load_pretrained_VoxNet_params
+
+            agent = load_pretrained_VoxNet_params(agent, image_keys)
+
+        return agent
+
+    def data_augmentation_fn(self, rng, observations):
+        # TODO make it configurable: see https://github.com/rail-berkeley/serl/pull/67
+
+        for pixel_key in self.config["image_keys"]:
+            # pointcloud augmentation
+            if "pointcloud" in pixel_key:
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_shift_voxel(
+                            observations[pixel_key], rng, padding=3, num_batch_dims=2
+                        )
+                    }
+                )
+
+            # image augmentation
+            else:
+                observations = observations.copy(
+                    add_or_replace={
+                        pixel_key: batched_random_crop(
+                            observations[pixel_key], rng, padding=4, num_batch_dims=2
+                        )
+                    }
+                )
         return observations
 
     @partial(jax.jit, static_argnames=("utd_ratio", "pmap_axis"))
