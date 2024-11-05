@@ -1,0 +1,9 @@
+[submodule "fri"]
+	path = fri
+	url = git@github.com:lbr-stack/fri.git
+[submodule "lbr_fri_idl"]
+	path = lbr_fri_idl
+	url = https://github.com/lbr-stack/lbr_fri_idl.git
+[submodule "lbr_fri_ros2_stack"]
+	path = lbr_fri_ros2_stack
+	url = https://github.com/lbr-stack/lbr_fri_ros2_stack.git
