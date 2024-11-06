@@ -3,6 +3,8 @@
 ![](https://github.com/rail-berkeley/serl/workflows/pre-commit/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Static Badge](https://img.shields.io/badge/Project-Page-a)](https://serl-robot.github.io/)
+[![Discord](https://img.shields.io/discord/1302866684612444190?label=Join%20Us%20on%20Discord&logo=discord&color=7289da)](https://discord.gg/G4xPJEhwuC)
+
 
 ![](./docs/images/tasks-banner.gif)
 
