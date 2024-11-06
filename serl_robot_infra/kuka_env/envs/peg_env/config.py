@@ -20,7 +20,7 @@ class PegEnvConfig(DefaultEnvConfig):
             -0.0078615,
         ]
     )
-    RESET_POSE = TARGET_POSE + np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
+    RESET_POSE = TARGET_POSE + np.array([0.5, 0.1, 0.3, 0.0, 0.0, 0.0])
     REWARD_THRESHOLD: np.ndarray = np.array([0.01, 0.01, 0.01, 0.2, 0.2, 0.2])
     APPLY_GRIPPER_PENALTY = False
     ACTION_SCALE = np.array([0.02, 0.1, 1])

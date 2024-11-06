@@ -1,4 +1,7 @@
 """Gym Interface for Franka"""
+import sys
+sys.path.append("/home/aero/anaconda3/envs/serl/lib/python3.10/site-packages")
+
 import numpy as np
 import gym
 import cv2
@@ -11,13 +14,14 @@ import threading
 from datetime import datetime
 from collections import OrderedDict
 from typing import Dict
+sys.path.append("/home/aero/omey_ws/serl-rros/src/")
+from serl_robot_infra.franka_env.camera.video_capture import VideoCapture
+from serl_robot_infra.franka_env.camera.rs_capture import RSCapture
+from serl_robot_infra.franka_env.utils.rotations import euler_2_quat, quat_2_euler
 
-from franka_env.camera.video_capture import VideoCapture
-from franka_env.camera.rs_capture import RSCapture
-from franka_env.utils.rotations import euler_2_quat, quat_2_euler
 
-# from kuka_server.robot_interface import RobotInterfaceNode
-from kuka_server.kuka_server.robot_interface import RobotInterfaceNode
+# from kuka_server.kuka_server.robot_interface import RobotInterfaceNode
+from kuka_server.robot_interface import RobotInterfaceNode
 
 
 class ImageDisplayer(threading.Thread):
@@ -431,3 +435,11 @@ class KukaEnv(gym.Env):
             "tcp_torque": self.currtorque,
         }
         return copy.deepcopy(dict(images=images, state=state_observation))
+
+
+if __name__ == '__main__':
+
+    env = gym.make("KukaEnv")
+    
+    
+    

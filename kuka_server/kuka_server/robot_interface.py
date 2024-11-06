@@ -27,6 +27,7 @@ from moveit_msgs.srv import GetPositionIK, GetMotionPlan, GetPositionFK
 from moveit_msgs.action import ExecuteTrajectory
 from kuka_server.wait_for_message import wait_for_message
 
+
 from kuka_server.utils import quat_to_euler, convert_wrench_to_numpy, euler_to_quat
 from lbr_fri_idl.msg import LBRState
 import copy
@@ -46,8 +47,8 @@ class RobotInterfaceNode(Node):
     fri_execute_action_name_ = "joint_trajectory_controller/follow_joint_trajectory"
     WRENCH_TOPIC = "/lbr/force_torque_broadcaster/wrench"
 
-    base_ = "lbr_link_0"
-    end_effector_ = "lbr_link_ee"
+    base_ = "link_0"  ###Changed for compatibility with latest lbr stack
+    end_effector_ = "link_ee"
 
     def __init__(self) -> None:
         super().__init__("robot_interface_node", namespace=self.namespace_)
@@ -137,7 +138,7 @@ class RobotInterfaceNode(Node):
         current_robot_state.joint_state = current_joint_state
 
         request = GetPositionFK.Request()
-
+        self.get_logger().info(f"{self.namespace_}/{self.base_}")
         request.header.frame_id = f"{self.namespace_}/{self.base_}"
         request.header.stamp = self.get_clock().now().to_msg()
 
@@ -215,11 +216,11 @@ class RobotInterfaceNode(Node):
 
         ##TCP pose
         current_ee_geom_pose, current_joint_state = self.get_fk()
-        self.robot_state["pose"][:3] = np.array(current_ee_geom_pose.position.x,current_ee_geom_pose.position.y,current_ee_geom_pose.position.z)
-        euler_angles = quat_to_euler( np.array(current_ee_geom_pose.orientation.x,
+        self.robot_state["pose"][:3] = np.array([current_ee_geom_pose.position.x,current_ee_geom_pose.position.y,current_ee_geom_pose.position.z])
+        euler_angles = quat_to_euler( np.array([current_ee_geom_pose.orientation.x,
                                                current_ee_geom_pose.orientation.y,
                                                current_ee_geom_pose.orientation.z,
-                                               current_ee_geom_pose.orientation.w))
+                                               current_ee_geom_pose.orientation.w]))
         self.robot_state["pose"][3:] = euler_angles
         
         ##Getting Joint Angles
@@ -427,14 +428,14 @@ def main(args=None):
     executor.add_node(robot_interface_node)
     robot_interface_node.get_logger().info("Robot interface node started.")
 
-    target_poses = []
-    for i in range(3):
-        target_poses.append(
-            Pose(
-                position=Point(x=0.6, y=-0.1 + 0.1 * i, z=0.6),
-                orientation=Quaternion(x=0.0, y=-1.0, z=0.0, w=0.0),
-            )
-        )
+    # target_poses = []
+    # for i in range(3):
+    #     target_poses.append(
+    #         Pose(
+    #             position=Point(x=0.5, y=-0.1 + 0.1 * i, z=0.6),
+    #             orientation=Quaternion(x=0.0, y=-1.0, z=0.0, w=0.0),
+    #         )
+    #     )
 
     # traj = robot_interface_node.get_motion_plan(target_poses[1])
     # if traj:
@@ -462,36 +463,38 @@ def main(args=None):
 
     #     robot_interface_node.get_logger().info("Current pose: " + str(robot_interface_node.get_fk()[0])) 
 
-    for target_pose in target_poses:
-        traj = robot_interface_node.get_motion_plan(target_pose, True)
-        if traj:
-            client = robot_interface_node.get_motion_execute_client()
-            goal = ExecuteTrajectory.Goal()
-            goal.trajectory = traj
+    # for target_pose in target_poses:
+    #     traj = robot_interface_node.get_motion_plan(target_pose, True)
+    #     if traj:
+    #         client = robot_interface_node.get_motion_execute_client()
+    #         goal = ExecuteTrajectory.Goal()
+    #         goal.trajectory = traj
 
-            future = client.send_goal_async(goal)
-            rclpy.spin_until_future_complete(robot_interface_node, future)
+    #         future = client.send_goal_async(goal)
+    #         rclpy.spin_until_future_complete(robot_interface_node, future)
             
-            goal_handle = future.result()
-            if not goal_handle.accepted:
-                robot_interface_node.get_logger().error("Failed to execute trajectory")
-            else:
-                robot_interface_node.get_logger().info("Trajectory accepted")
+    #         goal_handle = future.result()
+    #         if not goal_handle.accepted:
+    #             robot_interface_node.get_logger().error("Failed to execute trajectory")
+    #         else:
+    #             robot_interface_node.get_logger().info("Trajectory accepted")
 
             
-            result_future = goal_handle.get_result_async()
+    #         result_future = goal_handle.get_result_async()
 
-            expect_duration = traj.joint_trajectory.points[-1].time_from_start
-            expect_time = time.time() + 2 * expect_duration.sec
-            while not result_future.done() and time.time() < expect_time:
-                time.sleep(0.01)
+    #         expect_duration = traj.joint_trajectory.points[-1].time_from_start
+    #         expect_time = time.time() + 2 * expect_duration.sec
+    #         while not result_future.done() and time.time() < expect_time:
+    #             time.sleep(0.01)
 
-            robot_interface_node.get_logger().info("Trajectory executed")
+    #         robot_interface_node.get_logger().info("Trajectory executed")
         
-            robot_interface_node.get_logger().info("Current pose: "  + str(robot_interface_node.get_fk()[0]) )
+    #         robot_interface_node.get_logger().info("Current pose: "  + str(robot_interface_node.get_fk()[0]) )
 
     # rclpy.spin(robot_interface_node)
+    robot_interface_node.get_current_state()
     
+    print("Current State: ", robot_interface_node.robot_state)
     executor.spin()
 
     rclpy.shutdown()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+import sys
+sys.path.append("/home/aero/anaconda3/envs/serl/lib/python3.10/site-packages")
 import time
 from functools import partial
 import jax
@@ -28,14 +29,13 @@ from serl_launcher.utils.launcher import (
 )
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-from franka_env.envs.relative_env import RelativeFrame
+from kuka_env.envs.relative_env import RelativeFrame
 from franka_env.envs.wrappers import (
-    GripperCloseEnv,
-    SpacemouseIntervention,
     Quat2EulerWrapper,
 )
 
 import franka_env
+import kuka_env
 
 FLAGS = flags.FLAGS
 
@@ -210,7 +210,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
 ##############################################################################
 
 
-def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
+def learner(rng, agent: DrQAgent, replay_buffer):
     """
     The learner loop, which runs when "--learner" is set to True.
     """
@@ -262,13 +262,13 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
         },
         device=sharding.replicate(),
     )
-    demo_iterator = demo_buffer.get_iterator(
-        sample_args={
-            "batch_size": FLAGS.batch_size // 2,
-            "pack_obs_and_next_obs": True,
-        },
-        device=sharding.replicate(),
-    )
+    # demo_iterator = demo_buffer.get_iterator(
+    #     sample_args={
+    #         "batch_size": FLAGS.batch_size // 2,
+    #         "pack_obs_and_next_obs": True,
+    #     },
+    #     device=sharding.replicate(),
+    # )
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
@@ -278,8 +278,8 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
         for critic_step in range(FLAGS.critic_actor_ratio - 1):
             with timer.context("sample_replay_buffer"):
                 batch = next(replay_iterator)
-                demo_batch = next(demo_iterator)
-                batch = concat_batches(batch, demo_batch, axis=0)
+                # demo_batch = next(demo_iterator)
+                # batch = concat_batches(batch, demo_batch, axis=0)
 
             with timer.context("train_critics"):
                 agent, critics_info = agent.update_critics(
@@ -288,8 +288,8 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
 
         with timer.context("train"):
             batch = next(replay_iterator)
-            demo_batch = next(demo_iterator)
-            batch = concat_batches(batch, demo_batch, axis=0)
+            # demo_batch = next(demo_iterator)
+            # batch = concat_batches(batch, demo_batch, axis=0)
             agent, update_info = agent.update_high_utd(batch, utd_ratio=1)
 
         # publish the updated network
@@ -324,9 +324,9 @@ def main(_):
         fake_env=FLAGS.learner,
         save_video=FLAGS.eval_checkpoint_step,
     )
-    env = GripperCloseEnv(env)
-    if FLAGS.actor:
-        env = SpacemouseIntervention(env)
+    # env = GripperCloseEnv(env)
+    # if FLAGS.actor:
+    #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SERLObsWrapper(env)
@@ -358,27 +358,26 @@ def main(_):
             capacity=FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
-        demo_buffer = MemoryEfficientReplayBufferDataStore(
-            env.observation_space,
-            env.action_space,
-            capacity=10000,
-            image_keys=image_keys,
-        )
-        import pickle as pkl
+        # demo_buffer = MemoryEfficientReplayBufferDataStore(
+        #     env.observation_space,
+        #     env.action_space,
+        #     capacity=10000,
+        #     image_keys=image_keys,
+        # )
+        # import pickle as pkl
 
-        with open(FLAGS.demo_path, "rb") as f:
-            trajs = pkl.load(f)
-            for traj in trajs:
-                demo_buffer.insert(traj)
-        print(f"demo buffer size: {len(demo_buffer)}")
+        # with open(FLAGS.demo_path, "rb") as f:
+        #     trajs = pkl.load(f)
+        #     for traj in trajs:
+        #         demo_buffer.insert(traj)
+        # print(f"demo buffer size: {len(demo_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
         learner(
             sampling_rng,
             agent,
-            replay_buffer,
-            demo_buffer=demo_buffer,
+            replay_buffer
         )
 
     elif FLAGS.actor:

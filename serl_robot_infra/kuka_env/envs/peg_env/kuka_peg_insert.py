@@ -6,7 +6,7 @@ import copy
 
 from kuka_env.envs.kuka_env import KukaEnv
 from franka_env.utils.rotations import euler_2_quat
-from franka_env.envs.peg_env.config import PegEnvConfig
+from kuka_env.envs.peg_env.config import PegEnvConfig
 
 
 class KukaPegInsert(KukaEnv):
