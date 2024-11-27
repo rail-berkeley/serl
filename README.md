@@ -8,10 +8,10 @@
 
 ![](./docs/images/tasks-banner.gif)
 
-**Webpage: [https://hil-serl.github.io/](https://hil-serl.github.io/)**
+**Webpage: [https://serl-robot.github.io/](https://serl-robot.github.io/)**
 
 
-**Also check out our new project HIL-SERL: [https://serl-robot.github.io/](https://serl-robot.github.io/)**
+**Also check out our new project HIL-SERL: [https://hil-serl.github.io/](https://hil-serl.github.io/)**
 
 
 SERL provides a set of libraries, env wrappers, and examples to train RL policies for robotic manipulation tasks. The following sections describe how to use SERL. We will illustrate the usage with examples.
