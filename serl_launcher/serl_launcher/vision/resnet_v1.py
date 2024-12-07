@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from serl_launcher.vision.film_conditioning_layer import FilmConditioning
+from serl_launcher.common.typing import PRNGKey
 
 ModuleDef = Any
 
@@ -198,7 +199,6 @@ class ResNetEncoder(nn.Module):
     norm: str = "group"
     add_spatial_coordinates: bool = False
     pooling_method: str = "avg"
-    use_spatial_softmax: bool = False
     softmax_temperature: float = 1.0
     use_multiplicative_cond: bool = False
     num_spatial_blocks: int = 8
@@ -322,10 +322,11 @@ class ResNetEncoder(nn.Module):
 
 
 class PreTrainedResNetEncoder(nn.Module):
+    rng: PRNGKey = None
     pooling_method: str = "avg"
-    use_spatial_softmax: bool = False
     softmax_temperature: float = 1.0
     num_spatial_blocks: int = 8
+    num_kp: Optional[int] = None  # for Spatial Softmax
     bottleneck_dim: Optional[int] = None
     pretrained_encoder: nn.module = None
 
@@ -348,8 +349,22 @@ class PreTrainedResNetEncoder(nn.Module):
                 channel=channel,
                 num_features=self.num_spatial_blocks,
             )(x)
-            x = nn.Dropout(0.1, deterministic=not train)(x)
+            x = nn.Dropout(0.1, deterministic=not train)(x, rng=self.rng)
         elif self.pooling_method == "spatial_softmax":
+            if self.num_kp is not None:
+                """
+                implemented as in https://github.com/huggingface/lerobot/blob/ff8f6aa6cde2957f08547eb081aac12ca4669b6a/lerobot/common/policies/diffusion/modeling_diffusion.py#L316
+                In this case it would result in 512 keypoints (corresponding to the 512 input channels). We can optionally
+                provide num_kp != None to control the number of keypoints.
+                """
+                x = nn.Conv(
+                    features=self.num_kp,
+                    kernel_size=1,
+                    use_bias=False,
+                    dtype=jnp.float32,
+                    kernel_init=nn.initializers.kaiming_normal(),
+                    name="spatial_softmax_conv",
+                )(x)
             height, width, channel = x.shape[-3:]
             pos_x, pos_y = jnp.meshgrid(
                 jnp.linspace(-1.0, 1.0, height), jnp.linspace(-1.0, 1.0, width)

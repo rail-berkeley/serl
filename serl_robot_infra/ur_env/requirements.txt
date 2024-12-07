@@ -1,0 +1,5 @@
+matplotlib
+pyspacemouse
+ur-rtde
+open3d
+clu

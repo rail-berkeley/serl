@@ -128,3 +128,110 @@ def load_resnet10_params(agent, image_keys=("image",), public=True):
 
     agent = agent.replace(state=agent.state.replace(params=new_params))
     return agent
+
+
+def load_pretrained_VoxNet_params(agent, image_keys=("pointcloud",)):
+    ckpt = jnp.load("/home/nico/Downloads/c-11.npz")
+
+    new_params = agent.state.params
+
+    for image_key in image_keys:
+        new_encoder_params = new_params["modules_actor"]["encoder"][
+            f"encoder_{image_key}"
+        ]
+        to_replace = {
+            "conv_5x5x5": "voxnet/conv1/conv3d/",
+            "conv_3x3x3": "voxnet/conv2/conv3d/",
+            "conv_2x2x2": "voxnet/conv3/conv3d/",
+        }
+        replaced = []
+        for key, weights in to_replace.items():
+            if key in new_encoder_params:
+                shape = new_encoder_params[key]["kernel"].shape
+                new_encoder_params[key]["kernel"] = (
+                    new_encoder_params[key]["kernel"]
+                    .at[:]
+                    .set(ckpt[weights + "kernel:0"][..., : shape[-1]])
+                )
+                new_encoder_params[key]["bias"] = (
+                    new_encoder_params[key]["bias"]
+                    .at[:]
+                    .set(ckpt[weights + "bias:0"][: shape[-1]])
+                )
+                replaced.append(f"{key}:{shape}")
+
+        print(f"replaced {replaced} in {image_key}")
+
+        # replace LayerNorm params with pretrained BN ones
+        new_encoder_params["LayerNorm_0"]["bias"] = (
+            new_encoder_params["LayerNorm_0"]["bias"]
+            .at[:]
+            .set(ckpt["voxnet/conv1/batch_normalization/beta:0"])
+        )
+        new_encoder_params["LayerNorm_0"]["scale"] = (
+            new_encoder_params["LayerNorm_0"]["scale"]
+            .at[:]
+            .set(ckpt["voxnet/conv1/batch_normalization/gamma:0"])
+        )
+
+        new_encoder_params["LayerNorm_1"]["bias"] = (
+            new_encoder_params["LayerNorm_0"]["bias"]
+            .at[:]
+            .set(ckpt["voxnet/conv2/batch_normalization/beta:0"])
+        )
+        new_encoder_params["LayerNorm_1"]["scale"] = (
+            new_encoder_params["LayerNorm_0"]["scale"]
+            .at[:]
+            .set(ckpt["voxnet/conv2/batch_normalization/gamma:0"])
+        )
+
+    agent = agent.replace(state=agent.state.replace(params=new_params))
+    return agent
+
+
+def print_agent_params(agent, image_keys=("image",)):
+    """
+    helper function to print the parameter count of the actor and critic networks
+    """
+
+    def get_size(params):
+        return sum(x.size for x in jax.tree.leaves(params))
+
+    total_param_count = get_size(agent.state.params)
+    actor, critic = (
+        agent.state.params["modules_actor"],
+        agent.state.params["modules_critic"],
+    )
+
+    # calculate encoder params
+    try:
+        pretrained_encoder_count = get_size(
+            actor["encoder"][f"encoder_{image_keys[0]}"]["pretrained_encoder"]
+        )
+    except Exception as e:
+        pretrained_encoder_count = 0
+
+    try:
+        encoder_count = get_size(actor["encoder"])
+    except Exception as e:
+        encoder_count = 0
+
+    actor_count = get_size(actor)
+    critic_count = get_size(critic)
+
+    print(f"\ntotal params: {total_param_count / 1e6:.3f}M")
+    print(
+        f"encoder params: {(encoder_count - pretrained_encoder_count) / 1e6:.3f}M    pretrained encoder params: {pretrained_encoder_count / 1e6:.3f}M"
+    )
+    print(
+        f"actor params: {(actor_count - encoder_count) / 1e6:.3f}M       critic_params: {critic_count / 1e6:.3f}M"
+    )
+    print(
+        f"total parameters to train: {(total_param_count - pretrained_encoder_count) / 1e6:.3f}M\n"
+    )
+
+
+def parameter_overview(agent):
+    from clu import parameter_overview
+
+    print(parameter_overview.get_parameter_overview(agent.state.params))

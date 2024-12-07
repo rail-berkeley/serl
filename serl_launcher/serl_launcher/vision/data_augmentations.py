@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 
+@partial(jax.jit, static_argnames="padding")
 def random_crop(img, rng, *, padding):
     crop_from = jax.random.randint(rng, (2,), 0, 2 * padding + 1)
     crop_from = jnp.concatenate([crop_from, jnp.zeros((1,), dtype=jnp.int32)])
@@ -29,6 +30,36 @@ def batched_random_crop(img, rng, *, padding, num_batch_dims: int = 1):
 
     img = jax.vmap(
         lambda i, r: random_crop(i, r, padding=padding), in_axes=(0, 0), out_axes=0
+    )(img, rngs)
+
+    # Restore batch dims
+    img = jnp.reshape(img, original_shape)
+    return img
+
+
+def random_shift_3d(img, rng, *, padding):
+    crop_from = jax.random.randint(rng, (3,), 0, 2 * padding + 1)
+    padded_img = jnp.pad(
+        img,
+        (
+            (padding, padding),
+            (padding, padding),
+            (padding, padding),
+        ),
+        mode="constant"
+    )
+    return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
+
+
+@partial(jax.jit, static_argnames=("padding", "num_batch_dims"))
+def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
+    original_shape = img.shape
+    img = jnp.reshape(img, (-1, *img.shape[num_batch_dims:]))
+    # shape (B, B2, X, Y, Z)
+
+    rngs = jax.random.split(rng, img.shape[0])
+    img = jax.vmap(
+        lambda i, r: random_shift_3d(i, r, padding=padding), in_axes=(0, 0), out_axes=0
     )(img, rngs)
 
     # Restore batch dims
