@@ -244,7 +244,7 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
 
         gripper_pos = np.array(
             self._data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32
-        )
+        ).reshape(1)
         obs["state"]["panda/gripper_pos"] = gripper_pos
 
         # joint_pos = np.stack(
