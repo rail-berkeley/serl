@@ -144,6 +144,8 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
         self._viewer = MujocoRenderer(
             self.model,
             self.data,
+            width=self._render_specs.width,
+            height=self._render_specs.height,
         )
         self._viewer.render(self.render_mode)
 
@@ -225,9 +227,8 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
     def render(self):
         rendered_frames = []
         for cam_id in self.camera_id:
-            rendered_frames.append(
-                self._viewer.render(render_mode="rgb_array", camera_id=cam_id)
-            )
+            self._viewer.camera_id = cam_id
+            rendered_frames.append(self._viewer.render(render_mode="rgb_array"))
         return rendered_frames
 
     # Helper methods.
