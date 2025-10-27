@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EXAMPLE_DIR=${EXAMPLE_DIR:-"examples/async_sac_state_sim"}
-CONDA_ENV=${CONDA_ENV:-"serl"}
+CONDA_ENV=${CONDA_ENV:-"serl-docker"}
 
 cd $EXAMPLE_DIR
 echo "Running from $(pwd)"

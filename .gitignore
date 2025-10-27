@@ -172,3 +172,29 @@ MUJOCO_LOG.TXT
 _METADATA
 checkpoint
 wandb/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+realsense-ros/
+.vscode/
+data_collector/data_collector/**/*.csv
+data_collector/data_collector/**/*.jpg
+data_collector/data_collector/**/*.jpeg
+data_collector/data_collector/**/*.png
+
+.~lock.*
+
+examples/async_peg_insert_drq/checkpoints*/**
+examples/async_peg_insert_drq/log*/**
+examples/async_peg_insert_drq/demo_data*/**/**
+examples/async_peg_insert_drq/experiments*/**/**

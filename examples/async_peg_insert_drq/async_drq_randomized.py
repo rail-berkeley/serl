@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
+import sys
+import os
+import getpass
 
+username = getpass.getuser()
+env = "serl"
+print("Ensure to change anaconda3 or miniconda3 and change your environment name")
+print("Conda Environment name is: ", env)
+sys.path.append(
+    "/home/" + username + "/anaconda3/envs/" + env + "/lib/python3.10/site-packages"
+)
+import rclpy
+import rclpy.duration
+from rclpy.executors import MultiThreadedExecutor
 import time
 from functools import partial
 import jax
@@ -26,27 +39,47 @@ from serl_launcher.utils.launcher import (
     make_trainer_config,
     make_wandb_logger,
 )
+from kuka_server.robot_interface import RobotInterfaceNode
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
-from franka_env.envs.relative_env import RelativeFrame
-from franka_env.envs.wrappers import (
-    GripperCloseEnv,
-    SpacemouseIntervention,
+
+import os
+
+MAIN_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.append(MAIN_DIR)
+from serl_robot_infra.kuka_env.envs.relative_env import RelativeFrame
+from serl_robot_infra.kuka_env.envs.wrappers import (
     Quat2EulerWrapper,
 )
 
-import franka_env
+import serl_robot_infra.franka_env
+import serl_robot_infra.kuka_env
+
+# sys.argv = sys.argv[:1]
+
+# # `app.run` calls `sys.exit`
+# try:
+#   app.run(lambda argv: None)
+# except:
+#   pass
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string("env", "FrankaEnv-Vision-v0", "Name of environment.")
+flags.DEFINE_string("env", "KukaPegInsert-Vision-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
-flags.DEFINE_integer("max_traj_length", 100, "Maximum length of trajectory.")
+
+## TODO :: NISARA :: change max trajectory length to at least 300 (or see what the new data wants)
+flags.DEFINE_integer("max_traj_length", 200, "Maximum length of trajectory.")
+
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
 flags.DEFINE_integer("critic_actor_ratio", 4, "critic to actor update ratio.")
+flags.DEFINE_boolean(
+    "load_checkpoint", False, "Whether to start from previous checkpoint or not."
+)
+flags.DEFINE_string("load_checkpoint_path", None, "Checkpoint to start training from.")
 
+flags.DEFINE_integer("batch_size", 256, "Batch size for training the policy.")
 flags.DEFINE_integer("max_steps", 1000000, "Maximum number of training steps.")
 flags.DEFINE_integer("replay_buffer_capacity", 200000, "Replay buffer capacity.")
 
@@ -56,6 +89,7 @@ flags.DEFINE_integer("steps_per_update", 30, "Number of steps per update the ser
 
 flags.DEFINE_integer("log_period", 10, "Logging period.")
 flags.DEFINE_integer("eval_period", 2000, "Evaluation period.")
+flags.DEFINE_integer("loaded_checkpoint_step", 1000, "Loaded Checkpoint Step.")
 
 # flag to indicate if this is a leaner or a actor
 flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
@@ -94,6 +128,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     This is the actor loop, which runs when "--actor" is set to True.
     """
     if FLAGS.eval_checkpoint_step:
+        print("Evaluating the policy")
         success_counter = 0
         time_list = []
 
@@ -104,14 +139,17 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
         )
         agent = agent.replace(state=ckpt)
 
-        for episode in range(FLAGS.eval_n_trajs):
+        for episode in tqdm.tqdm(range(FLAGS.eval_n_trajs), "Evaluation Trajectory"):
             obs, _ = env.reset()
             done = False
             start_time = time.time()
             while not done:
+                sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    argmax=True,
+                    # argmax=True,
+                    seed=key,
+                    # deterministic=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
 
@@ -151,10 +189,11 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     done = False
 
     # training loop
+    print("Entering Training Loop")
     timer = Timer()
     running_return = 0.0
 
-    for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True):
+    for step in tqdm.tqdm(range(FLAGS.max_steps), dynamic_ncols=True, desc="actor"):
         timer.tick("total")
 
         with timer.context("sample_actions"):
@@ -168,6 +207,8 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
                     deterministic=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
+                # nisara : Comment
+                # print("Actions in Training Loop: ", actions)
 
         # Step environment
         with timer.context("step_env"):
@@ -215,8 +256,9 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
     The learner loop, which runs when "--learner" is set to True.
     """
     # set up wandb and logging
+    # wandb_logger = None
     wandb_logger = make_wandb_logger(
-        project="serl_dev",
+        project="serl_testing",
         description=FLAGS.exp_name or FLAGS.env,
         debug=FLAGS.debug,
     )
@@ -304,7 +346,7 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
         if FLAGS.checkpoint_period and update_steps % FLAGS.checkpoint_period == 0:
             assert FLAGS.checkpoint_path is not None
             checkpoints.save_checkpoint(
-                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=100
+                FLAGS.checkpoint_path, agent.state, step=update_steps, keep=200
             )
 
         update_steps += 1
@@ -314,28 +356,42 @@ def learner(rng, agent: DrQAgent, replay_buffer, demo_buffer):
 
 
 def main(_):
+    rclpy.init(args=_)
+    print("ROS2 initialized.")
+    robot_interface_node = RobotInterfaceNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(robot_interface_node)
+    robot_interface_node.get_logger().info("Robot interface node started.")
+    # executor.spin_once()
+
     assert FLAGS.batch_size % num_devices == 0
     # seed
     rng = jax.random.PRNGKey(FLAGS.seed)
-
+    print("Initializing environment")
     # create env and load dataset
+    print("Value of learner: ", FLAGS.learner)
+
     env = gym.make(
         FLAGS.env,
         fake_env=FLAGS.learner,
         save_video=FLAGS.eval_checkpoint_step,
+        robot_interface_node=robot_interface_node,
     )
-    env = GripperCloseEnv(env)
-    if FLAGS.actor:
-        env = SpacemouseIntervention(env)
+    print("Environment initialized")
+    # env = GripperCloseEnv(env)
+    # if FLAGS.actor:
+    #     env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
     env = Quat2EulerWrapper(env)
     env = SERLObsWrapper(env)
     env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     env = RecordEpisodeStatistics(env)
+    print("Environment wrapped")
 
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
     rng, sampling_rng = jax.random.split(rng)
+    print("Creating agent")
     agent: DrQAgent = make_drq_agent(
         seed=FLAGS.seed,
         sample_obs=env.observation_space.sample(),
@@ -344,13 +400,26 @@ def main(_):
         encoder_type=FLAGS.encoder_type,
     )
 
+    if FLAGS.load_checkpoint:
+        print(f"Loading Checkpoint from Previous Run:{FLAGS.load_checkpoint_path}")
+
+        ckpt = checkpoints.restore_checkpoint(
+            FLAGS.load_checkpoint_path,
+            agent.state,
+            step=FLAGS.loaded_checkpoint_step,
+        )
+        agent = agent.replace(state=ckpt)
+
+    print("Agent created")
     # replicate agent across devices
     # need the jnp.array to avoid a bug where device_put doesn't recognize primitives
+    print("Replicating agent")
     agent: DrQAgent = jax.device_put(
         jax.tree_map(jnp.array, agent), sharding.replicate()
     )
 
     if FLAGS.learner:
+        print("Learner code executed")
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
@@ -358,30 +427,28 @@ def main(_):
             capacity=FLAGS.replay_buffer_capacity,
             image_keys=image_keys,
         )
+        print("Replay buffer initialized")
+        print("Checkpoint Path: ", FLAGS.checkpoint_path)
         demo_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,
             env.action_space,
             capacity=10000,
             image_keys=image_keys,
         )
-        import pickle as pkl
+        import pickle5 as pkl
 
         with open(FLAGS.demo_path, "rb") as f:
-            trajs = pkl.load(f)
+            trajs = pkl.load(f, fix_imports=True)
             for traj in trajs:
                 demo_buffer.insert(traj)
         print(f"demo buffer size: {len(demo_buffer)}")
 
         # learner loop
         print_green("starting learner loop")
-        learner(
-            sampling_rng,
-            agent,
-            replay_buffer,
-            demo_buffer=demo_buffer,
-        )
+        learner(sampling_rng, agent=agent, replay_buffer=replay_buffer, demo_buffer=demo_buffer)
 
     elif FLAGS.actor:
+        print("Initializing Actor Node")
         sampling_rng = jax.device_put(sampling_rng, sharding.replicate())
         data_store = QueuedDataStore(2000)  # the queue size on the actor
 
@@ -391,6 +458,8 @@ def main(_):
 
     else:
         raise NotImplementedError("Must be either a learner or an actor")
+
+    rclpy.shutdown()
 
 
 if __name__ == "__main__":
