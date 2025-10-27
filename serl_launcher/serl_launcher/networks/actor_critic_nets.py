@@ -62,7 +62,8 @@ class Critic(nn.Module):
             obs_enc = self.encoder(observations)
 
         inputs = jnp.concatenate([obs_enc, actions], -1)
-        outputs = self.network(inputs, train=train)
+        outputs = self.network(inputs, train)
+        # train=train throws: "RuntimeWarning: kwargs are not supported in vmap, so "train" is(are) ignored"
         if self.init_final is not None:
             value = nn.Dense(
                 1,
@@ -157,7 +158,7 @@ def ensemblize(cls, num_qs, out_axes=0):
     return nn.vmap(
         cls,
         variable_axes={"params": 0},
-        split_rngs={"params": True},
+        split_rngs={"params": True, "dropout": True},
         in_axes=None,
         out_axes=out_axes,
         axis_size=num_qs,

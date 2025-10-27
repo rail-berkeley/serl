@@ -14,9 +14,12 @@ class SmallEncoder(nn.Module):
     pool_method: str = "spatial_learned_embeddings"
     bottleneck_dim: Optional[int] = None
     spatial_block_size: Optional[int] = 8
+    num_kp: Optional[int] = 32
 
     @nn.compact
-    def __call__(self, observations: jnp.ndarray, train=False) -> jnp.ndarray:
+    def __call__(
+        self, observations: jnp.ndarray, train=False, encode=True
+    ) -> jnp.ndarray:
         assert len(self.features) == len(self.strides)
 
         x = observations.astype(jnp.float32) / 255.0
@@ -44,6 +47,13 @@ class SmallEncoder(nn.Module):
                 raise ValueError(
                     "spatial_block_size must be set when using spatial_learned_embeddings"
                 )
+            x = nn.Conv(  # 512 to num_kp features (less complexity)
+                features=self.num_kp,
+                kernel_size=1,
+                use_bias=False,
+                dtype=jnp.float32,
+                kernel_init=nn.initializers.kaiming_normal(),
+            )(x)
             x = SpatialLearnedEmbeddings(*(x.shape[-3:]), self.spatial_block_size)(x)
             x = nn.Dropout(0.1, deterministic=not train)(x)
 
