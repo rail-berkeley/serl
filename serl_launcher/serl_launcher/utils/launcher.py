@@ -18,6 +18,7 @@ from serl_launcher.agents.continuous.vice import VICEAgent
 from serl_launcher.data.data_store import (
     MemoryEfficientReplayBufferDataStore,
     ReplayBufferDataStore,
+    FractalSymmetryReplayBufferDataStore,
 )
 
 ##############################################################################
@@ -179,13 +180,17 @@ def make_trainer_config(port_number: int = 5488, broadcast_port: int = 5489):
 
 def make_wandb_logger(
     project: str = "agentlace",
+    name: str = "placeholder_run_name",
     description: str = "serl_launcher",
+    wandb_output_dir: str = None,
     debug: bool = False,
+    offline: bool = False,
 ):
     wandb_config = WandBLogger.get_default_config()
     wandb_config.update(
         {
             "project": project,
+            "name": name,
             "exp_descriptor": description,
             "tag": description,
         }
@@ -193,7 +198,9 @@ def make_wandb_logger(
     wandb_logger = WandBLogger(
         wandb_config=wandb_config,
         variant={},
+        wandb_output_dir=wandb_output_dir,
         debug=debug,
+        offline=offline
     )
     return wandb_logger
 
@@ -206,6 +213,13 @@ def make_replay_buffer(
     image_keys: list = [],  # used only type=="memory_efficient_replay_buffer"
     preload_rlds_path: Optional[str] = None,
     preload_data_transform: Optional[callable] = None,
+    branch_method: str = None, # used only type=="fractal_symmetry_replay_buffer"
+    split_method : str = None, # used only type=="fractal_symmetry_replay_buffer"
+    workspace_width : float = None, # used only type=="fractal_symmetry_replay_buffer"
+    workspace_width_method : str = None, # used only type=="fractal_symmetry_replay_buffer"
+    x_obs_idx = None,
+    y_obs_idx = None,
+    **kwargs: dict # used only type=="fractal_symmetry_replay_buffer"
 ):
     """
     This is the high-level helper function to
@@ -215,7 +229,7 @@ def make_replay_buffer(
     - env: gym or gymasium environment
     - capacity: capacity of the replay buffer
     - rlds_logger_path: path to save RLDS logs
-    - type: support only for "replay_buffer" and "memory_efficient_replay_buffer"
+    - type: support only for "replay_buffer", "memory_efficient_replay_buffer", and "fractal_symmetry_replay_buffer"
     - image_keys: list of image keys, used only "memory_efficient_replay_buffer"
     - preload_rlds_path: path to preloaded RLDS trajectories
     - preload_data_transform: data transformation function for preloaded RLDS data
@@ -254,9 +268,31 @@ def make_replay_buffer(
             rlds_logger=rlds_logger,
             image_keys=image_keys,
         )
+    elif type == "fractal_symmetry_replay_buffer":
+        replay_buffer = FractalSymmetryReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            capacity=capacity,
+            branch_method=branch_method,
+            split_method=split_method,
+            workspace_width=workspace_width,
+            x_obs_idx=x_obs_idx,
+            y_obs_idx=y_obs_idx,
+            rlds_logger=rlds_logger,
+            image_keys=image_keys,
+            kwargs=kwargs,
+        )
+    
     else:
         raise ValueError(f"Unsupported replay_buffer_type: {type}")
 
+    # Load RLDS or oxe_envlogger recroded data with tfds.builder_from_directory. 
+    #   Choose number of episodes by passing split="train[:N%]" or split="test[:N%]"
+    #   or ds = tfds.builder_from_directory(builder_dir).as_dataset(split="train").take(5)
+    #   See more details: https://www.tensorflow.org/datasets/splits
+    #
+    # It's also possible to filter specirfic episodes, i.e. by time:
+    # ds = ds.filter(lambda ep: tf.strings.regex_full_match(ep['some/session_id'], "20250821_222412"))
     if preload_rlds_path:
         print(f" - Preloaded {preload_rlds_path} to replay buffer")
         dataset = tfds.builder_from_directory(preload_rlds_path).as_dataset(split="all")

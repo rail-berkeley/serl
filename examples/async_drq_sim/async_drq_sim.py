@@ -38,9 +38,10 @@ import franka_sim
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("env", "PandaPickCubeVision-v0", "Name of environment.")
+flags.DEFINE_string("env", "PandaReachSparseCube-v0", "Name of environment.")
 flags.DEFINE_string("agent", "drq", "Name of agent.")
 flags.DEFINE_string("exp_name", None, "Name of the experiment for wandb logging.")
+flags.DEFINE_string("run_name", None, "Name of run for wandb logging")
 flags.DEFINE_integer("max_traj_length", 1000, "Maximum length of trajectory.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_bool("save_model", False, "Whether to save model.")
@@ -68,6 +69,21 @@ flags.DEFINE_string("encoder_type", "resnet-pretrained", "Encoder type.")
 flags.DEFINE_string("demo_path", None, "Path to the demo data.")
 flags.DEFINE_integer("checkpoint_period", 0, "Period to save checkpoints.")
 flags.DEFINE_string("checkpoint_path", None, "Path to save checkpoints.")
+
+# flags for replay buffer
+flags.DEFINE_string("replay_buffer_type", "memory_efficient_replay_buffer", "Which replay buffer to use")
+flags.DEFINE_string("branch_method", None, "Method for how many branches to generate")
+flags.DEFINE_string("split_method", None, "Method for when to change number of branches generated")
+flags.DEFINE_float("workspace_width", 0.5, "Workspace width in meters")
+flags.DEFINE_integer("max_depth",None,"Maximum layers of depth")
+flags.DEFINE_integer("starting_branch_count", None, "Initial number of branches")
+flags.DEFINE_integer("branching_factor", None, "Rate of change of branches per dimension (x,y)") # For fractal_branch and fractal_contraction
+flags.DEFINE_float("alpha",None,"alpha value")
+flags.DEFINE_enum("disassociated_type", None, ["octahedron", "hourglass"], 
+                  "Type of disassociated fracal rollout. Octahedron: expand from min to max then contract to min,"
+                   + " Hourglass: Contract from max to min then expand to max")
+flags.DEFINE_integer("min_branch_count", None, "Minimum number of branches for disassociated fractal rollout")
+flags.DEFINE_integer("max_branch_count", None, "Maximum number of branches for disassociated fractal rollout")
 
 flags.DEFINE_boolean(
     "debug", False, "Debug mode."
@@ -108,7 +124,7 @@ def actor(agent: DrQAgent, data_store, env, sampling_rng):
     client.recv_network_callback(update_params)
 
     eval_env = gym.make(FLAGS.env)
-    if FLAGS.env == "PandaPickCubeVision-v0":
+    if FLAGS.env == "PandaReachSparseCube-v0":
         eval_env = SERLObsWrapper(eval_env)
         eval_env = ChunkingWrapper(eval_env, obs_horizon=1, act_exec_horizon=None)
     eval_env = RecordEpisodeStatistics(eval_env)
@@ -191,9 +207,12 @@ def learner(
     """
     # set up wandb and logging
     wandb_logger = make_wandb_logger(
-        project="serl_dev",
+        project=FLAGS.exp_name,
+        name=FLAGS.run_name,
         description=FLAGS.exp_name or FLAGS.env,
+        # wandb_output_dir=FLAGS.wandb_output_dir,
         debug=FLAGS.debug,
+        # offline=FLAGS.wandb_offline,
     )
 
     # To track the step in the training loop
@@ -325,11 +344,17 @@ def main(_):
     else:
         env = gym.make(FLAGS.env)
 
-    if FLAGS.env == "PandaPickCube-v0":
-        env = gym.wrappers.FlattenObservation(env)
-    if FLAGS.env == "PandaPickCubeVision-v0":
+    if FLAGS.env in {"PandaPickCube-v0", "PandaReachCube-v0", "PandaPickSparseCube-v0", "PandaReachSparseCube-v0", "PandaPickCubeVision-v0", "PandaReachCubeVision-v0", "PandaPickSparseCubeVision-v0", "PandaReachSparseCubeVision-v0"}:
+        x_obs_idx=np.array([0,4])
+        y_obs_idx=np.array([1,5])
+    else:
+        raise NotImplementedError(f"Unknown observation layout for {FLAGS.env}")
+    
+    if FLAGS.env == "PandaReachSparseCube-v0":
         env = SERLObsWrapper(env)
         env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+    else:
+        env = gym.wrappers.FlattenObservation(env)
 
     image_keys = [key for key in env.observation_space.keys() if key != "state"]
 
@@ -345,7 +370,7 @@ def main(_):
     # replicate agent across devices
     # need the jnp.array to avoid a bug where device_put doesn't recognize primitives
     agent: DrQAgent = jax.device_put(
-        jax.tree_map(jnp.array, agent), sharding.replicate()
+        jax.tree.map(jnp.array, agent), sharding.replicate()
     )
 
     if FLAGS.learner:
@@ -354,7 +379,21 @@ def main(_):
             env,
             capacity=FLAGS.replay_buffer_capacity,
             rlds_logger_path=FLAGS.log_rlds_path,
-            type="memory_efficient_replay_buffer",
+            type=FLAGS.replay_buffer_type,
+            branch_method=FLAGS.branch_method,
+            split_method=FLAGS.split_method,
+            branching_factor=FLAGS.branching_factor,
+            starting_branch_count=FLAGS.starting_branch_count,
+            workspace_width=FLAGS.workspace_width,
+            max_traj_length=FLAGS.max_traj_length,
+            x_obs_idx=x_obs_idx,
+            y_obs_idx=y_obs_idx,
+            preload_rlds_path=FLAGS.preload_rlds_path,
+            max_depth=FLAGS.max_depth,
+            alpha=FLAGS.alpha,
+            disassociated_type=FLAGS.disassociated_type,
+            min_branch_count=FLAGS.min_branch_count,
+            max_branch_count=FLAGS.max_branch_count,
             image_keys=image_keys,
         )
 
@@ -370,14 +409,39 @@ def main(_):
                 # NOTE: Create your own custom data transform function here if you
                 # are loading this via with --preload_rlds_path with tf rlds data
                 # This default does nothing
+                # See:  https://colab.research.google.com/github/google-research/rlds/blob/main/rlds/examples/rlds_tutorial.ipynb#scrollTo=X1KXM8IGecRO
+                #       https://www.tensorflow.org/guide/data 
+                #       https://github.com/google-research/rlds/blob/main/docs/transformations.md
+                #       Batch: rlds.transformations.batch (https://colab.research.google.com/github/google-research/rlds/blob/main/rlds/examples/rlds_tutorial.ipynb#scrollTo=TGT3YfzFOrBm)
+                #       Reverb: rlds.transformations.pattern_map (https://colab.research.google.com/github/google-research/rlds/blob/main/rlds/examples/rlds_dataset_patterns.ipynb )
+                #       Nested data set manipulation: rlds.transformations.episode_length/.sum_dataset/.final_step/.map_nested_steps
+                #       Concatenation: rlds.transformations.concatenate / .concat_if_terminal (https://colab.research.google.com/github/google-research/rlds/blob/main/rlds/examples/rlds_examples.ipynb#scrollTo=pWNhxwJzOUJv)
+                #       Stats: rlds.transformations.mean_and_std (https://colab.research.google.com/github/google-research/rlds/blob/main/rlds/examples/rlds_tutorial.ipynb#scrollTo=Z0TITfo_4oZr)
+                #       Truncation: rlds.transformations.truncate_after_condition 
+                #       Alignment: rlds.transformations.shift_keys
+                #       Zero Init: rlds.transformations.zeros_from_spec
                 return data
 
             demo_buffer = make_replay_buffer(
                 env,
                 capacity=FLAGS.replay_buffer_capacity,
-                type="memory_efficient_replay_buffer",
-                image_keys=image_keys,
+                rlds_logger_path=FLAGS.log_rlds_path,
+                type=FLAGS.replay_buffer_type,
+                branch_method=FLAGS.branch_method,
+                split_method=FLAGS.split_method,
+                branching_factor=FLAGS.branching_factor,
+                starting_branch_count=FLAGS.starting_branch_count,
+                workspace_width=FLAGS.workspace_width,
+                max_traj_length=FLAGS.max_traj_length,
+                x_obs_idx=x_obs_idx,
+                y_obs_idx=y_obs_idx,
                 preload_rlds_path=FLAGS.preload_rlds_path,
+                max_depth=FLAGS.max_depth,
+                alpha=FLAGS.alpha,
+                disassociated_type=FLAGS.disassociated_type,
+                min_branch_count=FLAGS.min_branch_count,
+                max_branch_count=FLAGS.max_branch_count,
+                image_keys=image_keys,
                 preload_data_transform=preload_data_transform,
             )
 

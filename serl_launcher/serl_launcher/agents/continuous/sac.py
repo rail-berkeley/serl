@@ -575,11 +575,11 @@ class SACAgent(flax.struct.PyTreeNode):
         def make_minibatch(data: jnp.ndarray):
             return jnp.reshape(data, (utd_ratio, minibatch_size) + data.shape[1:])
 
-        minibatches = jax.tree_map(make_minibatch, batch)
+        minibatches = jax.tree.map(make_minibatch, batch)
 
         (agent,), critic_infos = jax.lax.scan(scan_body, (self,), (minibatches,))
 
-        critic_infos = jax.tree_map(lambda x: jnp.mean(x, axis=0), critic_infos)
+        critic_infos = jax.tree.map(lambda x: jnp.mean(x, axis=0), critic_infos)
         del critic_infos["actor"]
         del critic_infos["temperature"]
 
