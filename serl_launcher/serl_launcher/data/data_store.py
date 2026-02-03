@@ -7,6 +7,9 @@ from serl_launcher.data.replay_buffer import ReplayBuffer
 from serl_launcher.data.memory_efficient_replay_buffer import (
     MemoryEfficientReplayBuffer,
 )
+from serl_launcher.data.fractal_symmetry_replay_buffer import (
+    FractalSymmetryReplayBuffer
+)
 
 from agentlace.data.data_store import DataStoreBase
 
@@ -112,8 +115,6 @@ class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStor
                     RLDSStepType.TRUNCATION,
                 }:
                     self.step_type = RLDSStepType.RESTART
-                elif self.step_type == RLDSStepType.TRUNCATION:
-                    self.step_type = RLDSStepType.RESTART
                 elif not data["masks"]:  # 0 is done, 1 is not done
                     self.step_type = RLDSStepType.TERMINATION
                 elif data["dones"]:
@@ -143,6 +144,69 @@ class MemoryEfficientReplayBufferDataStore(MemoryEfficientReplayBuffer, DataStor
     def get_latest_data(self, from_id: int):
         raise NotImplementedError  # TODO
 
+class FractalSymmetryReplayBufferDataStore(FractalSymmetryReplayBuffer, DataStoreBase):
+    def __init__(
+        self,
+        observation_space: gym.Space,
+        action_space: gym.Space,
+        capacity: int,
+        workspace_width: int = None,
+        x_obs_idx = None,
+        y_obs_idx = None,
+        branch_method: str = None,
+        split_method: str = None,
+        rlds_logger: Optional[RLDSLogger] = None,
+        image_keys: Iterable[str] = ("image",),
+        **kwargs: dict,
+    ):
+        FractalSymmetryReplayBuffer.__init__(self, observation_space, action_space, capacity, workspace_width, x_obs_idx, y_obs_idx, branch_method, split_method, img_keys=image_keys, **kwargs)
+        DataStoreBase.__init__(self, capacity)
+        self._lock = Lock()
+        self._logger = None
+
+        if rlds_logger:
+            self.step_type = RLDSStepType.TERMINATION  # to init the state for restart
+            self._logger = rlds_logger
+
+    # ensure thread safety
+    def insert(self, data):
+        with self._lock:
+            super(FractalSymmetryReplayBufferDataStore, self).insert(data)
+
+            # TODO: Data logging currently does NOT WORK as shown if we want to log our transformed transitions
+            # add data to the rlds logger
+            if self._logger:
+                if self.step_type in {
+                    RLDSStepType.TERMINATION,
+                    RLDSStepType.TRUNCATION,
+                }:
+                    self.step_type = RLDSStepType.RESTART
+                elif not data["masks"]:  # 0 is done, 1 is not done
+                    self.step_type = RLDSStepType.TERMINATION
+                elif data["dones"]:
+                    self.step_type = RLDSStepType.TRUNCATION
+                else:
+                    self.step_type = RLDSStepType.TRANSITION
+
+                self._logger(
+                    action=data["actions"],
+                    obs=data["next_observations"],  # TODO: check if this is correct
+                    reward=data["rewards"],
+                    step_type=self.step_type,
+                )
+
+    # ensure thread safety
+    def sample(self, *args, **kwargs):
+        with self._lock:
+            return super(FractalSymmetryReplayBufferDataStore, self).sample(*args, **kwargs)
+
+    # NOTE: method for DataStoreBase
+    def latest_data_id(self):
+        return self._insert_index
+
+    # NOTE: method for DataStoreBase
+    def get_latest_data(self, from_id: int):
+        raise NotImplementedError  # TODO
 
 def populate_data_store(
     data_store: DataStoreBase,
@@ -161,7 +225,6 @@ def populate_data_store(
                 data_store.insert(transition)
         print(f"Loaded {len(data_store)} transitions.")
     return data_store
-
 
 def populate_data_store_with_z_axis_only(
     data_store: DataStoreBase,

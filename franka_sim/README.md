@@ -8,7 +8,7 @@ It includes a state-based and a vision-based Franka lift cube task environment.
 - run `pip install -r requirements.txt` to install sim dependencies.
 
 # Explore the Environments
-- Run `python franka_sim/test/test_gym_env_human.py` to launch a display window and visualize the task.
+- Run `python3 franka_sim/test/test_gym_env_human.py` to launch a display window and visualize the task.
 
 # Credits:
 - This simulation is initially built by [Kevin Zakka](https://kzakka.com/).

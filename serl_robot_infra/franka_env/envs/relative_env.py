@@ -10,8 +10,18 @@ from franka_env.utils.transformations import (
 
 class RelativeFrame(gym.Wrapper):
     """
-    This wrapper transforms the observation and action to be expressed in the end-effector frame.
-    Optionally, it can transform the tcp_pose into a relative frame defined as the reset pose.
+    This wrapper transforms the observation and action to be expressed in the end-effector frame at reset. 
+    All measurements are thus relative to the starting reset frame.
+    
+    Consider the following frames and nomenclatures:
+    o: base frame
+    r: the frozen tcp frame that happens only at reset time.
+    b: end-effector frame
+
+    Notation: T_a_b would represent a transformation from b to a.
+    Transformation: reset_tcp_frame -> base_frame:    T_r_o (o to r)
+    Transformation: end_effector_frame -> base_frame: T_b_o (o to b)
+    Transformation: end_effector_frame -> reset_tcp_frame: T_b_r = T_r_o_inv * T_b_o (r to b)
 
     This wrapper is expected to be used on top of the base Franka environment, which has the following
     observation space:
@@ -30,10 +40,16 @@ class RelativeFrame(gym.Wrapper):
 
     def __init__(self, env: Env, include_relative_pose=True):
         super().__init__(env)
+
+        # Adjoint matrix used to convert tcp_vel or actions from base frame to end-effector frame via Adj(T)^(-1)*tcp_vel
         self.adjoint_matrix = np.zeros((6, 6))
 
         self.include_relative_pose = include_relative_pose
         if self.include_relative_pose:
+            # o: base frame
+            # r: the frozen tcp frame that happens only at reset time.
+            # b: end-effector frame
+            # Transformation from base to tcp: T_r_o 
             # Homogeneous transformation matrix from reset pose's relative frame to base frame
             self.T_r_o_inv = np.zeros((4, 4))
 
@@ -73,8 +89,15 @@ class RelativeFrame(gym.Wrapper):
 
     def transform_observation(self, obs):
         """
-        Transform observations from spatial(base) frame into body(end-effector) frame
-        using the adjoint matrix
+        Convert the environment's observation into the frames expected by the policy.
+
+        * Linear/angular velocities are provided by the wrapped env in the spatial (base)
+          frame; we left-multiply them by ``Adj(T)^{-1}`` so they are expressed in the
+          instantaneous body (end-effector) frame.
+        * When ``include_relative_pose`` is enabled, tcp poses are re-expressed relative
+          to the pose at reset. That is, we compute ``T_r^b = T_r^o @ T_o^b`` and return
+          the position/quaternion extracted from ``T_r^b``.
+        * Image observations pass through untouched.
         """
         adjoint_inv = np.linalg.inv(self.adjoint_matrix)
         obs["state"]["tcp_vel"] = adjoint_inv @ obs["state"]["tcp_vel"]

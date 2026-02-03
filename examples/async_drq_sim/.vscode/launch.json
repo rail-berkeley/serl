@@ -1,0 +1,169 @@
+{
+    // VSCode debug configuration version
+    "version": "0.2.0",
+    "configurations": [
+        // LEARNER
+        {
+            // Configuration for the RL agent learner component
+            "name": "Python: Learner",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/async_drq_sim.py",
+            // Command-line arguments matching run_learner.sh
+            "args": [
+                "--render",
+                "--env", "PandaReachSparseCube-v0",         // Environment to use
+                "--agent", "drq",                           // Agent type (drq or sac)
+                "--exp_name", "PandaReachCubeVision-v0_001", // Experiment name for wandb logging
+                "--max_traj_length", "100",                 // Max episode length/ Max episode length                  
+                "--seed", "42",                             // Random seed for reproducibility
+                // "--save_model",                          // Save model checkpoints
+                "--batch_size", "256",                      // Training batch size
+                "--critic_actor_ratio", "4",                // Critic-to-actor update ratio                
+                "--max_steps", "100_000 ",                   // Maximum training steps
+                "--replay_buffer_capacity", "200_000",      // Replay buffer capacity
+                "--random_steps", "0",                    // Number of random steps at beginning
+                "--training_starts", "300",                 // Start training after buffer has this many samples
+                "--steps_per_update", "30",                 // Number of env steps per update
+                "--learner",                                // REQUIRED: Indicates this is a learner instance
+                "--encoder_type", "resnet-pretrained",      // Use pixel-based observations
+
+                // Fractal
+                // "--replay_buffer_type", "fractal_symmetry_replay_buffer_parallel", // Use fractal symmetry replay buffer
+                // "--branch_method", "constant",
+                // "--split_method", "constant",
+                // "--starting_branch_count", "3",            // Start with 27 branches                  
+                // "--workspace_width", "0.5",   
+
+                // Demonstration data loading options
+                // "--load_demos",                             // Load demo dataset
+                // "--demo_dir",  "/data/data/serl/demos",
+                // "--file_name", "data_franka_reach_random_5_2.npz", // Name of the demo file to load
+                "--preload_rlds_path", "/media/bison/hdd/data/serl/demos/franka_reach_drq_demo_script/2_demos_session_20250916_100650/PandaReachSparseCube-v0/0.1.0", // Preload RLDS dataset for faster loading
+
+                // Dissasociated Fractals
+                // "--branch_method", "disassociated",   // branch method type
+                // "--split_method", "disassociated",    // split method type                
+                // "--disassociated_type", "octahedron", // Type of disassociated test to perform
+                // "--min_branch_count", "3",            // Minimum branch count for disassociated testing
+                // "--max_branch_count", "9",            // Maximum branch count for disassociated testing
+                // "--num_depth_sectors", "13",          // Desired number of sectors to divide rollouts into for branch count splitting
+                //"--alpha", "1"                           // alpha   
+
+            ],
+            "console": "integratedTerminal",                // Use integrated terminal to see output
+            "justMyCode": false,                            // Allow stepping into libraries
+            // Environment variables from run_learner.sh
+            "env": {
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",   // Don't preallocate JAX/XLA memory
+                "XLA_PYTHON_CLIENT_MEM_FRACTION": ".5"      // Limit JAX memory usage to 50%
+            },
+            // Additional helpful debugging options
+            "showReturnValue": true,                        // Show function return values
+            "purpose": ["debug-in-terminal"],               // Run in terminal for better output
+            "cwd": "${workspaceFolder}"                     // Set working directory explicitly
+        },
+        // ACTOR
+        {
+            // Configuration for the RL agent actor component
+            "name": "Python: Actor",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/async_drq_sim.py",
+            // Command-line arguments matching run_actor.sh
+            "args": [
+                "--render",
+                "--env", "PandaReachSparseCube-v0",         // Environment to use
+                "--agent", "drq",                           // Agent type (drq or sac)
+                "--exp_name", "PandaPickCubeVision-v0_sparse_001", // Experiment name for wandb logging
+                "--max_traj_length", "100",                 // Max episode length/ Max episode length                  
+                "--seed", "42",                             // Random seed for reproducibility
+                // "--save_model",                             // Save model checkpoints
+                "--batch_size", "256",                      // Training batch size
+                "--critic_actor_ratio", "8",                // Critic-to-actor update ratio                
+                "--max_steps", "50_000",                   // Maximum training steps
+                "--replay_buffer_capacity", "200_000",      // Replay buffer capacity
+                "--random_steps", "300",                    // Number of random steps at beginning
+                "--training_starts", "300",                 // Start training after buffer has this many samples
+                "--steps_per_update", "30",                 // Number of env steps per update
+                "--actor",                                // REQUIRED: Indicates this is a learner instance
+                "--encoder_type", "resnet-pretrained",      // Use pixel-based observations
+
+                // Fractal
+                // "--replay_buffer_type", "fractal_symmetry_replay_buffer_parallel", // Use fractal symmetry replay buffer
+                // "--branch_method", "constant",
+                // "--split_method", "constant",
+                // "--starting_branch_count", "3",            // Start with 27 branches                  
+                // "--workspace_width", "0.5",   
+
+                // Demonstration data loading options
+                // "--load_demos",                             // Load demo dataset
+                // "--demo_dir",  "/data/data/serl/demos",
+                // "--file_name", "data_franka_reach_random_5_2.npz", // Name of the demo file to load
+                "--preload_rlds_path", "/media/bison/hdd/data/serl/demos/franka_reach_drq_demo_script/2_demos_session_20250916_100650/PandaReachSparseCube-v0/0.1.0", // Preload RLDS dataset for faster loading
+
+                // Dissasociated Fractals
+                // "--branch_method", "disassociated",   // branch method type
+                // "--split_method", "disassociated",    // split method type                
+                // "--disassociated_type", "octahedron", // Type of disassociated test to perform
+                // "--min_branch_count", "3",            // Minimum branch count for disassociated testing
+                // "--max_branch_count", "9",            // Maximum branch count for disassociated testing
+                // "--num_depth_sectors", "13",          // Desired number of sectors to divide rollouts into for branch count splitting
+                //"--alpha", "1"                           // alpha  
+
+            ],
+            "console": "integratedTerminal",                // Use integrated terminal to see output
+            "justMyCode": false,                            // Allow stepping into libraries
+            // Environment variables from run_actor.sh
+            "env": {
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",   // Don't preallocate JAX/XLA memory
+                "XLA_PYTHON_CLIENT_MEM_FRACTION": ".5"      // Limit JAX memory usage to 50%
+            },
+            "showReturnValue": true,                        // Show function return values
+            "purpose": ["debug-in-terminal"],               // Run in terminal for better output
+            "cwd": "${workspaceFolder}"                     // Set working directory explicitly
+        }
+    ],
+    // Compound configurations to launch multiple configurations together
+    "compounds": [
+        {
+            // Launch both learner and actor at the same time
+            "name": "Learner + Actor",
+            "configurations": ["Python: Learner", "Python: Actor"],
+            // Note: Actor will connect to learner via TrainerClient, assuming localhost IP
+            // Both will run in separate debug sessions with independent controls
+        }
+    ],
+    
+    /*
+    DEBUGGING TIPS:
+    
+    - IMPORTANT: You must select either Learner or Actor configuration when debugging
+      (the NotImplementedError occurs if neither --learner nor --actor flag is specified)
+    
+    - If you get an error about 'utd_ratio', use the "Python: Learner (Fix utd_ratio)" configuration
+      which adds this missing parameter
+    
+    - Set breakpoints in learner() or actor() functions to step through the main training loops
+    
+    - Key places to set breakpoints:
+      * In actor(): near the action sampling logic (step < FLAGS.random_steps)
+      * In learner(): where agent.update_high_utd() is called
+      * Server/client communication points (client.update(), server.publish_network())
+    
+    - For memory issues: Watch replay buffer size growth with breakpoints in data_store.insert()
+    
+    - JAX issues: Set breakpoints after jax.device_put() calls to ensure proper device placement
+    
+    - The "utd_ratio" parameter seems to be used in the learner function but isn't defined 
+      in the FLAGS. Use the special configuration or add a --utd_ratio flag to fix.
+    
+    DEBUG WORKFLOW:
+    
+    1. Start with "Python: Learner (Fix utd_ratio)" configuration
+    2. Set breakpoints at key sections you want to monitor
+    3. Run the debugger and observe variable values at each step
+    4. Once learner is properly running, launch the Actor in a separate instance
+    5. Watch for communication between the two
+    */
+}

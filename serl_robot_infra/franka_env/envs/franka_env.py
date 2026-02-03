@@ -390,7 +390,7 @@ class FrankaEnv(gym.Env):
         if mode == "binary":
             if (
                 pos <= -self.config.BINARY_GRIPPER_THREASHOLD
-                and self.gripper_binary_state == 0
+                # and self.gripper_binary_state == 0
             ):  # close gripper
                 requests.post(self.url + "close_gripper")
                 time.sleep(0.6)

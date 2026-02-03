@@ -22,6 +22,8 @@ from serl_launcher.networks.reward_classifier import load_classifier_func
 import jax
 
 if __name__ == "__main__":
+
+    #Initializes Enviroment 
     env = gym.make("FrankaCableRoute-Vision-v0", save_video=False)
     env = GripperCloseEnv(env)
     env = SpacemouseIntervention(env)
@@ -37,7 +39,7 @@ if __name__ == "__main__":
         key=key,
         sample=env.observation_space.sample(),
         image_keys=image_keys,
-        checkpoint_path="/home/undergrad/code/serl_dev/examples/async_cable_route_drq/classifier_ckpt/",
+        checkpoint_path="/home/student/code/serl/examples/async_cable_route_drq/",
     )
     env = BinaryRewardClassifierWrapper(env, classifier_func)
 

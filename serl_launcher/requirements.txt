@@ -1,6 +1,7 @@
+opencv-python<4.12.0.88
 gym >= 0.26
 numpy>=1.24.3
-flax>=0.8.0
+flax>=0.8.0, < 0.10.6
 distrax>=0.1.2
 ml_collections >= 0.1.0
 tqdm >= 4.60.0
@@ -8,7 +9,7 @@ chex>=0.1.85
 optax>=0.1.5
 orbax-checkpoint>=0.5.10
 absl-py >= 0.12.0
-scipy==1.11.4
+scipy>=1.11.4
 wandb >= 0.12.14
 tensorflow>=2.16.0
 tensorflow_probability>=0.24.0

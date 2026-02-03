@@ -18,7 +18,6 @@ class MemoryEfficientReplayBuffer(ReplayBuffer):
         pixel_keys: Tuple[str, ...] = ("pixels",),
     ):
         self.pixel_keys = pixel_keys
-
         observation_space = copy.deepcopy(observation_space)
         self._num_stack = None
         for pixel_key in self.pixel_keys:

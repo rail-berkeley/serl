@@ -172,3 +172,7 @@ MUJOCO_LOG.TXT
 _METADATA
 checkpoint
 wandb/
+
+# VS Code settings
+*.code-workspace
+

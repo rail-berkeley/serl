@@ -1,0 +1,4 @@
+tensorflow-metadata==1.17.2
+apache-beam==2.67.0
+protobuf>=4.21.6,<4.22
+git+https://github.com/rail-berkeley/oxe_envlogger.git@main??

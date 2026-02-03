@@ -22,17 +22,24 @@ def _init_replay_dict(
 
 
 def _insert_recursively(
-    dataset_dict: DatasetDict, data_dict: DatasetDict, insert_index: int
+    dataset_dict: DatasetDict, data_dict: DatasetDict, insert_index: int, capacity: int, batch_size: int = None,
 ):
     if isinstance(dataset_dict, np.ndarray):
-        dataset_dict[insert_index] = data_dict
+        if batch_size:
+            if insert_index + batch_size > capacity:
+                dataset_dict[insert_index:capacity] = data_dict[0:(capacity - insert_index)]
+                dataset_dict[0:(insert_index + batch_size - capacity)] = data_dict[(capacity - insert_index):batch_size]
+            else:
+                dataset_dict[insert_index:(insert_index + batch_size)] = data_dict
+        else:
+            dataset_dict[insert_index] = data_dict
     elif isinstance(dataset_dict, dict):
         assert dataset_dict.keys() == data_dict.keys(), (
             dataset_dict.keys(),
             data_dict.keys(),
         )
         for k in dataset_dict.keys():
-            _insert_recursively(dataset_dict[k], data_dict[k], insert_index)
+            _insert_recursively(dataset_dict[k], data_dict[k], insert_index, capacity, batch_size)
     else:
         raise TypeError()
 
@@ -68,15 +75,20 @@ class ReplayBuffer(Dataset):
     def __len__(self) -> int:
         return self._size
 
-    def insert(self, data_dict: DatasetDict):
-        _insert_recursively(self.dataset_dict, data_dict, self._insert_index)
+    def insert(self, data_dict: DatasetDict, batch_size : int = None):
+        _insert_recursively(self.dataset_dict, data_dict, self._insert_index, self._capacity, batch_size)
 
-        self._insert_index = (self._insert_index + 1) % self._capacity
-        self._size = min(self._size + 1, self._capacity)
+        if batch_size:
+            self._insert_index = (self._insert_index + batch_size) % self._capacity
+            self._size = min(self._size + batch_size, self._capacity)
+        else:
+            self._insert_index = (self._insert_index + 1) % self._capacity
+            self._size = min(self._size + 1, self._capacity)
 
     def get_iterator(self, queue_size: int = 2, sample_args: dict = {}, device=None):
         # See https://flax.readthedocs.io/en/latest/_modules/flax/jax_utils.html#prefetch_to_device
-        # queue_size = 2 should be ok for one GPU.
+        
+        # queue_size = 2 should be ok for one GPU. See more at https://chatgpt.com/share/687af063-d6b0-8004-92b6-0e88b9c5f1e8
         queue = collections.deque()
 
         def enqueue(n):

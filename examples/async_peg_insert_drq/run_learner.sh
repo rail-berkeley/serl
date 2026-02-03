@@ -1,16 +1,43 @@
+
+# All export statements end with && \ to chain them together
 export XLA_PYTHON_CLIENT_PREALLOCATE=false && \
-export XLA_PYTHON_CLIENT_MEM_FRACTION=.2 && \
+# XLA memory fraction with learner+action <0.8. Learner needs more.
+export XLA_PYTHON_CLIENT_MEM_FRACTION=.5 && \
+# Use malloc_async to reduce fragmentation, overlap memory allocation with compute, lower stalls and improve worklads. Requires cuda11.2+
+export TF_GPU_ALLOCATOR=cuda_malloc_async && \
+export SCRIPT_DIR=$(dirname "$(realpath "$0")") && \
+export ENV_NAME="FrankaPegInsert-Vision-v0" && \
+export TIMESTAMP=$(date +"%m-%d-%Y-%H-%M-%S") && \
+export CHECKPOINT_DIR="$SCRIPT_DIR/checkpoints/checkpoints-$TIMESTAMP" && \
+
+# Create checkpoint directory if it doesn't exist
+if [ ! -d "$CHECKPOINT_DIR" ]; then
+    echo "Creating checkpoint directory: $CHECKPOINT_DIR"
+    mkdir -p "$CHECKPOINT_DIR" || {
+        echo "Failed to create checkpoint directory!" >&2
+        exit 1
+    }
+fi
+
 python async_drq_randomized.py "$@" \
     --learner \
-    --env FrankaPegInsert-Vision-v0 \
-    --exp_name=serl_dev_drq_rlpd10demos_peg_insert_random_resnet_097 \
-    --seed 0 \
-    --random_steps 1000 \
-    --training_starts 200 \
-    --critic_actor_ratio 4 \
+    --render \
+    --env $ENV_NAME \
+    --exp_name="PegInsert-With-Checkpoints-10k-steps" \
+    --random_steps 0 \
+    --seed 4 \
+    --training_starts 1 \
+    --save_model \
     --batch_size 256 \
-    --eval_period 2000 \
+    --critic_actor_ratio 8 \
+    --replay_buffer_capacity 3_600_000 \
+    --random_steps 1_000 \
     --encoder_type resnet-pretrained \
-    --demo_path peg_insert_20_demos_2023-12-25_16-13-25.pkl \
-    --checkpoint_period 1000 \
-    --checkpoint_path /home/undergrad/code/serl_dev/examples/async_peg_insert_drq/5x5_20degs_20demos_rand_peg_insert_097
+    --demo_path peg_insert_20_demos_2026-01-16_19-44-07.pkl \
+    --save_model \
+    --replay_buffer_type "fractal_symmetry_replay_buffer" \
+    --branch_method "constant" \
+    --starting_branch_count 27 \
+    --workspace_width 0.3 \
+    --checkpoint_period 500 \
+    --checkpoint_path "$CHECKPOINT_DIR" \

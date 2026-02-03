@@ -28,10 +28,10 @@ class FrankaGripperServer(GripperServer):
     def close(self):
         msg = GraspActionGoal()
         msg.goal.width = 0.01
-        msg.goal.speed = 0.3
-        msg.goal.epsilon.inner = 1
-        msg.goal.epsilon.outer = 1
-        msg.goal.force = 130
+        msg.goal.speed = 0.1
+        msg.goal.epsilon.inner = 0.001
+        msg.goal.epsilon.outer = 1.0
+        msg.goal.force = 70.0
         self.grippergrasppub.publish(msg)
 
     def move(self, position: int):
