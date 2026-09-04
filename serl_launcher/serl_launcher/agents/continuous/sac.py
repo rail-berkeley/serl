@@ -18,6 +18,26 @@ from serl_launcher.networks.lagrange import GeqLagrangeMultiplier
 from serl_launcher.networks.mlp import MLP
 
 
+def _compute_target_q(
+    rewards: jax.Array,
+    masks: jax.Array,
+    discount: float,
+    target_next_min_q: jax.Array,
+    entropy_term: Optional[jax.Array] = None,
+) -> jax.Array:
+    """Build the bootstrapped SAC target, including optional entropy backup.
+
+    The entropy correction is part of the next-state value and therefore must
+    be discounted and masked together with the target Q estimate.  Keeping the
+    arithmetic in one helper also makes the terminal-transition behaviour
+    explicit and easy to test.
+    """
+    target_next_value = (
+        target_next_min_q if entropy_term is None else target_next_min_q - entropy_term
+    )
+    return rewards + discount * masks * target_next_value
+
+
 class SACAgent(flax.struct.PyTreeNode):
     """
     Online actor-critic supporting several different algorithms depending on configuration:
@@ -161,15 +181,19 @@ class SACAgent(flax.struct.PyTreeNode):
         target_next_min_q = target_next_qs.min(axis=0)
         chex.assert_shape(target_next_min_q, (batch_size,))
 
-        target_q = (
-            batch["rewards"]
-            + self.config["discount"] * batch["masks"] * target_next_min_q
-        )
-        chex.assert_shape(target_q, (batch_size,))
-
+        entropy_term = None
         if self.config["backup_entropy"]:
             temperature = self.forward_temperature()
-            target_q = target_q - temperature * next_actions_log_probs
+            entropy_term = temperature * next_actions_log_probs
+
+        target_q = _compute_target_q(
+            batch["rewards"],
+            batch["masks"],
+            self.config["discount"],
+            target_next_min_q,
+            entropy_term,
+        )
+        chex.assert_shape(target_q, (batch_size,))
 
         predicted_qs = self.forward_critic(
             batch["observations"], batch["actions"], rng=rng, grad_params=params
